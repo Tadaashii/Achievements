@@ -6,11 +6,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="style.css">
 <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
 <title>Achievements</title>
 <style>
 html, body {
--webkit-app-region: drag;
 user-select: none;
 overflow-y: auto;
 overflow-x: hidden;
@@ -69,38 +69,334 @@ font-size: 14px;
 .locked { color: red; font-weight: bold; }
 .unlocked { color: green; font-weight: bold; }
 
+.progress-bar { height: 5px; background-color: #44475a; border-radius: 3px; overflow: hidden; margin-top: 4px; width: 50%; }
+.progress-fill { height: 100%; background-color: #50fa7b; border-radius: 3px; transition: width 0.3s ease; }
+.achievement-progress { font-size: 0.85em; color: #888; }
+
 </style>
 </head>
-<body>
-<h1>Achievements</h1>
-<div id="top-bar">
-  <div id="left-controls" style="margin-left: 10px; position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 10px;">
-    <label for="zoom-dropdown" style="margin-left: 30px; margin-top: 25px;"></label>
-    <select id="zoom-dropdown">
-      <option value="0.75">75%</option>
-      <option value="1" selected>100%</option>
-      <option value="1.25">125%</option>
-      <option value="1.5">150%</option>
-      <option value="2">200%</option>
-    </select>
 
+<!-- Image script -->
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+  const embedRoot   = document.getElementById('embeddedGameImage');
+  const imgWrap     = document.getElementById('embeddedImageContainer');
+  const imgEl       = document.getElementById('embeddedGameImageImg');
+  const fallbackBox = document.getElementById('embeddedFallbackPrompt');
+  const fallbackIcon = new URL('./assets/achievements-logo.png', window.location.href).toString();
+
+  if (!embedRoot || !imgWrap || !imgEl) return;
+
+  // --- fallback logo ---
+  function showFallbackLogo() {
+    imgEl.onload = null;
+    imgEl.onerror = null;
+    imgEl.src = fallbackIcon;
+    imgWrap.style.display = 'flex';
+    if (fallbackBox) fallbackBox.style.display = 'none';
+  }
+  window.__showFallbackLogo = showFallbackLogo;
+  showFallbackLogo();
+
+  // --- UI helpers ---
+  function setVisible(hasImage) {
+    if (hasImage) {
+      if (fallbackBox) fallbackBox.style.display = 'none';
+      imgWrap.style.display = 'flex';
+    } else {
+      imgWrap.style.display = 'flex';
+      if (fallbackBox) fallbackBox.style.display = 'none';
+    }
+  }
+
+  function fileUrl(p) {
+    return `file:///${encodeURI(String(p).replace(/\\/g,'/'))}`;
+  }
+
+  function setImg(src) {
+    return new Promise((resolve, reject) => {
+      imgEl.onload  = () => resolve();
+      imgEl.onerror = () => reject(new Error('image load failed'));
+      const isFile = src.startsWith('file://');
+      const finalSrc = isFile ? src : `${src}${src.includes('?') ? '&' : '?'}v=${Date.now()}`;
+      imgEl.src = finalSrc;
+    });
+  }
+
+  async function setImgFromLocal(localPath) {
+    const url = fileUrl(localPath);
+    await setImg(url);
+  }
+
+  // --- CDN download (jpg -> png) ---
+  async function downloadAndSave(targetAppId, url) {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const blob = await res.blob();
+    const buf  = new Uint8Array(await blob.arrayBuffer());
+    await window.api.saveGameImage(String(targetAppId), buf);
+  }
+
+  async function downloadFromCdnAndCache(appid) {
+    const JPG = `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appid}/library_600x900.jpg`;
+    const PNG = `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appid}/portrait.png`;
+    try { await downloadAndSave(appid, JPG); return true; }
+    catch {}
+    try { await downloadAndSave(appid, PNG); return true; }
+    catch {}
+    return false;
+  }
+
+  // --- loader: local -> (fallback) -> CDN -> local ---
+  async function loadLocalCover(appid) {
+    if (!appid) { showFallbackLogo(); return; }
+
+    try {
+      const localPath = await window.api.checkLocalGameImage(String(appid));
+
+      if (localPath) {
+        try {
+          await setImgFromLocal(localPath);
+          setVisible(true);
+          return;
+        } catch {         
+          showFallbackLogo();
+          return;
+        }
+      }      
+      showFallbackLogo();
+
+      const ok = await downloadFromCdnAndCache(String(appid));
+      if (!ok) return;
+
+      const newLocal = await window.api.checkLocalGameImage(String(appid));
+      if (newLocal) {
+        try { await setImgFromLocal(newLocal); setVisible(true); }
+        catch { showFallbackLogo(); }
+      } else {
+        showFallbackLogo();
+      }
+    } catch {
+      showFallbackLogo();
+    }
+  }
+  window.__applyEmbeddedGameImageForAppId = async function (appid) {
+    if (!appid) { showFallbackLogo(); return; }
+    try { await loadLocalCover(String(appid)); }
+    catch { showFallbackLogo(); }
+  };
+
+  // ✎ prompt
+  window.showAltAppIdPrompt = function () {
+    if (fallbackBox) fallbackBox.style.display = 'flex';
+    imgWrap.style.display = 'none';
+    const input = document.getElementById('altAppId');
+    if (input) { input.focus(); input.select(); }
+  };
+
+  window.cancelFallback = function () {
+    if (fallbackBox) fallbackBox.style.display = 'none';
+    imgWrap.style.display = 'flex';
+  };
+
+  // alt AppID
+  window.downloadFromAlternativeAppId = async function () {
+    const input = document.getElementById('altAppId');
+    const alt = (input?.value || '').trim();
+    if (!/^\d+$/.test(alt)) { alert('Please enter a valid AppID'); return; }
+
+    const selectedConfig = document.getElementById('configList')?.value;
+    const currentConfig = selectedConfig ? await window.api.getConfigByName(selectedConfig) : null;
+    const currentAppId = currentConfig?.appid || alt;
+
+    let ok = false;
+    try {
+      await downloadAndSave(String(currentAppId),
+        `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${alt}/library_600x900.jpg`);
+      ok = true;
+    } catch {
+      try {
+        await downloadAndSave(String(currentAppId),
+          `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${alt}/portrait.png`);
+        ok = true;
+      } catch {}
+    }
+
+    if (ok) {
+      const newLocal = await window.api.checkLocalGameImage(String(currentAppId));
+      if (newLocal) {
+        try { await setImgFromLocal(newLocal); } catch {}
+        if (fallbackBox) fallbackBox.style.display = 'none';
+        imgWrap.style.display = 'flex';
+      }
+    }
+  };
+
+  // update main
+  if (!window.__imageListenerAttached) {
+    window.api?.on?.('update-image', async (payload) => {
+      const appid = (typeof payload === 'object' && payload?.appid)
+        ? String(payload.appid)
+        : (/^\d+$/.test(String(payload)) ? String(payload) : null);
+      if (appid) await loadLocalCover(appid);
+      else showFallbackLogo();
+    });
+    window.__imageListenerAttached = true;
+  }
+});
+</script>
+
+
+
+
+
+<body>
+<!-- Modern Titlebar -->
+<div class="titlebar">
+  <div class="titlebar-logo">
+    <img id="appIcon" alt="App Icon">
+    <span class="titlebar-title">Achievements</span>
+  </div>
+  <div class="titlebar-controls">
+    <button id="settingsBtn" class="titlebar-button">
+      <i class="fas fa-cog"></i>
+    </button>
+    <button id="minimizeBtn" class="titlebar-button">
+      <i class="fas fa-minus"></i>
+    </button>
+    <button id="maximizeBtn" class="titlebar-button">
+      <i class="far fa-square"></i>
+    </button>
+    <button id="closeBtn" class="titlebar-button close">
+      <i class="fas fa-times"></i>
+    </button>
   </div>
 </div>
 
-<thead class="drag">
-<div id="window-controls">
-<button id="minimizeBtn">—</button>
-<button id="maximizeBtn">▢</button>
-<button id="closeBtn">✕</button>
+<!-- Settings Menu Panel -->
+<div id="settingsMenu" class="settings-menu hidden">
+  <div class="settings-content" tabindex="-1">
+    <button class="settings-close-button" id="closeSettingsBtn">&times;</button>
+    
+    <div class="settings-tabs">
+      <h3 style="margin: 0 0 15px 10px; color: var(--dracula-purple);">Settings</h3>
+      <button class="settings-tab active" data-tab="general">General</button>
+      <button class="settings-tab" data-tab="notification">Notification</button>
+    </div>
+    
+    <div class="settings-tabs-content">
+      <div id="generalTab" class="tab-content active">
+        <div style="padding: 0 5px;">
+          <div class="settings-section">
+            <h4>App Scale</h4>
+            <div class="settings-control">			
+              <label for="app-zoom-dropdown">Zoom Level:</label>
+              <select id="app-zoom-dropdown">
+                <option value="0.75">75%</option>
+                <option value="1" selected>100%</option>
+                <option value="1.25">125%</option>
+                <option value="1.5">150%</option>
+                <option value="2">200%</option>
+              </select>
+            </div>
+          </div>
+          <div class="settings-section" style=" margin-bottom: 5px;">
+            <h4>Overlay Shortcut</h4>
+            <div class="settings-control">
+              <label for="overlay-shortcut-btn">Shortcut Key:</label>
+              <button id="overlay-shortcut-btn" type="button">Set Shortcut</button>
+            </div>
+          </div>
+			<div class="settings-section">
+			  <h4>Startup</h4>
+			  <div class="checkbox-control">
+				<input type="checkbox" id="settings-startInTrayCheckbox" />
+				<label for="settings-startInTrayCheckbox">Start in tray</label>
+			  </div>
+			</div>		
+			<div class="settings-section" style="margin-bottom: 5px;">
+			  <h4>Achievements Screenshots</h4>
+			  <div class="settings-control">
+				<div class="input-with-button">
+				<label for="settings-screenshotFolder">Save to folder:</label>	
+				  <input type="text" id="settings-screenshotFolder" placeholder="Choose a folder" readonly />
+				  <button type="button" id="settings-selectScreenshotFolder" aria-label="Choose folder">📂</button>
+				</div>				
+			  </div>
+			  <div class="checkbox-control" style="margin-top: -10px;">
+				<input type="checkbox" id="settings-disableScreenshotCheckbox" />
+				<label for="settings-disableScreenshotCheckbox">Disable Screenshot</label>
+			  </div>
+			</div>			
+        </div>
+      </div>
+      
+      <div id="notificationTab" class="tab-content">
+        <div style="padding: 0 5px;">
+          <div class="settings-section">
+            <h4>Achievement Testing</h4>
+            <button id="settings-testAchievementBtn" class="settings-test-button" style="width: 100%; margin: 10px 0; padding: 10px;">Test Achievement</button>
+            
+            <div class="checkbox-control">
+              <input type="checkbox" id="settings-disableProgressCheckbox" />
+              <label for="settings-disableProgressCheckbox">Disable Progress Report</label>
+            </div>
+
+            <div class="checkbox-control">
+              <input type="checkbox" id="settings-disablePlaytimeCheckbox" />
+              <label for="settings-disablePlaytimeCheckbox">Disable Playtime</label>
+            </div>
+			
+            <div class="settings-slider">
+              <label for="settings-scaleSlider">Achievement Scale: <span id="settings-scaleValue">1.0</span></label>
+              <div class="slider-control">
+                <input type="range" id="settings-scaleSlider"
+                  min="0.01" max="2.0" step="0.01" value="1.0" />
+                <span class="value" id="settings-scaleValueDisplay">100%</span>
+              </div>
+            </div>
+            
+            <div class="settings-control">
+              <label for="settings-positionDropdown">Achievement Position:</label>
+              <select id="settings-positionDropdown">
+                <option value="center-bottom">Center Bottom</option>
+                <option value="center-top">Center Top</option>
+                <option value="top-right">Top Right</option>
+                <option value="bottom-right">Bottom Right</option>
+                <option value="top-left">Top Left</option>
+                <option value="bottom-left">Bottom Left</option>
+              </select>
+            </div>
+            
+            <div class="settings-control">
+              <label for="settings-presetDropdown">Achievement Presets:</label>
+              <select id="settings-presetDropdown"></select>
+            </div>
+            
+            <div class="settings-control">
+              <label for="settings-soundSelect">Achievement Sound:</label>
+              <select id="settings-soundSelect"></select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="top-bar">
+  <div id="left-controls" style="margin-left: 10px; position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 10px;">
+    <!-- Remove the zoom dropdown from here since it's now in the settings menu -->
+  </div>
 </div>
 
 <div class="container">
   <div id="left-controls" style="position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 10px;">
-    <button id="shortcutInput" type="button">Overlay Shortcut</button>
+    <!-- Shortcut input button removed -->
   </div>
 <!-- Toggle Settings Button -->
 <div style="margin-bottom: 10px; position: relative; display: flex; align-items: center; gap: 10px;">
-<button id="toggleBtn">Show Settings</button>
+<button id="toggleBtn">Show Options</button>
 
 <!-- Progres bar -->
 <div id="achStats" style="
@@ -127,18 +423,11 @@ font-weight: bold;
 </div>
 </div>
 
-<button id="playBtn" style="margin-left: auto;">▶ Play</button>
-</div>
-
-
-
-<div id="gameImageContainer" style="margin-bottom: 20px; display: none;">
-<img id="gameImage" src="" alt="Game Cover"
-style="width: 120px; border-radius: 10px; box-shadow: 0 0 8px rgba(0,0,0,0.3);">
+<button id="playBtn" style="margin-left: auto;"><i class="fas fa-play"></i> Play</button>
 </div>
 
 <!-- Toggleable Settings Container -->
-<div id="buttonContainer" class="hidden config-container" style="display: flex; justify-content: space-between; gap: 15px;">
+<div id="buttonContainer" class="hidden config-container" style="display: none; justify-content: space-between; gap: 15px;">
 
 <!-- Left Side: Create Config and Select Config -->
 <div class="left-config" style="flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 5px;">
@@ -211,73 +500,62 @@ Save Config
 
 </div>
 
-<div class="config-controls" style="flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 5px;">
-<label for="configList">Select Config:</label>
-<select id="configList" style="width: 100%; margin-top: -15px;">
-<option value="" disabled selected>Select</option>
-</select>
-<div>
-<button id="deleteConfigBtn" style="display: none; width: 100%; margin-top: 5px;">Delete</button>
-<div style="display: flex; width: 100%; margin-top: 15px; gap: 10px;  margin-bottom: 5px;">
-<button id="backButton" class="hidden">Back</button>
-<button id="editConfigBtn" style="display: none;">Edit Config</button>
-</div>
+<div class="config-controls clean">
+  <label for="configList" class="field-label">Select Config:</label>
+  <select id="configList" class="field-input">
+    <option value="" disabled selected>Select</option>
+  </select>
 
-</div>
-<div class="language-controls" style="width: 100%; margin-top: -22px;">
-<label for="langList"style="width: 100%; margin-top: 11px;">Select Language:</label>
-<select id="languageSelect" >
-<option value="english">English</option>
-<option value="german">Deutsch</option>
-<option value="french">Français</option>
-<option value="italian">Italiano</option>
-<option value="koreana">한국어 (Korean)</option>
-<option value="spanish">Español</option>
-<option value="schinese">简体中文 (Chinese - Simplified)</option>
-<option value="tchinese">繁體中文 (Chinese - Traditional)</option>
-<option value="russian">Русский</option>
-<option value="japanese">日本語</option>
-<option value="polish">Polski</option>
-<option value="brazilian">Português (Brasil)</option>
-<option value="LATAM">Español (Latinoamérica)</option>
-</select>
-</div>
-<button id="toggleImageBtn"style="width: 100%; margin-top: 45px;">⇦ Show Game Image</button>			
+  <button id="deleteConfigBtn" style="display:none; margin-top: 25px;">Delete</button>
+
+  <div class="button-row">
+	<button id="editConfigBtn" style="display:none;">Edit Config</button>
+    <button id="backButton" class="hidden">Back</button>    
+  </div>
+
+  <div class="language-controls">
+    <label for="languageSelect" class="field-label">Select Language:</label>
+    <select id="languageSelect" class="field-input">
+      <option value="english">English</option>
+      <option value="german">Deutsch</option>
+      <option value="french">Français</option>
+      <option value="italian">Italiano</option>
+      <option value="koreana">한국어 (Korean)</option>
+      <option value="spanish">Español</option>
+      <option value="schinese">简体中文 (Chinese - Simplified)</option>
+      <option value="tchinese">繁體中文 (Chinese - Traditional)</option>
+      <option value="russian">Русский</option>
+      <option value="japanese">日本語</option>
+      <option value="polish">Polski</option>
+      <option value="brazilian">Português (Brasil)</option>
+      <option value="LATAM">Español (Latinoamérica)</option>
+    </select>
+  </div>
 </div>
 
 </div>
 
 <!-- Right Side: Test Achievement + Dropdowns -->
-<div class="settings-container" style="flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 5px;">
-<div style="display: flex; align-items: center; gap: 50px;">
-<button id="testAchievementBtn">Test Achievement</button>
-<label style="display: flex; align-items: center; gap: 15px;">Disable Progress Report
-<input type="checkbox" id="disableProgressCheckbox" />
-</label>
-</div>
+<!--div class="settings-container" style="flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 5px;">
+  <!-- Content removed as it's now in the settings modal -->
+<!--/div-->
+<!-- Right Side: Game Image (embedded) -->
+<div class="settings-container" style="flex:1; min-width:300px; display:flex; flex-direction:column; gap:5px;">
+  <div id="embeddedGameImage" class="game-image-embed">
+    <div id="embeddedImageContainer">
+      <img id="embeddedGameImageImg" src="" alt="Game Cover">
+      <button id="edit-btn" type="button" onclick="showAltAppIdPrompt()">✎</button>
+    </div>
 
-<div class="slider">
-<label for="scaleSlider">Achievement Scale: <span id="scaleValue">1.0</span></label>
-<input type="range" id="scaleSlider"
-min="0.01" max="1.0" step="0.01" value="1.0"
-style="width: 100%; appearance: none; -webkit-appearance: none; height: 6px; border-radius: 3px; background: #ccc; outline: none; padding: 0; margin: 0;" />
-</div>
-<div class="dropdown-group" style="display: flex; flex-direction: column; gap: 6px; margin-top:10px">
-<label for="positionDropdown">Achievement Position:</label>
-<select id="positionDropdown">
-<option value="center-bottom">Center Bottom</option>
-<option value="center-top">Center Top</option>
-<option value="top-right">Top Right</option>
-<option value="bottom-right">Bottom Right</option>
-<option value="top-left">Top Left</option>
-<option value="bottom-left">Bottom Left</option>
-</select>
-
-<label for="presetDropdown">Achievement Presets:</label>
-<select id="presetDropdown"></select>					
-<label for="soundSelect">Achievement Sound:</label>
-<select id="soundSelect"></select>
-</div>
+    <div id="embeddedFallbackPrompt" style="display:none; flex-direction:column; align-items:center; padding:20px; color:white;">
+      <p>⚠️ Does the game have a different Steam AppID on Steam?</p>
+      <input type="text" id="altAppId" placeholder="Enter alternative AppID" style="padding:5px; font-size:16px; width:200px;">
+      <div style="margin-top: 10px;">
+        <button type="button" onclick="downloadFromAlternativeAppId()">✅ Try Alternative</button>
+        <button type="button" onclick="cancelFallback()" style="margin-left:5px;">✖ Cancel</button>
+      </div>
+    </div>
+  </div>
 </div>
 </div>
 </div>
@@ -290,136 +568,120 @@ style="width: 100%; appearance: none; -webkit-appearance: none; height: 6px; bor
 <div style="height: 50px;"></div>
 </div>
 
+<!-- Hidden elements to maintain compatibility with existing code -->
+<div style="display: none;">
+  <button id="testAchievementBtn">Test Achievement</button>
+  <input type="checkbox" id="disableProgressCheckbox" />
+  <input type="range" id="scaleSlider" min="0.01" max="2.0" step="0.01" value="1.0" />
+  <span id="scaleValue">1.0</span>
+  <select id="positionDropdown">
+    <option value="center-bottom">Center Bottom</option>
+    <option value="center-top">Center Top</option>
+    <option value="top-right">Top Right</option>
+    <option value="bottom-right">Bottom Right</option>
+    <option value="top-left">Top Left</option>
+    <option value="bottom-left">Bottom Left</option>
+  </select>
+  <select id="presetDropdown"></select>
+  <select id="soundSelect"></select>
+</div>
+
 <script>
-document.getElementById('zoom-dropdown').addEventListener('change', (e) => {
-  const zoomValue = parseFloat(e.target.value);
-  window.electronAPI.setZoomFactor(zoomValue);
-});
 
+  window.addEventListener('DOMContentLoaded', () => {
+    const iconParam = new URLSearchParams(location.search).get('icon');
+    if (!iconParam) return;
+    const url = decodeURIComponent(iconParam);
+    const el = document.getElementById('appIcon');
+    if (el) el.src = url;
+  });
 
-const shortcutInput = document.getElementById('shortcutInput');
-let isListeningForShortcut = false;
-let pressedKeys = new Set();
-let shortcutTimeout;
-let currentKeyHandler = null;
+async function buildMainAchievementsTable(selectedConfig, lang = 'english') {
+  if (!selectedConfig) return;
 
-shortcutInput.addEventListener('mousedown', (e) => {
-  e.preventDefault(); 
-  shortcutInput.blur(); 
-});
+  const achievementsDataObj = await window.api.loadAchievementData(selectedConfig);
+  const savedAchievementsObj = await window.api.loadSavedAchievements(selectedConfig);
 
-shortcutInput.addEventListener('click', () => {
-  if (shortcutInput.textContent === 'Press keys...') {
-    cleanupShortcutRecording();
-    restoreSavedShortcutLabel();
-    return;
+  const tableBody = document.getElementById('achievementsTableBody');
+  if (!tableBody) return;
+  tableBody.innerHTML = '';
+
+  if (achievementsDataObj?.error || !Array.isArray(achievementsDataObj?.achievements)) return;
+
+  // Sort after name
+  const seen = new Set();
+  const unique = [];
+  for (const a of achievementsDataObj.achievements) {
+    if (!a?.name || seen.has(a.name)) continue;
+    seen.add(a.name);
+    unique.push(a);
   }
 
-  shortcutInput.textContent = 'Press keys...';
-  isListeningForShortcut = true;
-  pressedKeys.clear();
+  // unlocked first
+  const isUnlocked = (name) => !!(savedAchievementsObj?.achievements?.[name]?.earned);
+  unique.sort((a, b) => (isUnlocked(b.name) ? 1 : 0) - (isUnlocked(a.name) ? 1 : 0));
 
-  const handleKeyDown = (e) => {
-    if (!isListeningForShortcut) return;
-
-    e.preventDefault();
-    pressedKeys.add(e.key);
-
-    clearTimeout(shortcutTimeout);
-    shortcutTimeout = setTimeout(() => {
-      if (!isListeningForShortcut) return;
-
-      const keys = [];
-
-      if (pressedKeys.has('Control')) keys.push('Control');
-      if (pressedKeys.has('Shift')) keys.push('Shift');
-      if (pressedKeys.has('Alt')) keys.push('Alt');
-
-      const mainKeys = [...pressedKeys].filter(k => !['Control', 'Shift', 'Alt', 'Meta'].includes(k));
-      if (mainKeys.length > 0) {
-        const mainKey = mainKeys[0];
-        keys.push(mainKey.length === 1 ? mainKey.toUpperCase() : mainKey);
-      }
-
-      if (keys.length < 2) {
-        shortcutInput.textContent = 'Invalid combo';
-		setTimeout(() => restoreSavedShortcutLabel(), 1200);
-      } else {
-        const combo = keys.join('+');
-        shortcutInput.textContent = combo;
-        window.api.savePreferences({ overlayShortcut: combo });
-        window.api.updateOverlayShortcut?.(combo); // safe optional chaining
-      }
-
-      cleanupShortcutRecording();
-    }, 400);
-  };
-
-  currentKeyHandler = handleKeyDown;
-  document.addEventListener('keydown', handleKeyDown);
-});
-
-function cleanupShortcutRecording() {
-  isListeningForShortcut = false;
-  pressedKeys.clear();
-  clearTimeout(shortcutTimeout);
-
-  if (currentKeyHandler) {
-    document.removeEventListener('keydown', currentKeyHandler);
-    currentKeyHandler = null;
+  function tsToLocal(ts) {
+    if (!ts) return "N/A";
+    const d = new Date((String(ts).length === 10 ? ts * 1000 : Number(ts)));
+    return isNaN(d) ? "N/A" : d.toLocaleString();
   }
-}
 
-async function restoreSavedShortcutLabel() {
-  const prefs = await window.api.loadPreferences();
-  shortcutInput.textContent = prefs?.overlayShortcut || 'Overlay Shortcut';
-}
+  for (const achievement of unique) {
+    const displayName = getSafeLocalizedText(achievement.displayName, lang);
+    const description = getSafeLocalizedText(achievement.description, lang);
+    const iconGray = achievement.icon_gray || achievement.icongray;
+    const icon = achievement.icon || iconGray;
 
+    const saved = savedAchievementsObj?.achievements?.[achievement.name];
+    const imgRel = saved?.earned ? icon : iconGray;
+    const imagePath = `file:///${(`${achievementsDataObj.config_path}\\${imgRel}`).replace(/\\/g, '/')}`;
 
-document.addEventListener('mousedown', (event) => {
-  if (isListeningForShortcut && event.target !== shortcutInput) {
-    cleanupShortcutRecording();
-    shortcutInput.textContent = 'Overlay Shortcut';
+    const statusHTML = saved?.earned
+      ? `<span class="unlocked">Unlocked</span>`
+      : `<span class="locked">Locked</span>`;
+
+    const earnedTimeText = saved?.earned_time ? `<br>${tsToLocal(saved.earned_time)}` : '';
+
+    let progressText = '';
+    if (typeof saved?.progress === 'number' && typeof saved?.max_progress === 'number') {
+      const pct = Math.min(100, Math.round((saved.progress / saved.max_progress) * 100));
+      progressText = `
+        <div class="achievement-progress">
+          Progress: ${saved.progress} / ${saved.max_progress}
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:${pct}%"></div>
+          </div>
+        </div>`;
+    }
+
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td class="image">
+        <img src="${imagePath}" alt="Icon"
+             onerror="this.onerror=null; this.src='https://cdn-icons-png.flaticon.com/512/11455/11455431.png';" />
+      </td>
+      <td class="displayName">
+        <strong>${displayName}</strong><br>
+        <span class="description"><em>${description}</em>${progressText}</span>
+      </td>
+      <td class="status">${statusHTML} ${earnedTimeText}</td>
+    `;
+    tableBody.appendChild(row);
   }
-});
 
-
-
-
-
-document.getElementById('toggleImageBtn').addEventListener('click', async () => {
-const selectedConfigName = document.getElementById('configList').value;
-const toggleBtn = document.getElementById('toggleImageBtn');
-
-if (!selectedConfigName) {
-alert('Please select a config first!');
-return;
+  // Main Progress Bar
+  updateAchievementStats(unique.map(a => ({ ...a, earned: isUnlocked(a.name) })));
+  const achStats = document.getElementById('achStats');
+  if (achStats) achStats.style.display = 'block';
 }
 
-const config = await window.api.getConfigByName(selectedConfigName);
-const appid = config?.appid;
-
-if (!appid) {
-alert('This config has no AppID set!');
-return;
-}
-
-const currentText = toggleBtn.textContent.trim();
-
-if (currentText.includes('Show')) {
-await window.api.openGameImageWindow(appid, 'user');
-toggleBtn.textContent = '⇨ Hide Game Image';
-} else {
-await window.api.closeImageWindow();
-toggleBtn.textContent = '⇦ Show Game Image';
-}
+window.api.on('refresh-achievements-table', async (configName) => {
+  const cfg  = configName || document.getElementById('configList').value;
+  if (!cfg) return;
+  const lang = document.getElementById('languageSelect').value || 'english';
+  await buildMainAchievementsTable(cfg, lang);
 });
-
-window.api.onImageWindowStatus?.((status) => {
-const toggleBtn = document.getElementById('toggleImageBtn');
-toggleBtn.textContent = status.isVisible ? '⇨ Hide Game Image' : '⇦ Show Game Image';
-});
-
 
 const notificationQueue = [];
 let isNotificationActive = false;
@@ -442,7 +704,6 @@ const isChecked = e.target.checked;
 window.api.disableProgress(isChecked);
 await window.api.savePreferences({ disableProgress: isChecked });
 });
-
 
 isNotificationActive = true;
 const { message, backgroundColor } = notificationQueue.shift();
@@ -523,7 +784,6 @@ updateScaleLabel();
 
 
 window.addEventListener('DOMContentLoaded', () => {
-
 const minimizeBtn = document.getElementById('minimizeBtn');
 const maximizeBtn = document.getElementById('maximizeBtn');
 const closeBtn = document.getElementById('closeBtn');
@@ -532,34 +792,6 @@ document.getElementById('closeConfigModal').addEventListener('click', () => {
 document.getElementById('configModal').classList.add('hidden');
 resetConfigForm();
 });
-
-if (minimizeBtn) {
-minimizeBtn.addEventListener('click', () => {
-document.dispatchEvent(new CustomEvent('custom-minimize'));
-});
-}
-
-if (maximizeBtn) {
-maximizeBtn.addEventListener('click', () => {
-document.dispatchEvent(new CustomEvent('custom-maximize'));
-});
-}
-
-if (closeBtn) {
-closeBtn.addEventListener('click', () => {
-document.dispatchEvent(new CustomEvent('custom-close'));
-});
-}
-});
-
-document.addEventListener('custom-minimize', () => {
-window.customApi.minimizeWindow();
-});
-document.addEventListener('custom-maximize', () => {
-window.customApi.maximizeWindow();
-});
-document.addEventListener('custom-close', () => {
-window.customApi.closeWindow();
 });
 
 let editingConfigName = null;
@@ -706,15 +938,17 @@ document.getElementById("toggleBtn").addEventListener("click", function () {
 let container = document.getElementById("buttonContainer");
 if (container.classList.contains("hidden")) {
 container.classList.remove("hidden");
-this.textContent = "Hide Settings";
+  container.style.display = "flex";
+this.textContent = "Hide Options";
 } else {
 container.classList.add("hidden");
-this.textContent = "Show Settings";
+  container.style.display = "none";
+this.textContent = "Show Options";
 }
 });
 
 document.getElementById('selectExecutable').addEventListener('click', async () => {
-const selectedExe = await window.api.selectExecutable(); // adaugi această funcție în preload și main
+const selectedExe = await window.api.selectExecutable();
 if (selectedExe) {
 document.getElementById('executablePath').value = selectedExe;
 }
@@ -739,6 +973,9 @@ await window.api.savePreferences({ language: selectedLang });
 const configName = document.getElementById('configList').value;
 window.api.refreshUILanguage({ language: selectedLang, configName });
 
+  if (configName) {
+    await buildMainAchievementsTable(configName, selectedLang);
+  }
 
 localStorage.setItem('preferredLanguage', selectedLang);
 });
@@ -788,7 +1025,6 @@ Object.values(input).find(v => typeof v === 'string' && v.trim() !== '') ||
 return 'Hidden';
 }
 
-
 window.addEventListener('DOMContentLoaded', async () => {
 const configs = await window.api.loadConfigs();
 const configList = document.getElementById('configList');
@@ -824,11 +1060,10 @@ const currentConfig = await window.api.getConfigByName(selectedConfig);
 if (currentConfig && currentConfig.appid) {
 }
 if (currentConfig?.appid) {
-const result = await window.api.openGameImageWindow(currentConfig.appid, 'user');
-const toggleBtn = document.getElementById('toggleImageBtn');
-toggleBtn.textContent = result.isVisible ? '⇨ Hide Game Image' : '⇦ Show Game Image';
+  await window.__applyEmbeddedGameImageForAppId(currentConfig.appid);
+} else {
+  window.__showFallbackLogo?.();
 }
-
 const playBtn = document.getElementById('playBtn');
 playBtn.style.display = currentConfig?.executable ? 'inline-block' : 'none';
 
@@ -851,49 +1086,8 @@ return;
 }
 
 const lang = document.getElementById('languageSelect').value;
+await buildMainAchievementsTable(selectedConfig, lang);
 
-for (const achievement of achievementsDataObj.achievements) {
-const displayName = getSafeLocalizedText(achievement.displayName, lang);
-const description = getSafeLocalizedText(achievement.description, lang);
-const iconGray = achievement.icon_gray || achievement.icongray;
-const icon = achievement.icon || iconGray;
-
-let imagePath = `${achievementsDataObj.config_path}\\${iconGray}`;
-let status = `<span style="color: red; font-weight: bold;">Locked</span>`;
-let earnedTimeText = "";
-let progressText = "";
-
-if (
-savedAchievementsObj &&
-savedAchievementsObj.achievements &&
-savedAchievementsObj.achievements[achievement.name] &&
-savedAchievementsObj.achievements[achievement.name].earned
-) {
-imagePath = `${achievementsDataObj.config_path}\\${icon}`;
-status = `<span style="color: green; font-weight: bold;">Unlocked</span>`;
-earnedTimeText = `<br>${formatTimestamp(savedAchievementsObj.achievements[achievement.name].earned_time)}`;
-}
-
-if (savedAchievementsObj?.achievements?.[achievement.name]) {
-const saved = savedAchievementsObj.achievements[achievement.name];
-if (typeof saved.progress === 'number' && typeof saved.max_progress === 'number') {
-progressText = `<br><span style="font-size: 0.85em; color: #888;">Progress: ${saved.progress} / ${saved.max_progress}</span>`;
-}
-}
-
-const row = document.createElement('tr');
-row.innerHTML = `
-<td class="image">
-<img src="file:///${imagePath.replace(/\\/g, "/")}" alt="Icon"
-onerror="this.onerror=null; this.src='https://cdn-icons-png.flaticon.com/512/11455/11455431.png';" />
-</td>
-<td class="displayName"><strong>${displayName}</strong><br>
-<span class="description"><em>${description}</em>${progressText}</span>
-</td>
-<td class="status">${status} ${earnedTimeText}</td>
-`;
-tableBody.appendChild(row);
-}
 
 updateAchievementStats(achievementsDataObj.achievements.map(a => {
 const saved = savedAchievementsObj?.achievements?.[a.name];
@@ -909,15 +1103,57 @@ document.getElementById('achStats').style.display = 'block';
 
 window.addEventListener('DOMContentLoaded', async () => {
 try {
-const presets = await window.api.loadPresets();
+const presetsData = await window.api.loadPresets();
 const presetDropdown = document.getElementById('presetDropdown');
 presetDropdown.innerHTML = '';
-presets.forEach(preset => {
-const option = document.createElement('option');
-option.value = preset;
-option.textContent = preset;
-presetDropdown.appendChild(option);
-});
+
+// Create category for presets that support scaling above 100%
+const highScalingGroup = document.createElement('optgroup');
+highScalingGroup.label = "⭐ Supports 200% Scaling";
+
+// Create category for regular presets
+const regularGroup = document.createElement('optgroup');
+regularGroup.label = "Standard Presets (100% Max)";
+
+// Check if we have the new structured format or old format
+if (presetsData.isStructured) {
+  // Handle new structured format with separate folders
+  
+  // Add scalable presets
+  presetsData.scalable.forEach(preset => {
+    const option = document.createElement('option');
+    option.value = preset;
+    option.textContent = preset;
+    highScalingGroup.appendChild(option);
+  });
+  
+  // Add non-scalable presets
+  presetsData.nonScalable.forEach(preset => {
+    const option = document.createElement('option');
+    option.value = preset;
+    option.textContent = preset;
+    regularGroup.appendChild(option);
+  });
+} else {
+  // Handle old format for backwards compatibility
+  presetsData.forEach(preset => {
+    const option = document.createElement('option');
+    option.value = preset;
+    option.textContent = preset;
+    
+    // Add presets to their appropriate groups using the old logic
+    if (preset === 'Modern' || preset === 'xqjan' || preset === 'Neon Future') {
+      highScalingGroup.appendChild(option);
+    } else {
+      regularGroup.appendChild(option);
+    }
+  });
+}
+
+// Add groups to dropdown with enhanced scaling options first
+presetDropdown.appendChild(highScalingGroup);
+presetDropdown.appendChild(regularGroup);
+
 } catch (error) {
 console.error('Error loading presets:', error);
 }
@@ -937,43 +1173,17 @@ position = positionDropdown.value;
 });
 
 testButton.addEventListener('click', async function() {
-const selectedConfig = configList.value;
-if (!selectedConfig) {
-alert("Select a config!");
-return;
-}
-
-const achievementsData = await window.api.loadAchievementData(selectedConfig);
-if (achievementsData.error) {
-alert(achievementsData.error);
-return;
-}
-
-const achievement = achievementsData.achievements[0];
-if (!achievement) {
-alert("No achievements on this config.");
-return;
-}
-
-const preset = presetDropdown.value || 'default';
-const position = positionDropdown.value;
-const lang = document.getElementById('languageSelect').value;
-const sound = document.getElementById('soundSelect').value;
-const displayName = getSafeLocalizedText(achievement.displayName, lang);
-const description = getSafeLocalizedText(achievement.description, lang);
-const notificationObj = {
-displayName,
-description,
-icon: achievement.icon,
-icon_gray: achievement.icon_gray || achievement.icongray,
-config_path: achievementsData.config_path,
-preset: preset,
-position: position,
-sound: sound
-};
-
-
-window.api.showNotification(notificationObj);
+  const preset = presetDropdown.value || 'default';
+  const position = positionDropdown.value;
+  const sound = document.getElementById('soundSelect').value;
+  const scale = parseFloat(document.getElementById('scaleSlider').value);
+  
+  window.api.showTestNotification({
+    preset,
+    position,
+    sound,
+    scale
+  });
 });
 
 });
@@ -1008,7 +1218,28 @@ try {
 const response = await window.api.deleteConfig(selectedConfig);
 if (response.success) {
 await loadConfigs();
-deleteConfigBtn.style.display = 'none';
+const configList = document.getElementById('configList');
+configList.value = '';
+document.getElementById('backButton').style.display = 'none';
+
+const selectOption = configList.querySelector('option[value=""]');
+if (selectOption) {
+selectOption.selected = true;
+selectOption.disabled = true;
+}
+
+document.getElementById('deleteConfigBtn').style.display = 'none';
+document.getElementById('editConfigBtn').style.display = 'none';
+document.getElementById('playBtn').style.display = 'none';
+resetConfigForm();
+
+const tableBody = document.getElementById('achievementsTableBody');
+if (tableBody) tableBody.innerHTML = '';
+
+window.api.updateConfig({ configName: null, preset: null, position: null });
+window.api.toggleOverlay(null);
+window.api.onLoadOverlayData(null);
+window.__showFallbackLogo?.();
 } else {
 console.error('Error on delete:', response.error);
 }
@@ -1028,8 +1259,7 @@ configList.value = '';
 backButton.classList.add('hidden');
 deleteConfigBtn.style.display = 'none';
 document.getElementById('achStats').style.display = 'none';
-window.api.closeImageWindow();
-document.getElementById('toggleImageBtn').textContent = '⇦ Show Game Image';
+window.__showFallbackLogo?.();
 });
 
 document.getElementById('backButton').addEventListener('click', () => {
@@ -1054,9 +1284,6 @@ if (tableBody) tableBody.innerHTML = '';
 window.api.updateConfig({ configName: null, preset: null, position: null });
 window.api.toggleOverlay(null);
 window.api.onLoadOverlayData(null);
-if (window.api) {
-window.api.closeImageWindow();
-}
 });
 
 window.api.onToggleOverlayShortcut(() => {
@@ -1100,6 +1327,10 @@ soundSelect.value = prefs.sound;
 if (prefs.disableProgress !== undefined) {
   document.getElementById('disableProgressCheckbox').checked = prefs.disableProgress;
 }
+if (prefs.disablePlaytime !== undefined) {
+  const cb = document.getElementById('settings-disablePlaytimeCheckbox');
+  if (cb) cb.checked = !!prefs.disablePlaytime;
+}
 } catch (err) {
 console.error("Sound Load Error:", err);
 }
@@ -1139,82 +1370,6 @@ console.error("❌ Failed to load sound path:", err);
 }
 }
 
-window.api.onRefreshAchievementsTable(async (event, configName) => {
-const selectedLang = document.getElementById('languageSelect').value;
-const lang = selectedLang;
-const selectedConfig = configName || document.getElementById('configList').value;
-
-
-if (!selectedConfig) {
-console.warn('No config selected!');
-return;
-}
-
-const achievementsDataObj = await window.api.loadAchievementData(selectedConfig);
-const savedAchievementsObj = await window.api.loadSavedAchievements(selectedConfig);
-
-const tableBody = document.querySelector('#achievementsTableBody');
-if (tableBody) {
-tableBody.innerHTML = '';
-}
-
-function formatTimestamp(timestamp) {
-if (!timestamp) return "N/A";
-const date = new Date(timestamp * 1000);
-return date.toLocaleString();
-}
-achievementsDataObj.achievements.forEach(achievement => {
-const row = document.createElement('tr');
-const displayName = getSafeLocalizedText(achievement.displayName, lang);
-const description = getSafeLocalizedText(achievement.description, lang);
-
-const iconGray = achievement.icon_gray || achievement.icongray;
-const icon = achievement.icon || iconGray;
-
-let imagePath = `${achievementsDataObj.config_path}\\${iconGray}`;
-let status = `<span style="color: red; font-weight: bold;">Locked</span>`;
-let earnedTimeText = "";
-let progressText = "";
-
-if (
-savedAchievementsObj &&
-savedAchievementsObj.achievements &&
-savedAchievementsObj.achievements[achievement.name] &&
-savedAchievementsObj.achievements[achievement.name].earned
-) {
-imagePath = `${achievementsDataObj.config_path}\\${icon}`;
-status = `<span style="color: green; font-weight: bold;">Unlocked</span>`;
-earnedTimeText = `<br>${formatTimestamp(savedAchievementsObj.achievements[achievement.name].earned_time)}`;
-}
-
-if (savedAchievementsObj?.achievements?.[achievement.name]) {
-const saved = savedAchievementsObj.achievements[achievement.name];
-if (typeof saved.progress === 'number' && typeof saved.max_progress === 'number') {
-progressText = `<br><span style="font-size: 0.85em; color: #888;">Progress: ${saved.progress} / ${saved.max_progress}</span>`;
-}
-}
-
-row.innerHTML = `
-<td class="image">
-<img src="file:///${imagePath.replace(/\\/g, "/")}" alt="Icon"
-onerror="this.onerror=null; this.src='https://cdn-icons-png.flaticon.com/512/11455/11455431.png';" /></td>
-<td class="displayName"><strong>${displayName}</strong><br>
-<span class="description"><em>${description}</em>${progressText}</span></td>
-<td class="status">${status} ${earnedTimeText}</td>
-`;
-tableBody.appendChild(row);
-
-updateAchievementStats(achievementsDataObj.achievements.map(a => {
-const saved = savedAchievementsObj?.achievements?.[a.name];
-return {
-...a,
-earned: saved?.earned || false
-};
-}));
-
-});
-});
-
 
 async function loadPreferences() {
   const prefs = await window.api.loadPreferences();
@@ -1231,15 +1386,20 @@ async function loadPreferences() {
     const cb = document.getElementById('disableProgressCheckbox');
     if (cb) cb.checked = prefs.disableProgress;
   }
+  if (prefs.disablePlaytime !== undefined) {
+  const cb = document.getElementById('settings-disablePlaytimeCheckbox');
+  if (cb) cb.checked = prefs.disablePlaytime;
+  }
+  
 if (prefs.windowZoomFactor) {
-  const zoomDropdown = document.getElementById('zoom-dropdown');
+  const zoomDropdown = document.getElementById('app-zoom-dropdown');
   if (zoomDropdown) {
     zoomDropdown.value = prefs.windowZoomFactor.toString();
-    window.api.setZoom(prefs.windowZoomFactor); // <== Adaugă asta aici!
+    window.api.setZoom(prefs.windowZoomFactor);
   }
 }
 if (prefs.overlayShortcut) {
-  document.getElementById('shortcutInput').value = prefs.overlayShortcut;
+  document.getElementById('overlay-shortcut-btn').textContent = prefs.overlayShortcut;
 }
 }
 
@@ -1261,25 +1421,69 @@ if (prefs.disableProgress !== undefined) {
 const cb = document.getElementById('disableProgressCheckbox');
 if (cb) cb.checked = prefs.disableProgress;
 }
+
+if (prefs.disablePlaytime !== undefined) {
+  const cb1 = document.getElementById('settings-disablePlaytimeCheckbox');
+  if (cb1) cb1.checked = prefs.disablePlaytime;
+}
+
 if (prefs.windowZoomFactor) {
-  const zoomDropdown = document.getElementById('zoom-dropdown');
+  const zoomDropdown = document.getElementById('app-zoom-dropdown');
   if (zoomDropdown) {
     zoomDropdown.value = prefs.windowZoomFactor.toString();
-    window.api.setZoom(prefs.windowZoomFactor); // <== Adaugă asta aici!
+    window.api.setZoom(prefs.windowZoomFactor);
   }
 }
  if (prefs?.overlayShortcut) {
-    shortcutInput.textContent = prefs.overlayShortcut;
+    document.getElementById('overlay-shortcut-btn').textContent = prefs.overlayShortcut;
   } else {
-    shortcutInput.textContent = 'Overlay Shortcut';
+    document.getElementById('overlay-shortcut-btn').textContent = 'Set Shortcut';
   }
+  
+    const ssInput  = document.getElementById('settings-screenshotFolder');
+    const ssButton = document.getElementById('settings-selectScreenshotFolder');
+    if (ssInput) {
+      ssInput.value = prefs?.screenshotFolder || '';
+    }
+    if (ssButton) {
+      ssButton.addEventListener('click', async () => {
+        const dir = await window.api.selectFolder();
+        if (dir) {
+          ssInput.value = dir;
+          await window.api.savePreferences({ screenshotFolder: dir });
+          console.log('📁 Screenshot folder set to:', dir);
+        }
+      });
+	  }
+
+const dsCb = document.getElementById('settings-disableScreenshotCheckbox');
+if (dsCb) {
+  dsCb.checked = !!(prefs && prefs.disableAchievementScreenshot);
+  dsCb.addEventListener('change', async (e) => {
+    await window.api.savePreferences({ disableAchievementScreenshot: e.target.checked });
+  });
+}
+
+
 }
 } catch (e) {
 console.warn('Settings cannot be load:', e);
 }
 });
 
-['positionDropdown', 'presetDropdown', 'soundSelect', 'languageSelect', 'scaleSlider', 'disableProgressCheckbox', 'zoom-dropdown'].forEach(id => {
+window.addEventListener('DOMContentLoaded', async () => {
+  const prefs = await window.api.loadPreferences();
+  const startInTrayEl = document.getElementById('settings-startInTrayCheckbox');
+  if (startInTrayEl) {
+    startInTrayEl.checked = !!prefs.startInTray;
+    startInTrayEl.addEventListener('change', async (e) => {
+      await window.api.savePreferences({ startInTray: e.target.checked });
+      console.log(e.target.checked ? 'App will start in tray' : 'App will show on startup');
+    });
+  }
+});
+
+['positionDropdown', 'presetDropdown', 'soundSelect', 'languageSelect', 'scaleSlider', 'disableProgressCheckbox', 'app-zoom-dropdown'].forEach(id => {
   const el = document.getElementById(id);
   if (el) {
     el.addEventListener('change', () => {
@@ -1290,10 +1494,10 @@ console.warn('Settings cannot be load:', e);
         language: document.getElementById('languageSelect')?.value,
         notificationScale: parseFloat(document.getElementById('scaleSlider')?.value || 1),
         disableProgress: document.getElementById('disableProgressCheckbox')?.checked,
-        windowZoomFactor: parseFloat(document.getElementById('zoom-dropdown')?.value || 1)
+        windowZoomFactor: parseFloat(document.getElementById('app-zoom-dropdown')?.value || 1)
       };
       window.api.savePreferences(prefs);
-      window.api.setZoom(prefs.windowZoomFactor); // setează zoom-ul live
+      window.api.setZoom(prefs.windowZoomFactor); // set zoom live
     });
   }
 });
@@ -1311,36 +1515,6 @@ localStorage.removeItem('configSavedSuccess');
 }
 });
 
-async function loadAndDisplayGameImage(appid, fallbackAppid = null) {
-const toggleBtn = document.getElementById('toggleImageBtn');
-const localImage = await window.api.checkLocalGameImage(appid);
-
-if (localImage) {
-document.getElementById('gameImage').src = `file://${localImage}`;
-toggleBtn.textContent = '⇨ Hide Game Image';
-return;
-}
-
-const url = `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appid}/library_600x900.jpg`;
-
-try {
-const response = await fetch(url);
-if (!response.ok) throw new Error('Image not found');
-const blob = await response.blob();
-const arrayBuffer = await blob.arrayBuffer();
-await window.api.saveGameImage(appid, new Uint8Array(arrayBuffer));
-const objectURL = URL.createObjectURL(blob);
-document.getElementById('gameImage').src = objectURL;
-toggleBtn.textContent = '⇨ Hide Game Image';
-} catch (err) {
-console.warn(`Image for AppID ${appid} not found.`, err);
-if (fallbackAppid) {
-loadAndDisplayGameImage(fallbackAppid);
-} else {
-document.getElementById('gameImage').src = 'https://cdn-icons-png.flaticon.com/512/11455/11455431.png';
-}
-}
-}
 
 function updateAchievementStats(achievements) {
 const total = achievements.length;
@@ -1356,7 +1530,7 @@ if (label && bar && percentLabel) {
 label.textContent = `Progress: ${unlocked} / ${total}`;
 bar.style.width = `${percentage}%`;
 percentLabel.textContent = `${percentage}%`;
-document.getElementById('achStats').style.display = 'block'; // ✅ asigurăm afișarea
+document.getElementById('achStats').style.display = 'block';
 }
 }
 
@@ -1417,6 +1591,343 @@ document.getElementById('generateConfigsBtn').addEventListener('click', async ()
   }
 });
 
+// Window control buttons
+document.getElementById('minimizeBtn').addEventListener('click', () => {
+  window.customApi.minimizeWindow();
+});
+
+document.getElementById('maximizeBtn').addEventListener('click', () => {
+  window.customApi.maximizeWindow();
+});
+
+document.getElementById('closeBtn').addEventListener('click', () => {
+  window.customApi.closeWindow();
+});
+
+// Update maximize button icon when window state changes
+window.electron.ipcRenderer.on('window-state-change', (isMaximized) => {
+  const maximizeBtn = document.getElementById('maximizeBtn');
+  if (isMaximized) {
+    maximizeBtn.innerHTML = '<i class="far fa-clone"></i>';
+  } else {
+    maximizeBtn.innerHTML = '<i class="far fa-square"></i>';
+  }
+});
+
+// Add visual feedback when clicking buttons
+const buttons = document.querySelectorAll('.titlebar-button');
+buttons.forEach(button => {
+  button.addEventListener('mousedown', () => {
+    button.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+  });
+  button.addEventListener('mouseup', () => {
+    button.style.backgroundColor = '';
+  });
+  button.addEventListener('mouseleave', () => {
+    button.style.backgroundColor = '';
+  });
+});
+
+// Settings Menu Functionality
+document.getElementById('settingsBtn').addEventListener('click', (event) => {
+  event.stopPropagation();
+  const settingsMenu = document.getElementById('settingsMenu');
+  settingsMenu.classList.remove('hidden');
+  
+  // Sync settings values from main UI to settings menu
+  syncSettingsToModal();
+  
+  // Set focus to the settings menu for keyboard accessibility
+  setTimeout(() => {
+    document.querySelector('.settings-content').focus();
+  }, 10);
+});
+
+// Close settings menu with close button
+document.getElementById('closeSettingsBtn').addEventListener('click', () => {
+  const settingsMenu = document.getElementById('settingsMenu');
+  settingsMenu.classList.add('hidden');
+  syncSettingsFromModal();
+});
+
+// Click outside to close settings menu
+document.getElementById('settingsMenu').addEventListener('click', (event) => {
+  const settingsContent = document.querySelector('.settings-content');
+  if (!settingsContent.contains(event.target)) {
+    document.getElementById('settingsMenu').classList.add('hidden');
+    syncSettingsFromModal();
+  }
+});
+
+// Close settings menu with Escape key
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    const settingsMenu = document.getElementById('settingsMenu');
+    if (!settingsMenu.classList.contains('hidden')) {
+      settingsMenu.classList.add('hidden');
+      syncSettingsFromModal();
+    }
+  }
+});
+
+// Tab switching
+document.querySelectorAll('.settings-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    // Remove active class from all tabs
+    document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    
+    // Add active class to clicked tab and corresponding content
+    tab.classList.add('active');
+    const tabId = tab.getAttribute('data-tab');
+    document.getElementById(tabId + 'Tab').classList.add('active');
+  });
+});
+
+// Achievement test button in settings
+document.getElementById('settings-testAchievementBtn').addEventListener('click', function() {
+  const preset = document.getElementById('settings-presetDropdown').value || 'default';
+  const position = document.getElementById('settings-positionDropdown').value;
+  const sound = document.getElementById('settings-soundSelect').value;
+  const scale = parseFloat(document.getElementById('settings-scaleSlider').value);
+  
+  window.api.showTestNotification({
+    preset,
+    position,
+    sound,
+    scale
+  });
+});
+
+// Settings scale slider
+const settingsScaleSlider = document.getElementById('settings-scaleSlider');
+const settingsScaleValue = document.getElementById('settings-scaleValue');
+const settingsScaleValueDisplay = document.getElementById('settings-scaleValueDisplay');
+
+function updateSettingsScaleLabel() {
+  const value = parseFloat(settingsScaleSlider.value);
+  const percentage = Math.round(value * 100);
+  settingsScaleValue.textContent = value.toFixed(2);
+  settingsScaleValueDisplay.textContent = `${percentage}%`;
+  settingsScaleSlider.style.background = `linear-gradient(to right, var(--dracula-cyan) 0%, var(--dracula-cyan) ${percentage}%, #ccc ${percentage}%, #ccc 100%)`;
+}
+
+settingsScaleSlider.addEventListener('input', () => {
+  updateSettingsScaleLabel();
+  window.api.savePreferences({ notificationScale: settingsScaleSlider.value });
+});
+
+// Save Settings without config
+document.getElementById('settings-disableProgressCheckbox').addEventListener('change', async (e) => {
+  const isChecked = e.target.checked;
+  window.api.disableProgress(isChecked);
+  await window.api.savePreferences({ disableProgress: isChecked });
+});
+
+document.getElementById('settings-disablePlaytimeCheckbox').addEventListener('change', async (e) => {
+  const on = e.target.checked;
+  window.api.setDisablePlaytime(on);
+  await window.api.savePreferences({ disablePlaytime: on });
+});
+
+document.getElementById('settings-positionDropdown')
+  .addEventListener('change', e => window.api.savePreferences({ position: e.target.value }));
+
+document.getElementById('settings-presetDropdown')
+  .addEventListener('change', e => window.api.savePreferences({ preset: e.target.value }));
+
+document.getElementById('settings-soundSelect')
+  .addEventListener('change', e => {
+    window.api.savePreferences({ sound: e.target.value });
+  });
+  
+// Function to sync values between main UI and settings menu
+function syncSettingsToModal() {
+  // Copy preset options
+  const mainPresetDropdown = document.getElementById('presetDropdown');
+  const settingsPresetDropdown = document.getElementById('settings-presetDropdown');
+  
+  if (mainPresetDropdown && settingsPresetDropdown) {
+    settingsPresetDropdown.innerHTML = mainPresetDropdown.innerHTML;
+    if (mainPresetDropdown.value) {
+      settingsPresetDropdown.value = mainPresetDropdown.value;
+    }
+  }
+  
+  // Copy sound options
+  const mainSoundSelect = document.getElementById('soundSelect');
+  const settingsSoundSelect = document.getElementById('settings-soundSelect');
+  
+  if (mainSoundSelect && settingsSoundSelect) {
+    settingsSoundSelect.innerHTML = mainSoundSelect.innerHTML;
+    if (mainSoundSelect.value) {
+      settingsSoundSelect.value = mainSoundSelect.value;
+    }
+  }
+  
+  // Sync position dropdown
+  const mainPositionDropdown = document.getElementById('positionDropdown');
+  const settingsPositionDropdown = document.getElementById('settings-positionDropdown');
+  
+  if (mainPositionDropdown && settingsPositionDropdown) {
+    settingsPositionDropdown.value = mainPositionDropdown.value;
+  }
+  
+  // Sync scale slider
+  const mainScaleSlider = document.getElementById('scaleSlider');
+  const settingsScaleSlider = document.getElementById('settings-scaleSlider');
+  
+  if (mainScaleSlider && settingsScaleSlider) {
+    settingsScaleSlider.value = mainScaleSlider.value;
+    updateSettingsScaleLabel();
+  }
+  
+  // Sync disable progress checkbox
+  const mainDisableProgressCheckbox = document.getElementById('disableProgressCheckbox');
+  const settingsDisableProgressCheckbox = document.getElementById('settings-disableProgressCheckbox');
+  
+  if (mainDisableProgressCheckbox && settingsDisableProgressCheckbox) {
+    settingsDisableProgressCheckbox.checked = mainDisableProgressCheckbox.checked;
+  }
+}
+
+function syncSettingsFromModal() {
+  // Copy values from settings menu to main UI
+  const mainPresetDropdown = document.getElementById('presetDropdown');
+  const settingsPresetDropdown = document.getElementById('settings-presetDropdown');
+  
+  if (mainPresetDropdown && settingsPresetDropdown && settingsPresetDropdown.value) {
+    mainPresetDropdown.value = settingsPresetDropdown.value;
+  }
+  
+  // Copy sound options
+  const mainSoundSelect = document.getElementById('soundSelect');
+  const settingsSoundSelect = document.getElementById('settings-soundSelect');
+  
+  if (mainSoundSelect && settingsSoundSelect && settingsSoundSelect.value) {
+    mainSoundSelect.value = settingsSoundSelect.value;
+  }
+  
+  // Sync position dropdown
+  const mainPositionDropdown = document.getElementById('positionDropdown');
+  const settingsPositionDropdown = document.getElementById('settings-positionDropdown');
+  
+  if (mainPositionDropdown && settingsPositionDropdown) {
+    mainPositionDropdown.value = settingsPositionDropdown.value;
+  }
+  
+  // Sync scale slider
+  const mainScaleSlider = document.getElementById('scaleSlider');
+  const settingsScaleSlider = document.getElementById('settings-scaleSlider');
+  
+  if (mainScaleSlider && settingsScaleSlider) {
+    mainScaleSlider.value = settingsScaleSlider.value;
+    const event = new Event('input');
+    mainScaleSlider.dispatchEvent(event);
+  }
+  
+  // Sync disable progress checkbox
+  const mainDisableProgressCheckbox = document.getElementById('disableProgressCheckbox');
+  const settingsDisableProgressCheckbox = document.getElementById('settings-disableProgressCheckbox');
+  
+  if (mainDisableProgressCheckbox && settingsDisableProgressCheckbox) {
+    mainDisableProgressCheckbox.checked = settingsDisableProgressCheckbox.checked;
+  }
+    ['presetDropdown','positionDropdown','soundSelect'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.dispatchEvent(new Event('change')); // savePreferences()
+  });
+}
+
+// Zoom level control
+document.getElementById('app-zoom-dropdown').addEventListener('change', (e) => {
+  const zoomValue = parseFloat(e.target.value);
+  window.api.setZoom(zoomValue);
+  window.api.savePreferences({ windowZoomFactor: zoomValue });
+});
+
+// Overlay shortcut functionality
+const overlayShortcutBtn = document.getElementById('overlay-shortcut-btn');
+let isListeningForShortcut = false;
+let pressedKeys = new Set();
+let shortcutTimeout;
+let currentKeyHandler = null;
+
+overlayShortcutBtn.addEventListener('click', () => {
+  if (overlayShortcutBtn.textContent === 'Press keys...' || overlayShortcutBtn.classList.contains('listening')) {
+    cleanupShortcutRecording();
+    restoreSavedShortcutLabel();
+    return;
+  }
+
+  overlayShortcutBtn.textContent = 'Press keys...';
+  overlayShortcutBtn.classList.add('listening');
+  isListeningForShortcut = true;
+  pressedKeys.clear();
+
+  const handleKeyDown = (e) => {
+    if (!isListeningForShortcut) return;
+
+    e.preventDefault();
+    pressedKeys.add(e.key);
+
+    clearTimeout(shortcutTimeout);
+    shortcutTimeout = setTimeout(() => {
+      if (!isListeningForShortcut) return;
+
+      const keys = [];
+
+      if (pressedKeys.has('Control')) keys.push('Control');
+      if (pressedKeys.has('Shift')) keys.push('Shift');
+      if (pressedKeys.has('Alt')) keys.push('Alt');
+
+      const mainKeys = [...pressedKeys].filter(k => !['Control', 'Shift', 'Alt', 'Meta'].includes(k));
+      if (mainKeys.length > 0) {
+        const mainKey = mainKeys[0];
+        keys.push(mainKey.length === 1 ? mainKey.toUpperCase() : mainKey);
+      }
+
+      if (keys.length < 2) {
+        overlayShortcutBtn.textContent = 'Invalid combo';
+        setTimeout(() => restoreSavedShortcutLabel(), 1200);
+      } else {
+        const combo = keys.join('+');
+        overlayShortcutBtn.textContent = combo;
+        window.api.savePreferences({ overlayShortcut: combo });
+        window.api.updateOverlayShortcut?.(combo);
+      }
+
+      cleanupShortcutRecording();
+    }, 400);
+  };
+
+  currentKeyHandler = handleKeyDown;
+  document.addEventListener('keydown', handleKeyDown);
+});
+
+function cleanupShortcutRecording() {
+  isListeningForShortcut = false;
+  pressedKeys.clear();
+  clearTimeout(shortcutTimeout);
+  overlayShortcutBtn.classList.remove('listening');
+  
+  if (currentKeyHandler) {
+    document.removeEventListener('keydown', currentKeyHandler);
+    currentKeyHandler = null;
+  }
+}
+
+async function restoreSavedShortcutLabel() {
+  const prefs = await window.api.loadPreferences();
+  overlayShortcutBtn.textContent = prefs?.overlayShortcut || 'Set Shortcut';
+}
+
+document.addEventListener('mousedown', (event) => {
+  if (isListeningForShortcut && event.target !== overlayShortcutBtn) {
+    cleanupShortcutRecording();
+    restoreSavedShortcutLabel();
+  }
+});
 </script>
 </body>
 </html>

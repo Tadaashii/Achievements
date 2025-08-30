@@ -3,73 +3,244 @@
 <head>
 <meta charset="UTF-8" />
 <title>Achievements Overlay</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
+/* Dracula Theme Color Variables */
+:root {
+  --dracula-background: #282a36;
+  --dracula-current-line: #44475a;
+  --dracula-foreground: #f8f8f2;
+  --dracula-comment: #6272a4;
+  --dracula-cyan: #8be9fd;
+  --dracula-green: #50fa7b;
+  --dracula-orange: #ffb86c;
+  --dracula-pink: #ff79c6;
+  --dracula-purple: #bd93f9;
+  --dracula-red: #ff5555;
+  --dracula-yellow: #f1fa8c;
+}
+
 html, body {
   background: transparent;
-  border-radius: 10px;
   margin: 0;
   padding: 0;
   overflow: hidden;
   user-select: none;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: var(--dracula-foreground);
+  height: 100vh;
 }
 
-.scroll-container {
+.overlay-container {
   max-height: 100vh;
   overflow-y: auto;
-  scrollbar-width: none;
+  scrollbar-width: thin;
   -ms-overflow-style: none;
+  background-color: rgba(40, 42, 54, 0.85);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--dracula-purple);
 }
 
-.scroll-container::-webkit-scrollbar {
-  display: none;
+.overlay-container::-webkit-scrollbar {
+  width: 6px;
 }
 
-table {
-  color: white;
-  border-collapse: collapse;
-  background-color: rgba(0,0,0,0.6);
-  border-radius: 10px;
+.overlay-container::-webkit-scrollbar-thumb {
+  background-color: var(--dracula-purple);
+  border-radius: 3px;
+}
+
+.overlay-container::-webkit-scrollbar-track {
+  background-color: var(--dracula-current-line);
+}
+
+.overlay-header {
+  background-color: rgba(68, 71, 90, 0.8);
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--dracula-purple);
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  -webkit-app-region: drag;
+}
+
+.overlay-header h2 {
+  margin: 0;
+  color: var(--dracula-purple);
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.overlay-stats {
+  background-color: rgba(68, 71, 90, 0.6);
+  padding: 10px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--dracula-comment);
+}
+
+.stats-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stats-item i {
+  color: var(--dracula-cyan);
+}
+
+.stats-item .value {
+  font-weight: bold;
+  color: var(--dracula-green);
+}
+
+.progress-bar {
+  height: 6px;
+  background-color: var(--dracula-current-line);
+  border-radius: 3px;
   overflow: hidden;
+  margin-top: 4px;
   width: 100%;
 }
 
-th, td {
-  padding: 8px;
-  border: 1px solid #555;
+.progress-fill {
+  height: 100%;
+  background-color: var(--dracula-green);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.achievements-list {
+  padding: 0;
+  margin: 0;
+  list-style-type: none;
+}
+
+.achievement-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--dracula-current-line);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: background-color 0.2s ease;
+}
+
+.achievement-item:hover {
+  background-color: rgba(68, 71, 90, 0.4);
+}
+
+.achievement-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid var(--dracula-comment);
+}
+
+.achievement-info {
+  flex: 1;
+}
+
+.achievement-name {
+  font-weight: bold;
+  margin-bottom: 4px;
+  color: var(--dracula-cyan);
+}
+
+.achievement-description {
+  font-size: 0.9em;
+  color: var(--dracula-foreground);
+  opacity: 0.9;
+  margin-bottom: 4px;
+}
+
+.achievement-progress {
+  font-size: 0.8em;
+  color: var(--dracula-comment);
+}
+
+.achievement-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: 90px;
+}
+
+.status-locked {
+  color: var(--dracula-red);
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-unlocked {
+  color: var(--dracula-green);
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.achievement-time {
+  font-size: 0.8em;
+  color: var(--dracula-comment);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
   text-align: center;
+  color: var(--dracula-comment);
 }
 
-img {
-  width: 50px;
-  height: auto;
+.empty-state i {
+  font-size: 48px;
+  margin-bottom: 16px;
+  color: var(--dracula-purple);
 }
 
-.drag {
-  -webkit-app-region: drag;
+.empty-state-message {
+  font-size: 16px;
 }
 </style>
 </head>
 <body>
-<div class="scroll-container">
-<table>
-<thead class="drag">
-<tr>
-  <th>Icon</th>
-  <th>Achievement</th>
-  <th>Status</th>
-</tr>
-</thead>
-<tbody id="overlayTableBody">
-</tbody>
-<tfoot>
-<tr id="noConfigMessageRow" style="display: none;">
-  <td colspan="3" style="text-align: center; font-style: italic; color: #ccc;">
-	Select a config!
-  </td>
-</tr>
-</tfoot>
-</table>
+<div class="overlay-container">
+  <div class="overlay-header">
+    <h2>Achievements</h2>
+    <div id="achievement-count" class="stats-item">
+      <i class="fas fa-trophy"></i>
+      <span class="value">0/0</span>
+    </div>
+  </div>
+  
+  <div class="overlay-stats">
+    <div class="stats-item">
+      <i class="fas fa-chart-simple"></i>
+      <span>Completion:</span>
+      <span id="completion-percentage" class="value">0%</span>
+    </div>
+    <div class="progress-bar">
+      <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+    </div>
+  </div>
 
+  <div id="empty-state" class="empty-state">
+    <i class="fas fa-gamepad"></i>
+    <div class="empty-state-message">Select a game configuration to view achievements</div>
+  </div>
+  
+  <ul id="achievements-list" class="achievements-list"></ul>
 </div>
 
 <script>
@@ -79,140 +250,183 @@ let currentDataHash = null;
 let isLoading = false;
 
 function getSafeLocalizedText(input, lang = 'english') {
-if (!input) return 'Hidden';
-if (typeof input === 'string') return input.trim() || 'Hidden';
-if (typeof input === 'object') {
-return input[lang] || input.english ||
-  Object.values(input).find(v => typeof v === 'string' && v.trim() !== '') ||
-  'Hidden';
-}
-return 'Hidden';
+  if (!input) return 'Hidden';
+  if (typeof input === 'string') return input.trim() || 'Hidden';
+  if (typeof input === 'object') {
+    return input[lang] || input.english ||
+      Object.values(input).find(v => typeof v === 'string' && v.trim() !== '') ||
+      'Hidden';
+  }
+  return 'Hidden';
 }
 
 function formatTimestamp(timestamp) {
-if (!timestamp) return "N/A";
-const date = new Date(timestamp * 1000);
-return date.toLocaleString();
+  if (!timestamp) return "N/A";
+  const date = new Date(timestamp * 1000);
+  return date.toLocaleString();
 }
 
 function computeAchievementsHash(achievements, saved, lang) {
-return achievements.map(ach => {
-const name = ach.name;
-const display = getSafeLocalizedText(ach.displayName, lang);
-const savedData = saved?.achievements?.[name] || {};
-const earned = savedData.earned ? '1' : '0';
-const progress = savedData.progress ?? '';
-const max = savedData.max_progress ?? '';
-return `${name}-${display}-${earned}-${progress}-${max}`;
-}).join('|');
+  return achievements.map(ach => {
+    const name = ach.name;
+    const display = getSafeLocalizedText(ach.displayName, lang);
+    const savedData = saved?.achievements?.[name] || {};
+    const earned = savedData.earned ? '1' : '0';
+    const progress = savedData.progress ?? '';
+    const max = savedData.max_progress ?? '';
+    return `${name}-${display}-${earned}-${progress}-${max}`;
+  }).join('|');
 }
 
-
-async function loadTableData(configName) {
-if (!configName || isLoading) return;
-isLoading = true;
-
-const tableBody = document.querySelector('#overlayTableBody');
-const achievementsDataObj = await window.api.loadAchievementData(configName);
-const savedAchievementsObj = await window.api.loadSavedAchievements(configName);
-const lang = overlayLang;
-
-if (!Array.isArray(achievementsDataObj.achievements)) {
-isLoading = false;
-return;
+function updateStats(achievements, savedData) {
+  const total = achievements.length;
+  const unlocked = achievements.reduce((count, ach) => {
+    const saved = savedData?.achievements?.[ach.name];
+    return count + (saved?.earned ? 1 : 0);
+  }, 0);
+  
+  const percentage = total > 0 ? Math.round((unlocked / total) * 100) : 0;
+  
+  document.getElementById('achievement-count').querySelector('.value').textContent = `${unlocked}/${total}`;
+  document.getElementById('completion-percentage').textContent = `${percentage}%`;
+  document.getElementById('progress-fill').style.width = `${percentage}%`;
 }
 
-const newHash = computeAchievementsHash(achievementsDataObj.achievements, savedAchievementsObj, lang);
-const isSameConfig = currentConfigName === configName;
-const isSameHash = currentDataHash === newHash;
+async function loadAchievements(configName) {
+  if (!configName || isLoading) return;
+  isLoading = true;
 
-if (isSameConfig && isSameHash) {
-isLoading = false;
-return;
+  const achievementsList = document.getElementById('achievements-list');
+  const emptyState = document.getElementById('empty-state');
+  const achievementsDataObj = await window.api.loadAchievementData(configName);
+  const savedAchievementsObj = await window.api.loadSavedAchievements(configName);
+  const lang = overlayLang;
+
+  if (!Array.isArray(achievementsDataObj.achievements)) {
+    isLoading = false;
+    emptyState.style.display = 'flex';
+    achievementsList.style.display = 'none';
+    return;
+  }
+
+  const newHash = computeAchievementsHash(achievementsDataObj.achievements, savedAchievementsObj, lang);
+  const isSameConfig = currentConfigName === configName;
+  const isSameHash = currentDataHash === newHash;
+
+  if (isSameConfig && isSameHash) {
+    isLoading = false;
+    return;
+  }
+
+  emptyState.style.display = 'none';
+  achievementsList.style.display = 'block';
+  achievementsList.innerHTML = '';
+  
+  const uniqueAchievements = new Set();
+  const achievements = [];
+
+  achievementsDataObj.achievements.forEach(achievement => {
+    if (!achievement.name || uniqueAchievements.has(achievement.name)) return;
+    uniqueAchievements.add(achievement.name);
+    achievements.push(achievement);
+  });
+  
+  // Update stats
+  updateStats(achievements, savedAchievementsObj);
+
+  // Sort achievements: unlocked first, then locked
+  achievements.sort((a, b) => {
+    const aUnlocked = savedAchievementsObj?.achievements?.[a.name]?.earned ? 1 : 0;
+    const bUnlocked = savedAchievementsObj?.achievements?.[b.name]?.earned ? 1 : 0;
+    return bUnlocked - aUnlocked;
+  });
+
+  achievements.forEach(achievement => {
+    const displayName = getSafeLocalizedText(achievement.displayName, lang);
+    const description = getSafeLocalizedText(achievement.description, lang);
+    const iconGray = achievement.icon_gray || achievement.icongray;
+    const icon = achievement.icon || iconGray;
+
+    let imagePath = `${achievementsDataObj.config_path}\\${iconGray}`;
+    let statusHTML = `<div class="status-locked"><i class="fas fa-lock"></i> Locked</div>`;
+    let earnedTimeHTML = '';
+    let progressHTML = '';
+
+    const saved = savedAchievementsObj?.achievements?.[achievement.name];
+
+    if (saved?.earned) {
+      imagePath = `${achievementsDataObj.config_path}\\${icon}`;
+      statusHTML = `<div class="status-unlocked"><i class="fas fa-unlock"></i> Unlocked</div>`;
+      earnedTimeHTML = `<div class="achievement-time">${formatTimestamp(saved.earned_time)}</div>`;
+    }
+
+    if (typeof saved?.progress === 'number' && typeof saved?.max_progress === 'number') {
+      const progressPercentage = Math.min(100, Math.round((saved.progress / saved.max_progress) * 100));
+      progressHTML = `
+        <div class="achievement-progress">
+          Progress: ${saved.progress} / ${saved.max_progress}
+          <div class="progress-bar" style="margin-top: 4px; height: 4px;">
+            <div class="progress-fill" style="width: ${progressPercentage}%;"></div>
+          </div>
+        </div>
+      `;
+    }
+
+    const listItem = document.createElement('li');
+    listItem.className = 'achievement-item';
+    listItem.innerHTML = `
+      <img class="achievement-icon" src="file:///${imagePath.replace(/\\/g, "/")}" alt="Icon"
+           onerror="this.onerror=null; this.src='https://cdn-icons-png.flaticon.com/512/11455/11455431.png';">
+      <div class="achievement-info">
+        <div class="achievement-name">${displayName}</div>
+        <div class="achievement-description">${description}</div>
+        ${progressHTML}
+      </div>
+      <div class="achievement-status">
+        ${statusHTML}
+        ${earnedTimeHTML}
+      </div>
+    `;
+    achievementsList.appendChild(listItem);
+  });
+
+  currentConfigName = configName;
+  currentDataHash = newHash;
+  isLoading = false;
 }
-
-tableBody.innerHTML = '';
-const uniqueAchievements = new Set();
-
-achievementsDataObj.achievements.forEach(achievement => {
-if (!achievement.name || uniqueAchievements.has(achievement.name)) return;
-uniqueAchievements.add(achievement.name);
-
-const displayName = getSafeLocalizedText(achievement.displayName, lang);
-const description = getSafeLocalizedText(achievement.description, lang);
-const iconGray = achievement.icon_gray || achievement.icongray;
-const icon = achievement.icon || iconGray;
-
-let imagePath = `${achievementsDataObj.config_path}\\${iconGray}`;
-let status = `<span style="color: red; font-weight: bold;">Locked</span>`;
-let earnedTimeText = '';
-let progressText = '';
-
-const saved = savedAchievementsObj?.achievements?.[achievement.name];
-
-if (saved?.earned) {
-  imagePath = `${achievementsDataObj.config_path}\\${icon}`;
-  status = `<span style="color: green; font-weight: bold;">Unlocked</span>`;
-  earnedTimeText = `<br>${formatTimestamp(saved.earned_time)}`;
-}
-
-if (typeof saved?.progress === 'number' && typeof saved?.max_progress === 'number') {
-  progressText = `<br><span style="font-size: 0.85em; color: #888;">Progress: ${saved.progress} / ${saved.max_progress}</span>`;
-}
-
-const row = document.createElement('tr');
-row.innerHTML = `
-  <td class="image">
-	<img src="file:///${imagePath.replace(/\\/g, "/")}" alt="Icon"
-		 onerror="this.onerror=null; this.src='https://cdn-icons-png.flaticon.com/512/11455/11455431.png';" /></td>
-  <td class="displayName"><strong>${displayName}</strong><br>
-	<span class="description"><em>${description}</em>${progressText}</span>
-  </td>
-  <td class="status">${status} ${earnedTimeText}</td>
-`;
-tableBody.appendChild(row);
-});
-
-currentConfigName = configName;
-currentDataHash = newHash;
-isLoading = false;
-}
-
 
 window.api.onSetLanguage((lang) => {
-overlayLang = lang;
-if (currentConfigName) {
-loadTableData(currentConfigName);
-}
+  overlayLang = lang;
+  if (currentConfigName) {
+    loadAchievements(currentConfigName);
+  }
 });
 
 window.api.onLoadOverlayData((configName) => {
-const tableBody = document.querySelector('#overlayTableBody');
-const messageRow = document.getElementById('noConfigMessageRow');
+  const achievementsList = document.getElementById('achievements-list');
+  const emptyState = document.getElementById('empty-state');
 
-if (!configName) {
-tableBody.innerHTML = '';
-if (messageRow) messageRow.style.display = '';
-currentConfigName = null;
-currentDataHash = null;
-return;
-}
+  if (!configName) {
+    achievementsList.innerHTML = '';
+    emptyState.style.display = 'flex';
+    achievementsList.style.display = 'none';
+    currentConfigName = null;
+    currentDataHash = null;
+    return;
+  }
 
-if (messageRow) messageRow.style.display = 'none';
-loadTableData(configName);
+  loadAchievements(configName);
 });
 
-
 window.api.onRefreshAchievementsTable(() => {
-if (currentConfigName) {
-loadTableData(currentConfigName);
-}
+  if (currentConfigName) {
+    loadAchievements(currentConfigName);
+  }
 });
 
 window.onload = () => {
-window.api.requestCurrentConfig();
+  window.api.requestCurrentConfig?.();
 };
-
 </script>
 </body>
 </html>

@@ -1,12 +1,27 @@
+/* Dracula Theme Color Variables */
+:root {
+  --dracula-background: #282a36;
+  --dracula-current-line: #44475a;
+  --dracula-foreground: #f8f8f2;
+  --dracula-comment: #6272a4;
+  --dracula-cyan: #8be9fd;
+  --dracula-green: #50fa7b;
+  --dracula-orange: #ffb86c;
+  --dracula-pink: #ff79c6;
+  --dracula-purple: #bd93f9;
+  --dracula-red: #ff5555;
+  --dracula-yellow: #f1fa8c;
+}
+
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #1e1e1e;
-  color: #f0f0f0;
+  background-color: var(--dracula-background);
+  color: var(--dracula-foreground);
   margin: 0;
-  padding: 20px;
+  padding: 48px 20px 20px 20px;
   height: 100vh;
   overflow-y: auto;
-  -webkit-app-region: drag;
+  -webkit-app-region: no-drag;
   user-select: none;
   scrollbar-width: none; 
   -ms-overflow-style: none;  
@@ -15,17 +30,84 @@ body {
 html {
   scrollbar-width: none;
 }
+
+/* Modern Titlebar Styles */
+.titlebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 38px;
+  background: var(--dracula-current-line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  -webkit-app-region: drag;
+  z-index: 9999;
+  box-shadow: none;
+  border-bottom: none;
+}
+
+.titlebar-logo {
+  display: flex;
+  align-items: center;
+  margin-left: 12px;
+  gap: 8px;
+}
+
+.titlebar-logo img {
+  width: 20px;
+  height: 20px;
+}
+
+.titlebar-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--dracula-purple);
+  margin-left: 4px;
+}
+
+.titlebar-controls {
+  display: flex;
+  -webkit-app-region: no-drag;
+  margin-right: 4px;
+}
+
+.titlebar-button {
+  width: 46px;
+  height: 38px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--dracula-foreground);
+  background: transparent;
+  border: none;
+  transition: background-color 0.2s;
+  -webkit-app-region: no-drag;
+  outline: none;
+  padding: 0;
+  margin: 0;
+  box-shadow: none;
+}
+
+.titlebar-button:hover {
+  background-color: var(--dracula-comment);
+}
+
+.titlebar-button.close:hover {
+  background-color: var(--dracula-red);
+}
+
 #top-bar {
   position: absolute;
-  top: 10px;
+  top: 38px;
   left: 10px;
   right: 10px;
   height: 40px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  z-index: 9999;
-  -webkit-app-region: drag;
+  z-index: 999;
 }
 
 #left-controls {
@@ -44,43 +126,25 @@ html {
 }
 
 #window-controls {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  display: flex;
-  align-self: auto;
-  gap: 6px;
-  z-index: 9999;
-}
-
-#window-controls button {
-  background-color: #444;
-  border: none;
-  color: white;
-  padding: 5px 10px;
-  font-size: 14px;
-  border-radius: 4px;
-}
-
-#window-controls button:hover {
-  background-color: #666;
+  display: none;
 }
 
 h1 {
   text-align: center;
   color: #ffffff;
+  margin-top: 10px;
   margin-bottom: 25px;
   font-size: 2em;
 }
 
 #editConfigBtn {
-  background-color: #f39c12;
-  color: white;
+  background-color: var(--dracula-orange);
+  color: var(--dracula-background);
   font-weight: bold;
 }
 
 #editConfigBtn:hover {
-  background-color: #e67e22;
+  background-color: var(--dracula-yellow);
 }
 
 .modal {
@@ -105,20 +169,19 @@ h1 {
 }
 
 .modal-content {
-  background-color: #2e2e2e;
+  background-color: var(--dracula-background);
   padding: 20px;
   width: 700px;
   border-radius: 12px;
-  box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.3);
-  max-height: 60vh;
+  box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.5);
+  max-height: 70vh;
   overflow-y: auto;
   position: relative;
-  color: #f0f0f0;
-  border: 1px solid #555; 
+  color: var(--dracula-foreground);
+  border: 1px solid var(--dracula-purple);
   -webkit-app-region: no-drag;
   scrollbar-width: none; 
   -ms-overflow-style: none;  
-  scrollbar-width: none;
 }
 
 .modal-content::-webkit-scrollbar {
@@ -130,14 +193,14 @@ h1 {
   right: 15px;
   top: 10px;
   font-size: 24px;
-  color: #f0f0f0;
+  color: var(--dracula-foreground);
   background: none;
   border: none;
   cursor: pointer;
 }
 
 .close-button:hover {
-  color: #ff5f5f;
+  color: var(--dracula-red);
 }
 
 .modal .input-with-button {
@@ -184,19 +247,28 @@ button, input, select {
   margin: 3px 0;
   border-radius: 6px;
   border: none;
-  background-color: #333;
-  color: #fff;
-  transition: background-color 0.3s ease;
+  background-color: var(--dracula-current-line);
+  color: var(--dracula-foreground);
+  transition: all 0.2s ease;
   box-sizing: border-box;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
-button:hover, select:hover, input:hover {
-  background-color: #444;
+button:hover, select:hover {
+  background-color: var(--dracula-comment);
   cursor: pointer;
+  transform: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
+
+button:active {
+  transform: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
 #saveBtn {
-  background-color: #4CAF50;
-  color: white;
+  background-color: var(--dracula-green);
+  color: var(--dracula-background);
   border: none;
   padding: 10px 24px;
   border-radius: 6px;
@@ -206,10 +278,11 @@ button:hover, select:hover, input:hover {
 }
 
 #saveBtn:hover {
-  background-color: #45a049;
-  transform: scale(1.03);
+  background-color: var(--dracula-cyan);
+  transform: none;
   cursor: pointer;
 }
+
 label {
   font-weight: bold;
   margin-top: 8px;
@@ -220,48 +293,40 @@ label {
 .container {
   width: 100%;
   margin: 0 auto;
-}
-
-#shortcutInput {
-  background-color: #566573;
-  color: white;
-  font-weight: bold;
-  padding: 10px 15px;
-  margin-bottom: 15px;
-  display: inline-block;
-  width: auto;
-}
-
-#shortcutInput:hover {
-  background-color: #3e8e41;
+  padding-top: 30px;
 }
 
 #toggleBtn {
-  background-color: #566573;
-  color: white;
-  font-weight: bold;
-  padding: 10px 15px;
-  margin-bottom: 15px;
-  display: inline-block;
-  width: auto;
+  background-color: var(--dracula-purple);
+  color: var(--dracula-background);
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: 6px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 #toggleBtn:hover {
-  background-color: #3e8e41;
+  background-color: var(--dracula-pink);
+  transform: none;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 #playBtn {
-  background-color: #566573;
-  color: white;
-  font-weight: bold;
-  padding: 10px 15px;
-  margin-bottom: 15px;
-  display: none;
-  width: auto;
+  background-color: var(--dracula-green);
+  color: var(--dracula-background);
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 #playBtn:hover {
-  background-color: #3e8e41;
+  background-color: var(--dracula-cyan);
+  transform: none;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 #arrowIcon {
@@ -276,7 +341,7 @@ label {
 
 #buttonContainer {
   display: none;
-  background-color: rgba(255, 255, 255, 0.07);
+  background-color: var(--dracula-current-line);
   padding: 20px;
   border-radius: 12px;
   box-shadow: 0 0 12px rgba(0, 0, 0, 0.3);
@@ -295,20 +360,22 @@ label {
   gap: 12px;
 }
 
-#createNewConfigBtn{
-  background-color: #566573;
+#createNewConfigBtn {
+  background-color: var(--dracula-purple);
+  color: var(--dracula-foreground);
 }
 
 #createNewConfigBtn:hover {
-  background-color: #3e8e41;
+  background-color: var(--dracula-pink);
 }
 
-#generateConfigsBtn{
-  background-color: #566573;
+#generateConfigsBtn {
+  background-color: var(--dracula-purple);
+  color: var(--dracula-foreground);
 }
 
 #generateConfigsBtn:hover {
-  background-color: #3e8e41;
+  background-color: var(--dracula-pink);
 }
 
 #new-config-form {
@@ -319,15 +386,15 @@ label {
 }
 
 input[type="text"] {
-  background-color: #2e2e2e;
-  border: 1px solid #555;
-  color: #fff;
+  background-color: var(--dracula-background);
+  border: 1px solid var(--dracula-comment);
+  color: var(--dracula-foreground);
 }
 
 select {
-  background-color: #2e2e2e;
-  border: 1px solid #555;
-  color: #fff;
+  background-color: var(--dracula-background);
+  border: 1px solid var(--dracula-comment);
+  color: var(--dracula-foreground);
 }
 
 .config-controls select,
@@ -337,34 +404,36 @@ select {
 }
 
 #deleteConfigBtn {
-  background-color: #c0392b;
+  background-color: var(--dracula-red);
+  color: var(--dracula-foreground);
 }
 
 #deleteConfigBtn:hover {
-  background-color: #e74c3c;
+  background-color: #ff7777;
 }
 
 #backButton {
-  background-color: #666;
-  color: white;
+  background-color: var(--dracula-comment);
+  color: var(--dracula-foreground);
 }
 
 #backButton:hover {
-  background-color: #888;
+  background-color: var(--dracula-purple);
 }
 
 #testAchievementBtn {
-  background-color: #2980b9;
+  background-color: var(--dracula-orange);
+  color: var(--dracula-background);
   align-self: flex-start;
 }
 
 #testAchievementBtn:hover {
-  background-color: #3498db;
+  background-color: var(--dracula-yellow);
 }
 
 .achievements {
   width: 100%;
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: var(--dracula-current-line);
   border-collapse: collapse;
   border-radius: 8px;
   overflow: hidden;
@@ -372,16 +441,16 @@ select {
 }
 
 .achievements th {
-  background-color: #444;
-  color: #fff;
+  background-color: var(--dracula-purple);
+  color: var(--dracula-background);
   padding: 12px;
 }
 
 .achievements td {
-  background-color: rgba(255, 255, 255, 0.03);
-  color: #e0e0e0;
+  background-color: var(--dracula-background);
+  color: var(--dracula-foreground);
   padding: 10px;
-  border-bottom: 1px solid #444;
+  border-bottom: 1px solid var(--dracula-current-line);
 }
 
 .achievements img {
@@ -396,6 +465,14 @@ select {
 
 .hidden {
   display: none !important;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.visible {
+  display: block;
+  opacity: 1;
+  transition: opacity 0.3s ease;
 }
 
 .dropdown-group label,
@@ -407,4 +484,414 @@ select {
 #new-config-form button {
   margin-top: 10px;
   align-self: flex-start;
+}
+
+/* Custom scrollbar for the app */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--dracula-background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--dracula-purple);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--dracula-pink);
+}
+
+/* Hide scrollbar but keep functionality */
+body::-webkit-scrollbar {
+  width: 8px;
+}
+
+/* Improve achievement stats display */
+#achStats {
+  background: var(--dracula-current-line);
+  padding: 8px 12px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--dracula-purple);
+}
+
+#achStatsBar {
+  background: var(--dracula-green);
+}
+
+/* Status colors */
+.locked { color: var(--dracula-red) !important; font-weight: bold; }
+.unlocked { color: var(--dracula-green) !important; font-weight: bold; }
+
+/* Settings Menu Styles - Improved */
+.settings-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 9998;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: opacity 0.3s ease;
+  backdrop-filter: blur(2px);
+}
+
+.settings-content {
+  width: 550px;
+  height: 450px;
+  max-width: 90%;
+  max-height: 80vh;
+  background-color: var(--dracula-background);
+  border: 1px solid var(--dracula-purple);
+  border-radius: 12px;
+  box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  padding: 24px;
+  position: relative;
+  transform: scale(1);
+  transition: transform 0.3s ease;
+  outline: none;
+  display: flex;
+  flex-direction: row;
+  gap: 20px;
+}
+
+.settings-menu.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.settings-menu.hidden .settings-content {
+  transform: scale(0.95);
+}
+
+/* Settings tabs */
+.settings-tabs {
+  display: flex;
+  flex-direction: column;
+  min-width: 120px;
+  width: 120px;
+  border-right: 1px solid var(--dracula-current-line);
+  margin-right: 20px;
+  padding-right: 20px;
+  flex-shrink: 0;
+}
+
+.settings-tab {
+  padding: 10px 15px;
+  cursor: pointer;
+  color: var(--dracula-comment);
+  font-weight: 500;
+  position: relative;
+  transition: all 0.2s ease;
+  background-color: transparent;
+  border: none;
+  text-align: left;
+  border-radius: 6px;
+  margin-bottom: 5px;
+}
+
+.settings-tab:hover {
+  color: var(--dracula-foreground);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.settings-tab.active {
+  color: var(--dracula-cyan);
+  background-color: var(--dracula-current-line);
+}
+
+.settings-tab.active::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: -21px;
+  height: 100%;
+  width: 2px;
+  background-color: var(--dracula-cyan);
+}
+
+.settings-tabs-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 10px;
+  position: relative;
+  height: 100%;
+}
+
+.tab-content {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.tab-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tab-content::-webkit-scrollbar-thumb {
+  background-color: var(--dracula-purple);
+  border-radius: 3px;
+}
+
+.tab-content::-webkit-scrollbar-track {
+  background-color: var(--dracula-current-line);
+}
+
+.tab-content.active {
+  display: block;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Settings notification tab */
+.settings-slider {
+  margin: 15px 0;
+}
+
+.settings-slider label {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.settings-slider .slider-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-slider input[type="range"] {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: #ccc;
+  outline: none;
+  padding: 0;
+  margin: 0;
+}
+
+.settings-slider .value {
+  min-width: 40px;
+  text-align: right;
+}
+
+.checkbox-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: -10px;
+}
+
+.checkbox-control input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
+.checkbox-control label {
+   position: relative;
+   top: 5px;
+}
+
+#overlay-shortcut-btn {
+  background-color: var(--dracula-purple);
+  color: var(--dracula-background);
+  text-align: center;
+  font-weight: 500;
+}
+
+#overlay-shortcut-btn:hover {
+  background-color: var(--dracula-pink);
+}
+
+#overlay-shortcut-btn.listening {
+  background-color: var(--dracula-orange);
+  color: var(--dracula-background);
+}
+
+/* Update titlebar button styles */
+#settingsBtn {
+  color: var(--dracula-cyan);
+}
+
+#settingsBtn:hover {
+  background-color: var(--dracula-comment);
+}
+
+.settings-test-button {
+  background-color: var(--dracula-orange);
+  color: var(--dracula-background);
+  font-weight: 500;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.settings-test-button:hover {
+  background-color: var(--dracula-yellow);
+}
+
+.settings-close-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dracula-foreground);
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s ease;
+}
+
+.settings-close-button:hover {
+  color: var(--dracula-red);
+}
+
+.settings-section {
+  margin-bottom: 24px;
+}
+
+.settings-section h4 {
+  margin: 0 0 10px 0;
+  color: var(--dracula-cyan);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.settings-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.settings-control label {
+  margin: 0;
+  color: var(--dracula-foreground);
+}
+
+.settings-control select,
+.settings-control button {
+  width: 150px;
+}
+
+/* Image */
+.game-image-embed { position:relative; width:100%; min-height:420px; background:#000; border-radius:10px; overflow:hidden; display:flex; }
+#embeddedImageContainer { width:100%; display:none; justify-content:center; align-items:center; }
+#embeddedGameImageImg { width:100%; height:auto; object-fit:contain; display:block; }
+
+#embeddedGameImage {
+  height: 320px;
+  width: 100%;
+  max-width: 280px;
+  margin: 0 auto; 
+  flex: 0 0 auto;
+}
+
+#embeddedImageContainer { 
+  height: 100%;
+}
+
+#embeddedGameImageImg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+
+#edit-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(255,255,255,0.12);
+  color: white;
+  border: none;
+  padding: 6px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+#edit-btn:hover { background: rgba(255,255,255,0.2); }
+
+.progress-bar {
+  height: 6px;
+  background-color: #44475a;   /* var(--dracula-current-line) */
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 4px;
+  width: 100%;
+}
+.progress-fill {
+  height: 100%;
+  background-color: #50fa7b;   /* var(--dracula-green) */
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.achievement-progress { 
+  font-size: 0.85em; 
+  color: #888; 
+}
+
+.settings-control .input-with-button {
+  position: relative;
+  flex: 1;             
+  max-width: 100%;
+}
+
+.settings-control .input-with-button input {
+  width: 100%;
+  padding-right: 40px;
+  border-radius: 6px;
+  box-sizing: border-box;
+  height: 36px;
+  line-height: 36px;
+}
+
+.settings-control .input-with-button button {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 24px;
+  width: 24px;
+  padding: 0;
+  font-size: 14px;
+  background-color: transparent;
+  color: #ccc;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.settings-control .input-with-button button:hover {
+  background-color: #444;
+  color: white;
 }

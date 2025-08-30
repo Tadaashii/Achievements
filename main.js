@@ -128,6 +128,14 @@ selectedLanguage = mergedPrefs.language;
 if ('disableProgress' in newPrefs) {
 global.disableProgress = newPrefs.disableProgress;
 }
+
+if ('disablePlaytime' in newPrefs) {
+    global.disablePlaytime = newPrefs.disablePlaytime;
+  }
+  
+if ('startInTray' in newPrefs) {
+    global.startInTray = !!newPrefs.startInTray;
+  }  
 try {
 fs.writeFileSync(preferencesPath, JSON.stringify(mergedPrefs, null, 2));
 } catch (err) {
@@ -156,6 +164,54 @@ ipcMain.on('set-zoom', (event, zoomFactor) => {
   }
 });
 
+function getScreenshotRootFolder() {
+  const prefs = readPrefsSafe();
+  // Default Pictures\Achievements Screenshots
+  const fallback = path.join(app.getPath('pictures'), 'Achievements Screenshots');
+  const root = prefs.screenshotFolder || fallback;
+  try {
+    if (!fs.existsSync(root)) fs.mkdirSync(root, { recursive: true });
+  } catch (e) {
+    console.warn('Cannot create screenshot root folder:', e.message);
+  }
+  return root;
+}
+
+function ensureDir(p) {
+  try {
+    if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
+  } catch (e) {
+    console.warn('Cannot create dir:', p, e.message);
+  }
+}
+
+function sanitizeFilename(name) {
+  return String(name || 'achievement')
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .replace(/\s+/g, ' ')
+    .slice(0, 120)
+    .trim() || 'achievement';
+}
+
+/**
+ * <root>/<gameName>/<displayName>.png  (timestamp if exists)
+ */
+async function saveFullScreenShot(gameName, achDisplayName) {
+  if (!screenshot) throw new Error('screenshot-desktop is not installed');
+  const root = getScreenshotRootFolder();
+  const gameFolder = path.join(root, sanitizeFilename(gameName || 'Unknown Game'));
+  ensureDir(gameFolder);
+
+  let file = path.join(gameFolder, sanitizeFilename(achDisplayName) + '.png');
+  if (fs.existsSync(file)) {
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    file = path.join(gameFolder, `${sanitizeFilename(achDisplayName)}_${ts}.png`);
+  }
+
+  const buf = await screenshot({ format: 'png' }); // full desktop
+  fs.writeFileSync(file, buf);
+  return file;
+}
 
 function waitForFile(filePath, callback, interval = 1000) {
 const checkFile = () => {
@@ -409,10 +465,12 @@ return null;
 let mainWindow;
 let tray = null;
 const { Menu, Tray } = require('electron');
-const trayIconPath = path.join(process.resourcesPath, 'icon.ico');
-
+const ICON_PATH = app.isPackaged
+  ? path.join(process.resourcesPath, 'icon.ico')  // in installer: resources\icon.ico
+  : path.join(__dirname, 'icon.ico');     
+  
 function createTray() {
-  tray = new Tray(trayIconPath);
+  tray = new Tray(ICON_PATH);
   const contextMenu = Menu.buildFromTemplate([
     {
       label: 'Show App',
@@ -435,9 +493,6 @@ function createTray() {
   tray.on('double-click', () => {
         if (mainWindow) {
       mainWindow.show();
-      if (imageWindow && !imageWindow.isDestroyed()) {
-        imageWindow.show();
-      }
     }
   });
 }
@@ -447,6 +502,13 @@ let currentConfigPath;
 let previousAchievements = {};
 
 function createMainWindow() {
+  let initialZoom = 1;
+  try {
+    const prefs = fs.existsSync(preferencesPath)
+      ? JSON.parse(fs.readFileSync(preferencesPath, 'utf-8'))
+      : {};
+    initialZoom = Number(prefs.windowZoomFactor) || 1;
+  } catch {}	
 mainWindow = new BrowserWindow({
 width: 900,
 height: 800,
@@ -458,13 +520,40 @@ webPreferences: {
 nodeIntegration: false,
 contextIsolation: true,
 backgroundThrottling: false,
-preload: path.join(__dirname, 'preload.js')
+preload: path.join(__dirname, 'preload.js'),
+zoomFactor: initialZoom
 }
 });
 
-mainWindow.loadFile('index.html');
+const ICON_URL = pathToFileURL(ICON_PATH).toString();
+mainWindow.loadFile('index.html', { query: { icon: ICON_URL } });
+
 mainWindow.webContents.on('did-finish-load', () => {
-mainWindow.webContents.setZoomFactor(1);
+  try {
+    const prefs = fs.existsSync(preferencesPath)
+      ? JSON.parse(fs.readFileSync(preferencesPath, 'utf-8'))
+      : {};
+    const shouldStartInTray = !!prefs.startInTray;
+	const zoom = Number(prefs.windowZoomFactor) || 1;
+    mainWindow.webContents.setZoomFactor(zoom);
+    if (!shouldStartInTray) mainWindow.show();
+  } catch (e) {
+    mainWindow.webContents.setZoomFactor(1);
+    mainWindow.show();
+  }
+});
+
+// Track window state changes
+mainWindow.on('maximize', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('window-state-change', true);
+  }
+});
+
+mainWindow.on('unmaximize', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('window-state-change', false);
+  }
 });
 }
 
@@ -489,15 +578,31 @@ const display = screen.getPrimaryDisplay();
 const { width, height } = display.workAreaSize;
 
 const preset = message.preset || 'default';
-const presetFolder = path.join(userPresetsFolder, preset);
+// Check in both scalable and non-scalable folders
+const scalableFolder = path.join(userPresetsFolder, 'Scalable', preset);
+const nonScalableFolder = path.join(userPresetsFolder, 'Non-scalable', preset);
+const oldStyleFolder = path.join(userPresetsFolder, preset);
+
+// Determine which folder contains the preset
+let presetFolder;
+if (fs.existsSync(scalableFolder)) {
+  presetFolder = scalableFolder;
+} else if (fs.existsSync(nonScalableFolder)) {
+  presetFolder = nonScalableFolder;
+} else {
+  presetFolder = oldStyleFolder; // Fallback to the old structure
+}
+
 const presetHtml = path.join(presetFolder, 'index.html');
 const position = message.position || 'center-bottom';
 const scale = parseFloat(message.scale || 1);
 
 const { width: windowWidth, height: windowHeight } = getPresetDimensions(presetFolder);
 
-const scaledWidth = windowWidth;
-const scaledHeight = windowHeight;
+// Apply scaling to window dimensions to prevent content overflow
+// at higher scale factors by increasing the window size proportionally
+const scaledWidth = Math.ceil(windowWidth * (scale > 1 ? scale : 1));
+const scaledHeight = Math.ceil(windowHeight * (scale > 1 ? scale : 1));
 
 let x = 0, y = 0;
 
@@ -512,7 +617,7 @@ y = 5;
 break;
 case 'bottom-right':
 x = width - scaledWidth - Math.round(20 * scale)
-y = height - Math.floor(scaledHeight * scale) - 40;
+y = height - Math.floor(scaledHeight) - 40;
 break;
 case 'top-left':
 x = Math.round(20 * scale)
@@ -520,12 +625,12 @@ y = 5;
 break;
 case 'bottom-left':
 x = Math.round(20 * scale)
-y = height - Math.floor(scaledHeight * scale) - 40;
+y = height - Math.floor(scaledHeight) - 40;
 break;
 case 'center-bottom':
 default:
 x = Math.floor((width - scaledWidth) / 2);
-y = height - Math.floor(scaledHeight * scale) - 40;
+y = height - Math.floor(scaledHeight) - 40;
 break;
 }
 
@@ -552,7 +657,7 @@ backgroundThrottling: false
 });
 
 notificationWindow.setAlwaysOnTop(true, 'screen-saver');
-notificationWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+notificationWindow.setVisibleOnAllWorkspaces(true);
 notificationWindow.setFullScreenable(false);
 notificationWindow.setFocusable(false);
 
@@ -631,31 +736,114 @@ notifyError("Achievement syntax not correct:", achievement);
 }
 });
 
+// New Image Windows
+// Return path to image if exists locally
+ipcMain.handle('checkLocalGameImage', async (event, appid) => {
+const imagePath = path.join(app.getPath('userData'), 'images', `${appid}.jpg`);
+try {
+await fs.promises.access(imagePath, fs.constants.F_OK);
+return imagePath; 
+} catch {
+return null; 
+}
+});
+
+
+
+// Save image locally from renderer
+ipcMain.handle('saveGameImage', async (event, appid, buffer) => {
+try {
+const imageDir = path.join(app.getPath('userData'), 'images');
+if (!fs.existsSync(imageDir)) fs.mkdirSync(imageDir, { recursive: true });
+const fullPath = path.join(imageDir, `${appid}.jpg`);
+fs.writeFileSync(fullPath, Buffer.from(buffer));
+return { success: true, path: fullPath };
+} catch (err) {
+notifyError('❌ Error saving image: ' + err.message);
+return { success: false, error: err.message };
+}
+});
+
+// Add new IPC handler for test achievements that doesn't require a config
+ipcMain.on('show-test-notification', (event, options) => {
+  const prefs = fs.existsSync(preferencesPath)
+    ? JSON.parse(fs.readFileSync(preferencesPath, 'utf8'))
+    : {};
+
+const baseDir = app.isPackaged ? process.resourcesPath : __dirname;
+
+  const notificationData = {
+    displayName: "This is a testing achievement notification",
+    description: "This is a testing achievement notification for this app",
+    icon: "icon.ico", // Use app icon
+    icon_gray: "icon.ico", // Use app icon
+    config_path: baseDir, // Use app's directory
+    preset: options.preset || 'default',
+    position: options.position || 'center-bottom',
+    sound: options.sound || 'mute',
+    scale: parseFloat(prefs.notificationScale || options.scale || 1),
+	skipScreenshot: true,
+	isTest: true
+  };
+
+  queueAchievementNotification(notificationData);
+});
+
 
 ipcMain.handle('load-presets', async () => {
 if (!fs.existsSync(userPresetsFolder)) return [];
 
-const presetsJsonPath = path.join(userPresetsFolder, 'presets.json');
 try {
-if (fs.existsSync(presetsJsonPath)) {
-const data = fs.readFileSync(presetsJsonPath, 'utf-8');
-const parsed = JSON.parse(data);
-return parsed.presets;
-} else {
-const dirs = fs.readdirSync(userPresetsFolder, { withFileTypes: true })
-.filter(dirent => dirent.isDirectory())
-.map(dirent => dirent.name);
-return dirs;
-}
+  // Check for the new structure with separate folders
+  const scalableFolder = path.join(userPresetsFolder, 'Scalable');
+  const nonScalableFolder = path.join(userPresetsFolder, 'Non-scalable');
+  
+  // Result object with category information
+  let result = {
+    scalable: [],
+    nonScalable: [],
+    isStructured: true  // Flag to indicate we're using the new folder structure
+  };
+  
+  // If both category folders exist, use the new structure
+  if (fs.existsSync(scalableFolder) && fs.existsSync(nonScalableFolder)) {
+    // Get scalable presets
+    const scalableDirs = fs.readdirSync(scalableFolder, { withFileTypes: true })
+      .filter(dirent => dirent.isDirectory())
+      .map(dirent => dirent.name);
+    
+    // Get non-scalable presets
+    const nonScalableDirs = fs.readdirSync(nonScalableFolder, { withFileTypes: true })
+      .filter(dirent => dirent.isDirectory())
+      .map(dirent => dirent.name);
+    
+    result.scalable = scalableDirs;
+    result.nonScalable = nonScalableDirs;
+    
+    return result;
+  } else {
+    // Fall back to flat structure if category folders don't exist
+    const dirs = fs.readdirSync(userPresetsFolder, { withFileTypes: true })
+      .filter(dirent => dirent.isDirectory())
+      .map(dirent => dirent.name);
+    
+    // Filter out the category folders themselves if they exist
+    const flatDirs = dirs.filter(dir => dir !== 'Scalable' && dir !== 'Non-scalable');
+    
+    // For backwards compatibility, return just the array
+    return flatDirs;
+  }
 } catch (error) {
-notifyError('Error reading presets:' + error.message);
-return [];
+  notifyError('Error reading presets: ' + error.message);
+  return [];
 }
 });
 
 const earnedNotificationQueue = [];
 let isNotificationShowing = false;
 let selectedNotificationScale = 1;
+const progressNotificationQueue = [];
+let isProgressShowing = false;
 
 function queueAchievementNotification(achievement) {
 const prefs = fs.existsSync(preferencesPath)
@@ -677,13 +865,14 @@ config_path: achievement.config_path,
 preset: achievement.preset,
 position: achievement.position,
 sound: achievement.sound,
-scale: parseFloat(achievement.scale || 1)
+scale: parseFloat(achievement.scale || 1),
+skipScreenshot: !!achievement.skipScreenshot, 
+isTest: !!achievement.isTest                  
 };
 
 earnedNotificationQueue.push(notificationData);
 processNextNotification();
 }
-
 
 function processNextNotification() {
 if (isNotificationShowing || earnedNotificationQueue.length === 0) return;
@@ -702,16 +891,64 @@ config_path: achievement.config_path,
 preset: achievement.preset,
 position: achievement.position,
 sound: achievement.sound,
-scale: parseFloat(achievement.scale || 1)
+scale: parseFloat(achievement.scale || 1),
+skipScreenshot: !!achievement.skipScreenshot,
+isTest: !!achievement.isTest
 };
 
-const presetFolder = path.join(userPresetsFolder, achievement.preset || 'default');
+const preset = achievement.preset || 'default';
+// Check in both scalable and non-scalable folders
+const scalableFolder = path.join(userPresetsFolder, 'Scalable', preset);
+const nonScalableFolder = path.join(userPresetsFolder, 'Non-scalable', preset);
+const oldStyleFolder = path.join(userPresetsFolder, preset);
+
+// Determine which folder contains the preset
+let presetFolder;
+if (fs.existsSync(scalableFolder)) {
+  presetFolder = scalableFolder;
+} else if (fs.existsSync(nonScalableFolder)) {
+  presetFolder = nonScalableFolder;
+} else {
+  presetFolder = oldStyleFolder; // Fallback to the old structure
+}
+
 const duration = getPresetAnimationDuration(presetFolder);
 const notificationWindow = createNotificationWindow(notificationData);
 
 if (mainWindow && !mainWindow.isDestroyed() && achievement.sound && achievement.sound !== 'mute') {
 mainWindow.webContents.send('play-sound', achievement.sound);
 }
+
+  // Screenshot
+  let disableByPrefs = false;
+  try {
+    const prefs = fs.existsSync(preferencesPath)
+      ? JSON.parse(fs.readFileSync(preferencesPath, 'utf8'))
+      : {};
+    disableByPrefs = !!prefs.disableAchievementScreenshot;
+  } catch {}
+
+ const shouldScreenshot = !notificationData.isTest
+                       && !notificationData.skipScreenshot
+                       && !disableByPrefs;
+
+  if (!notificationData.skipScreenshot && !disableByPrefs) {
+	if (shouldScreenshot) {
+    notificationWindow.webContents.once('did-finish-load', () => {
+      setTimeout(async () => {
+        try {
+          if (!screenshot) return;
+          const gameName = selectedConfig || 'Unknown Game';
+          const achName  = notificationData.displayName || 'Achievement';
+          const saved = await saveFullScreenShot(gameName, achName);
+          console.log('📸 Screenshot saved:', saved);
+        } catch (err) {
+          console.warn('Screenshot failed:', err.message);
+        }
+      }, 250);
+    });
+  }
+ }
 
 notificationWindow.on('closed', () => {
 isNotificationShowing = false;
@@ -725,7 +962,29 @@ notificationWindow.close();
 }, duration);
 }
 
+function queueProgressNotification(data) {
+  progressNotificationQueue.push(data);
+  processNextProgressNotification();
+}
 
+function processNextProgressNotification() {
+  if (isProgressShowing || progressNotificationQueue.length === 0) return;
+
+  const data = progressNotificationQueue.shift();
+  isProgressShowing = true;
+
+  const progressWindow = showProgressNotification(data);
+
+  if (progressWindow) {
+    progressWindow.on('closed', () => {
+      isProgressShowing = false;
+      processNextProgressNotification();
+    });
+  } else {
+    isProgressShowing = false;
+    processNextProgressNotification();
+  }
+}
 
 let currentAchievementsFilePath = null;
 let achievementsWatcher = null;
@@ -739,108 +998,130 @@ return path.join(cacheDir, `${configName}_achievements_cache.json`);
 }
 
 function loadPreviousAchievements(configName) {
-const cachePath = getCachePath(configName);
-if (fs.existsSync(cachePath)) {
-try {
-return JSON.parse(fs.readFileSync(cachePath, 'utf8'));
-} catch (e) {
-notifyError('Error reading achievement cache: ' + e.message);
-}
-}
-return {};
+  const cachePath = getCachePath(configName);
+  if (fs.existsSync(cachePath)) {
+    try {
+      return JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+    } catch (e) {
+      notifyError('Error reading achievement cache: ' + e.message);
+    }
+  }
+  return {};
 }
 
 function savePreviousAchievements(configName, data) {
-const cachePath = getCachePath(configName);
-try {
-fs.writeFileSync(cachePath, JSON.stringify(data, null, 2));
-} catch (e) {
-notifyError('Error reading achievement cache: ' + e.message);
-}
-}
-
-function loadAchievementsFromSaveFile(saveDir) {
-const jsonPath = path.join(saveDir, 'achievements.json');
-const iniPath = path.join(saveDir, 'achievements.ini');
-const binPath = path.join(saveDir, 'stats.bin');
-if (fs.existsSync(jsonPath)) {
-try {
-const raw = fs.readFileSync(jsonPath, 'utf8');
-const data = JSON.parse(raw);
-
-if (!Array.isArray(data)) {
-return data;
+  const cachePath = getCachePath(configName);
+  try {
+    fs.writeFileSync(cachePath, JSON.stringify(data, null, 2));
+  } catch (e) {
+    notifyError('Error reading achievement cache: ' + e.message);
+  }
 }
 
-const converted = {};
-for (const item of data) {
-if (item.name) {
-converted[item.name] = {
-earned: item.achieved === true,
-earned_time: item.UnlockTime || 0
-};
-}
-}
-return converted;
-
-} catch (e) {
-notifyError('❌ Error JSON: ' + e.message);
-return {};
-}
-} else if (fs.existsSync(iniPath)) {
-try {
-const iniData = fs.readFileSync(iniPath, 'utf8');
-const parsed = ini.parse(iniData);
-const converted = {};
-
-for (const key in parsed) {
-const ach = parsed[key];
-converted[key] = {
-earned: ach.Achieved === "1" || ach.Achieved === 1,
-progress: ach.CurProgress ? Number(ach.CurProgress) : undefined,
-max_progress: ach.MaxProgress ? Number(ach.MaxProgress) : undefined,
-earned_time: ach.UnlockTime ? Number(ach.UnlockTime) : 0
-};
+function sleepSync(ms) {
+  const sab = new SharedArrayBuffer(4);
+  const ia  = new Int32Array(sab);
+  Atomics.wait(ia, 0, 0, ms);
 }
 
-return converted;
-} catch (e) {
-notifyError('❌ Error INI: ' + e.message);
-return {};
-}
-} else {
-
-if (fs.existsSync(binPath)) {
-try {
-const parseStatsBin = require('./utils/parseStatsBin');
-const raw = parseStatsBin(binPath);
-const converted = {};
-const configJsonPath = fullAchievementsConfigPath;
-let crcMap = {};
-if (fs.existsSync(configJsonPath)) {
-const configJson = JSON.parse(fs.readFileSync(configJsonPath, 'utf8'));
-crcMap = buildCrcNameMap(configJson);
-}
-
-for (const [crc, item] of Object.entries(raw)) {
-const configEntry = crcMap[crc.toLowerCase()];
-const key = configEntry?.name || crc.toLowerCase();
-
-converted[key] = {
-earned: item.earned,
-earned_time: item.earned_time
-};
+function readJsonWithRetries(filePath, maxTries = 6, baseDelayMs = 35) {
+  let lastErr = null;
+  for (let i = 0; i < maxTries; i++) {
+    try {
+      const raw = fs.readFileSync(filePath, 'utf8');
+      return JSON.parse(raw);
+    } catch (e) {
+      lastErr = e;
+      const msg = String(e?.message || '');
+      if (
+        msg.includes('Unexpected end of JSON input') ||
+        msg.includes('Unexpected token') ||
+        e.code === 'EBUSY'
+      ) {
+        sleepSync(baseDelayMs + i * 25);
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr;
 }
 
-return converted;
-} catch (e) {
-notifyError('❌ Error parsing stats.bin: ' + e.message);
-return {};
-}
-} else {
-return {};
-}
-}
+
+function loadAchievementsFromSaveFile(saveDir, fallback) {
+  const jsonPath = path.join(saveDir, 'achievements.json');
+  const iniPath  = path.join(saveDir, 'achievements.ini');
+  const binPath  = path.join(saveDir, 'stats.bin');
+
+  if (fs.existsSync(jsonPath)) {
+    try {
+      const data = readJsonWithRetries(jsonPath, 6, 35);
+
+      if (!Array.isArray(data)) {
+        return data;
+      }
+
+      const converted = {};
+      for (const item of data) {
+        if (item?.name) {
+          converted[item.name] = {
+            earned: item.achieved === true,
+            earned_time: item.UnlockTime || 0
+          };
+        }
+      }
+      return converted;
+
+    } catch (e) {
+      console.warn('⚠ achievements.json still writing' + e.message);
+      return fallback || {};
+    }
+  } else if (fs.existsSync(iniPath)) {
+    try {
+      const iniData = fs.readFileSync(iniPath, 'utf8');
+      const parsed  = ini.parse(iniData);
+      const converted = {};
+      for (const key in parsed) {
+        const ach = parsed[key];
+        converted[key] = {
+          earned: ach.Achieved === "1" || ach.Achieved === 1,
+          progress: ach.CurProgress ? Number(ach.CurProgress) : undefined,
+          max_progress: ach.MaxProgress ? Number(ach.MaxProgress) : undefined,
+          earned_time: ach.UnlockTime ? Number(ach.UnlockTime) : 0
+        };
+      }
+      return converted;
+    } catch (e) {
+      notifyError('❌ Error INI: ' + e.message);
+      return fallback || {};
+    }
+  } else if (fs.existsSync(binPath)) {
+    try {
+      const parseStatsBin = require('./utils/parseStatsBin');
+      const raw = parseStatsBin(binPath);
+      const converted = {};
+      const configJsonPath = fullAchievementsConfigPath;
+      let crcMap = {};
+      if (fs.existsSync(configJsonPath)) {
+        const configJson = JSON.parse(fs.readFileSync(configJsonPath, 'utf8'));
+        crcMap = buildCrcNameMap(configJson);
+      }
+      for (const [crc, item] of Object.entries(raw)) {
+        const configEntry = crcMap[crc.toLowerCase()];
+        const key = configEntry?.name || crc.toLowerCase();
+        converted[key] = {
+          earned: item.earned,
+          earned_time: item.earned_time
+        };
+      }
+      return converted;
+    } catch (e) {
+      notifyError('❌ Error parsing stats.bin: ' + e.message);
+      return fallback || {};
+    }
+  }
+
+  return fallback || {};
 }
 
 function monitorAchievementsFile(filePath) {
@@ -878,7 +1159,7 @@ notifyError('❌ Error reading achievements: ' + e.message);
 }
 
 achievementsWatcher = (curr, prev) => {
-let currentAchievements = loadAchievementsFromSaveFile(path.dirname(filePath));
+let currentAchievements = loadAchievementsFromSaveFile(path.dirname(filePath), previousAchievements);
 
 Object.keys(currentAchievements).forEach(key => {
 const current = currentAchievements[key];
@@ -942,19 +1223,19 @@ const achievementConfig = isBin
 
 if (achievementConfig) {
 if (!global.disableProgress) {	
-showProgressNotification({
+queueProgressNotification({
 displayName: getSafeLocalizedText(achievementConfig.displayName, selectedLanguage),
 icon: achievementConfig.icon,
 progress: current.progress,
 max_progress: current.max_progress,
 config_path: selectedConfigPath
 });
+}
 
 mainWindow.webContents.send('refresh-achievements-table');
 if (overlayWindow && !overlayWindow.isDestroyed()) {
 overlayWindow.webContents.send('load-overlay-data', selectedConfig);
 overlayWindow.webContents.send('set-language', selectedLanguage);
-}
 }
 }
 }
@@ -967,7 +1248,8 @@ savePreviousAchievements(configName, previousAchievements);
 
 const checkFileLoop = () => {
 if (fs.existsSync(filePath)) {
-let currentAchievements = loadAchievementsFromSaveFile(path.dirname(filePath));
+let currentAchievements = loadAchievementsFromSaveFile(path.dirname(filePath), previousAchievements);
+
 const isFirstTime = Object.keys(previousAchievements).length === 0;
 
 if (isFirstLoad && isFirstTime) {
@@ -998,7 +1280,7 @@ description,
   preset: selectedPreset,
   position: selectedPosition,
   sound: selectedSound || 'mute',
-  soundPath: path.join(app.getAppPath(), 'sounds', selectedSound)
+  soundPath: selectedSound ? path.join(app.getAppPath(), 'sounds', selectedSound) : null
 });
 previousAchievements[key] = {
 earned: true,
@@ -1094,10 +1376,6 @@ selectedPreset = preset || 'default';
 selectedPosition = position || 'center-bottom';
 selectedConfigPath = config.config_path;
 selectedConfig = configName;
-if (imageWindow && !imageWindow.isDestroyed() && config?.appid) {
-const imageUrl = `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${config.appid}/library_600x900.jpg`;
-imageWindow.webContents.send('update-image', imageUrl);
-}
 
 monitorAchievementsFile(achievementsFilePath);
 if (overlayWindow && !overlayWindow.isDestroyed()) {
@@ -1215,6 +1493,7 @@ const prefs = fs.existsSync(preferencesPath)
 if (prefs.language) {
 selectedLanguage = prefs.language;
 }
+
 } catch (err) {
 notifyError('❌ Failed to load language preference: ' + err.message);
 }
@@ -1280,7 +1559,7 @@ if (fs.existsSync(configPath)) {
 const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 manualLaunchInProgress = true;
 detectedConfigName = configData.name;
-startPlaytimeLogWatcher(configData);
+if (!global.disablePlaytime) startPlaytimeLogWatcher(configData);
 } else {
 notifyError(`❌ Config file not found for: ${selectedConfig}`);
 }
@@ -1296,170 +1575,7 @@ notifyError("Failed to launch executable: " + err.message);
 });
 
 
-
-let imageWindow = null;
-
-function createGameImageWindow(appid) {
-const imageUrl = `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appid}/library_600x900.jpg`;
-
-if (imageWindow && !imageWindow.isDestroyed()) {
-if (currentAppId === appid) {
-imageWindow.webContents.send('update-image', imageUrl);
-if (!imageWindow.isVisible()) {
-imageWindow.show();
-}
-return;
-}
-
-currentAppId = appid;
-imageWindow.webContents.send('update-image', imageUrl);
-return;
-}
-
-
-const [mainX, mainY] = mainWindow.getPosition();
-
-imageWindow = new BrowserWindow({
-width: 500,
-height: 800,
-x: mainX - 500,
-y: mainY,
-frame: false,
-alwaysOnTop: false,
-resizable: false,
-show: false,
-parent: mainWindow,
-webPreferences: {
-preload: path.join(__dirname, 'preload.js'),
-contextIsolation: true,
-nodeIntegration: false,
-backgroundThrottling: false
-}
-});
-
-imageWindow.setFocusable(false);
-imageWindow.loadFile('gameImage.html');
-
-imageWindow.once('ready-to-show', () => {
-imageWindow.show();
-imageWindow.webContents.send('update-image', imageUrl);
-});
-
-const updatePosition = () => {
-if (imageWindow && !imageWindow.isDestroyed()) {
-const [x, y] = mainWindow.getPosition();
-const [, height] = mainWindow.getSize();
-imageWindow.setBounds({ x: x - 500, y, width: 500, height });
-}
-};
-
-mainWindow.removeListener('move', updatePosition);
-mainWindow.removeListener('resize', updatePosition);
-mainWindow.removeListener('unmaximize', updatePosition);
-mainWindow.removeListener('maximize', updatePosition);
-mainWindow.removeAllListeners('minimize');
-mainWindow.removeAllListeners('restore');
-
-mainWindow.on('move', updatePosition);
-mainWindow.on('resize', updatePosition);
-mainWindow.on('unmaximize', updatePosition);
-mainWindow.on('maximize', updatePosition);
-
-mainWindow.on('minimize', () => {
-if (imageWindow && !imageWindow.isDestroyed()) imageWindow.close();
-});
-
-mainWindow.on('restore', () => {
-if (imageWindow && !imageWindow.isDestroyed()) imageWindow.show();
-});
-
-imageWindow.on('closed', () => {
-imageWindow = null;
-});
-
-currentAppId = appid;
-}
-
-
 let currentAppId = null;
-
-ipcMain.handle('toggle-image-window', async (event, appid) => {
-const imageUrl = `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appid}/library_600x900.jpg`;
-
-if (imageWindow && !imageWindow.isDestroyed()) {
-if (currentAppId === appid) {
-if (!imageWindow.isVisible()) {
-imageWindow.show();
-} else {
-imageWindow.focus();
-}
-return { isVisible: true };
-} else {
-currentAppId = appid;
-imageWindow.webContents.send('update-image', imageUrl);
-return { isVisible: true };
-}
-}
-
-currentAppId = appid;
-createGameImageWindow(appid);
-return { isVisible: true };
-});
-
-
-
-ipcMain.on('close-image-window', () => {
-if (imageWindow && !imageWindow.isDestroyed()) {
-imageWindow.close();
-imageWindow = null;
-}
-});
-
-
-
-
-// Return path to image if exists locally
-ipcMain.handle('checkLocalGameImage', async (event, appid) => {
-const imagePath = path.join(app.getPath('userData'), 'images', `${appid}.jpg`);
-try {
-await fs.promises.access(imagePath, fs.constants.F_OK);
-return imagePath; 
-} catch {
-return null; 
-}
-});
-
-
-
-// Save image locally from renderer
-ipcMain.handle('saveGameImage', async (event, appid, buffer) => {
-try {
-const imageDir = path.join(app.getPath('userData'), 'images');
-if (!fs.existsSync(imageDir)) fs.mkdirSync(imageDir, { recursive: true });
-const fullPath = path.join(imageDir, `${appid}.jpg`);
-fs.writeFileSync(fullPath, Buffer.from(buffer));
-return { success: true, path: fullPath };
-} catch (err) {
-notifyError('❌ Error saving image: ' + err.message);
-return { success: false, error: err.message };
-}
-});
-
-ipcMain.on('notify-from-child', (event, msg) => {
-if (mainWindow && !mainWindow.isDestroyed()) {
-mainWindow.webContents.send('notify', msg);
-}
-  if (!imageWindow || imageWindow.isDestroyed()) return;
-
-  if (msg.action === 'enable-fallback-focus') {
-    imageWindow.setFocusable(true);
-    imageWindow.focus();
-  }
-
-  if (msg.action === 'disable-fallback-focus') {
-    imageWindow.setFocusable(false);
-  }
-});
 
 ipcMain.on('toggle-overlay', (event, selectedConfig) => {
 	if (!selectedConfig) return;
@@ -1471,6 +1587,13 @@ ipcMain.on('toggle-overlay', (event, selectedConfig) => {
   }
 });
 
+// Handle request for current config from overlay
+ipcMain.on('request-current-config', (event) => {
+  if (selectedConfig) {
+    event.sender.send('load-overlay-data', selectedConfig);
+    event.sender.send('set-language', selectedLanguage);
+  }
+});
 
 ipcMain.on('refresh-ui-after-language-change', (event, { language, configName }) => {
 selectedLanguage = language;
@@ -1488,12 +1611,11 @@ overlayWindow.webContents.send('set-language', selectedLanguage);
 
 function minimizeWindow() {
 if (mainWindow) mainWindow.hide();
-if (imageWindow && !imageWindow.isDestroyed()) imageWindow.hide();
 }
 
 
 function maximizeWindow() {
-if (mainWindow) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
 if (mainWindow.isMaximized()) {
 mainWindow.unmaximize();
 } else {
@@ -1505,10 +1627,6 @@ mainWindow.maximize();
 function closeWindow() {
 if (overlayWindow && !overlayWindow.isDestroyed()) {
 overlayWindow.close();
-}
-
-if (imageWindow && !imageWindow.isDestroyed()) {
-imageWindow.close();
 }
 
 if (playtimeWindow && !playtimeWindow.isDestroyed()) {
@@ -1526,7 +1644,7 @@ ipcMain.on('maximize-window', maximizeWindow);
 ipcMain.on('close-window', closeWindow);
 
 app.whenReady().then(async () => {
-// Load saved language
+// Load preferences
 try {
 const prefs = fs.existsSync(preferencesPath)
 ? JSON.parse(fs.readFileSync(preferencesPath, 'utf-8'))
@@ -1536,6 +1654,10 @@ if (prefs.language) {
 selectedLanguage = prefs.language;
 }
 global.disableProgress = prefs.disableProgress === true;
+global.disablePlaytime = prefs.disablePlaytime === true;
+    selectedSound    = prefs.sound    || 'mute';
+    selectedPreset   = prefs.preset   || 'default';
+    selectedPosition = prefs.position || 'center-bottom';
 } catch (err) {
 notifyError('❌ Failed to load language preference: ' + err.message);
 }
@@ -1595,6 +1717,7 @@ progressWindow.webContents.send('show-progress', data);
 setTimeout(() => {
 if (!progressWindow.isDestroyed()) progressWindow.close();
 }, 5000);
+return progressWindow;
 }
 ipcMain.on('disable-progress-check', (event) => {
 event.returnValue = global.disableProgress || false;
@@ -1604,11 +1727,41 @@ ipcMain.on('set-disable-progress', (_, value) => {
 global.disableProgress = value;
 });
 
+// === Disable Playtime: check + set ===
+ipcMain.on('disable-playtime-check', (event) => {
+  event.returnValue = global.disablePlaytime || false;
+});
+
+ipcMain.on('set-disable-playtime', (_event, value) => {
+  global.disablePlaytime = !!value;
+  try {
+    global.disablePlaytime = !!value;
+    const cur = fs.existsSync(preferencesPath)
+      ? JSON.parse(fs.readFileSync(preferencesPath, 'utf8'))
+      : {};
+    cur.disablePlaytime = !!value;
+    fs.writeFileSync(preferencesPath, JSON.stringify(cur, null, 2));
+  } catch (err) {
+    notifyError('❌ Failed to persist disablePlaytime: ' + err.message);
+  }
+});
 
 let playtimeWindow = null;
 let playtimeAlreadyClosing = false;
 
 function createPlaytimeWindow(playData) {
+  try {
+    const cur = fs.existsSync(preferencesPath)
+      ? JSON.parse(fs.readFileSync(preferencesPath, 'utf8'))
+      : {};
+    if (cur.disablePlaytime === true || global.disablePlaytime === true) {
+      console.log('[playtime] blocked at createPlaytimeWindow() entry');
+      return;
+    }
+  } catch (e) {
+    if (global.disablePlaytime === true) return;
+  }
+  
 if (playtimeWindow && !playtimeWindow.isDestroyed()) {
 if (!playtimeAlreadyClosing) {
 playtimeWindow.webContents.send('start-close-animation');
@@ -1652,6 +1805,23 @@ playtimeWindow.setFocusable(false);
 playtimeWindow.loadFile('playtime.html');
 
 playtimeWindow.once('ready-to-show', () => {
+
+    try {
+      const cur = fs.existsSync(preferencesPath)
+        ? JSON.parse(fs.readFileSync(preferencesPath, 'utf8'))
+        : {};
+      if (cur.disablePlaytime === true || global.disablePlaytime === true) {
+        console.log('[playtime] blocked at ready-to-show()');
+        if (!playtimeWindow.isDestroyed()) playtimeWindow.close();
+        return;
+      }
+    } catch (e) {
+      if (global.disablePlaytime === true) {
+        if (!playtimeWindow.isDestroyed()) playtimeWindow.close();
+        return;
+      }
+    }
+	
 if (playtimeWindow && !playtimeWindow.isDestroyed()) {
 playtimeWindow.show();
 
@@ -1666,6 +1836,8 @@ scale
 });
 }
 });
+
+
 ipcMain.once('close-playtime-window', () => {
 if (playtimeWindow && !playtimeWindow.isDestroyed()) {
 playtimeWindow.close();
@@ -1684,14 +1856,27 @@ playtimeAlreadyClosing = false;
 let detectedConfigName = null;
 const { pathToFileURL } = require('url');
 
-async function autoSelectRunningGameConfig() {
-const unpackedPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'utils', 'pslist-wrapper.mjs');
-const wrapperUrl = pathToFileURL(unpackedPath).href;
-const { getProcesses } = await import(wrapperUrl);
+async function importPsListWrapper() {
+  const tryPaths = [
+    path.join(__dirname, 'utils', 'pslist-wrapper.mjs'),
+    path.join(process.resourcesPath, 'app.asar.unpacked', 'utils', 'pslist-wrapper.mjs'),
+  ];
 
-const processes = await getProcesses(); 
-const logPath = path.join(app.getPath('userData'), 'process-log.txt');
-fs.writeFileSync(logPath, processes.map(p => p.name).join('\n'), 'utf8');
+  for (const p of tryPaths) {
+    try { await fs.promises.access(p, fs.constants.R_OK); 
+      return await import(pathToFileURL(p).href);
+    } catch { /* continue */ }
+  }
+  throw new Error(`pslist-wrapper.mjs not found in:\n${tryPaths.join('\n')}`);
+}
+
+
+async function autoSelectRunningGameConfig() {
+  try {
+    const { getProcesses } = await importPsListWrapper();
+    const processes = await getProcesses();
+	const logPath = path.join(app.getPath('userData'), 'process-log.txt');
+	fs.writeFileSync(logPath, processes.map(p => p.name).join('\n'), 'utf8');
 
 if (manualLaunchInProgress) {
 const configPath = path.join(configsDir, `${detectedConfigName}.json`);
@@ -1757,21 +1942,35 @@ notifyInfo(`${configData.name} started.`);
 
 if (mainWindow && !mainWindow.isDestroyed()) {
   mainWindow.webContents.send('auto-select-config', configName);
-  startPlaytimeLogWatcher(configData);
-createGameImageWindow(configData.appid);
+  if (!global.disablePlaytime) startPlaytimeLogWatcher(configData);
 }
 return;
 }
 }
 } catch (err) {
 notifyError('Error in autoSelectRunningGameConfig: ' + err.message);
-}
+    }
+  } catch (err) {
+    notifyError('Error in autoSelectRunningGameConfig: ' + err.message);
+  }
 }
 
 
 ipcMain.on('show-playtime', (event, playData) => {
-createPlaytimeWindow(playData);
+  try {
+    const cur = fs.existsSync(preferencesPath)
+      ? JSON.parse(fs.readFileSync(preferencesPath, 'utf8'))
+      : {};
+    if (cur.disablePlaytime === true || global.disablePlaytime === true) {
+      console.log('[playtime] dropped by prefs/global');
+      return;
+    }
+  } catch (e) {
+    if (global.disablePlaytime === true) return;
+  }
+  createPlaytimeWindow(playData);
 });
+
 
 
 const { generateGameConfigs } = require('./utils/auto-config-generator');
@@ -1787,6 +1986,25 @@ ipcMain.handle('generate-auto-configs', async (event, folderPath) => {
     return { success: false, message: error.message };
   }
 });
+
+
+// === screenshots support ===
+let screenshot = null;
+try {
+  screenshot = require('screenshot-desktop');
+} catch (e) {
+  console.warn('⚠️ Optional dependency "screenshot-desktop" missing. Run: npm i screenshot-desktop');
+}
+
+function readPrefsSafe() {
+  try {
+    return fs.existsSync(preferencesPath)
+      ? JSON.parse(fs.readFileSync(preferencesPath, 'utf8'))
+      : {};
+  } catch {
+    return {};
+  }
+}
 
 app.on('before-quit', () => {
 manualLaunchInProgress = false;

@@ -70,16 +70,51 @@ function cacheHeaderImage(appid, headerUrl) {
 const { pathToFileURL } = require('url');
 
 async function getProcessesSafe() {
-  const unpackedPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'utils', 'pslist-wrapper.mjs');
-  const wrapperUrl = pathToFileURL(unpackedPath).href;
+  const tryPaths = [
+    // 1) Build: UNPACKED
+    path.join(process.resourcesPath, 'app.asar.unpacked', 'utils', 'pslist-wrapper.mjs'),
+    // 2) Dev: from source
+    path.join(__dirname, 'utils', 'pslist-wrapper.mjs'),
+    // 3) (optional)
+    path.join(process.resourcesPath, 'utils', 'pslist-wrapper.mjs'),
+  ];
+
+  let found = null;
+  for (const p of tryPaths) {
+    try {
+      await fs.promises.access(p, fs.constants.R_OK);
+      found = p;
+      break;
+    } catch { /* continue */ }
+  }
+
+  if (!found) {
+    throw new Error(`pslist-wrapper.mjs not found in: \n${tryPaths.join('\n')}`);
+  }
+  const wrapperUrl = pathToFileURL(found).href;
   const { getProcesses } = await import(wrapperUrl);
   return await getProcesses();
 }
 
 
+function readPrefsSafe() {
+  try {
+    if (fs.existsSync(preferencesPath)) {
+      return JSON.parse(fs.readFileSync(preferencesPath, 'utf8'));
+    }
+  } catch {}
+  return {};
+}
+function isPlaytimeDisabled() {
+  const prefs = readPrefsSafe();
+  return !!prefs.disablePlaytime;
+}
 
 
 function startPlaytimeLogWatcher(configData) {
+	if (isPlaytimeDisabled()) {
+    return;
+}
   let isRunning = true;
   const { process_name: processName, appid, name } = configData;
 
@@ -91,10 +126,11 @@ function startPlaytimeLogWatcher(configData) {
   playtimeStart = Date.now();
   currentGame = configData;
 
-  const headerUrl = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/header.jpg`;
+  const headerUrl = `https://cdn.steamstatic.com/steam/apps/${appid}/header.jpg`;
 
   cacheHeaderImage(`${appid}`, headerUrl)
     .then(({ headerUrl }) => {
+	  if (isPlaytimeDisabled()) return;
       sendPlaytimeNotification({
         displayName: name,
         description: 'Tracking Playtime!',
@@ -125,13 +161,13 @@ function startPlaytimeLogWatcher(configData) {
           : `Played for ${minutesPlayed} minute${minutesPlayed > 1 ? 's' : ''}`;
 
         const headerPath = path.join(process.env.APPDATA, 'Achievements', 'images', String(appid), 'header.jpg');
-
+		if (!isPlaytimeDisabled()) { 
         sendPlaytimeNotification({
           displayName: name,
           description: displayTime,
           headerUrl: `file://${headerPath.replace(/\\/g, '/')}`
         });
-
+		}
         currentGame = null;
       }
     } catch (err) {

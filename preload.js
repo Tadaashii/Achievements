@@ -22,11 +22,14 @@ loadPresets: () => ipcRenderer.invoke('load-presets'),
 
 // Notification
 showNotification: (data) => ipcRenderer.send('show-notification', data),
+showTestNotification: (options) => ipcRenderer.send('show-test-notification', options),
 onNotification: (callback) => ipcRenderer.on('show-notification', (event, data) => callback(data)),
 onNotify: (callback) => ipcRenderer.on('notify', (_, data) => callback(data)),
 notifyMain: (msg) => ipcRenderer.send('notify-from-child', msg),
 once: (channel, callback) => { ipcRenderer.once(channel, (_, data) => callback(data));},
 disableProgress: (value) => ipcRenderer.send('set-disable-progress', value),
+setDisablePlaytime: (value) => ipcRenderer.send('set-disable-playtime', value),
+getDisablePlaytimeSync: () => ipcRenderer.sendSync('disable-playtime-check'),
 
 // Event for receiving a new monitored achievement
 onNewAchievement: (callback) => ipcRenderer.on('new-achievement', (event, data) => callback(data)),
@@ -54,15 +57,13 @@ renameAndSaveConfig: (oldName, config) => ipcRenderer.invoke('renameAndSaveConfi
 selectExecutable: () => ipcRenderer.invoke('selectExecutable'),
 launchExecutable: (exe, args) => ipcRenderer.invoke('launchExecutable', exe, args),
 onAchievementsMissing: (callback) => ipcRenderer.on('achievements-missing', (e, configName) => callback(configName)),
-openGameImageWindow: (appid) => ipcRenderer.invoke('toggle-image-window', appid),
 checkLocalGameImage: (appid) => ipcRenderer.invoke('checkLocalGameImage', appid),
 saveGameImage: (appid, buffer) => ipcRenderer.invoke('saveGameImage', appid, buffer),
-closeImageWindow: () => ipcRenderer.send('close-image-window'),
 onImageUpdate: (callback) => ipcRenderer.on('update-image', (_, url) => callback(url)),
 on: (channel, callback) => ipcRenderer.on(channel, (_, data) => callback(data)),
-onImageWindowStatus: (callback) => ipcRenderer.on('image-window-status', (event, status) => callback(status)),
 setZoom: (zoomFactor) => ipcRenderer.send('set-zoom', zoomFactor),
 updateOverlayShortcut: (combo) => ipcRenderer.send('update-overlay-shortcut', combo),
+requestCurrentConfig: () => ipcRenderer.send('request-current-config'),
 // language
 refreshUILanguage: (language) => ipcRenderer.send('refresh-ui-after-language-change', language),
 setLanguage: (lang) => {
@@ -78,10 +79,16 @@ setLanguageAndReload: async (language) => {
 contextBridge.exposeInMainWorld('electron', {
 ipcRenderer: {
 on: (channel, func) => {
-  ipcRenderer.on(channel, (event, ...args) => func(...args));
+  const validChannels = ['window-state-change', 'notify', 'achievements-missing', 'update-image', 'show-playtime', 'start-close-animation'];
+  if (validChannels.includes(channel)) {
+    ipcRenderer.on(channel, (event, ...args) => func(...args));
+  }
 },
 send: (channel, data) => {
-  ipcRenderer.send(channel, data);
+  const validChannels = ['refresh-ui-after-language-change', 'update-overlay-shortcut', 'close-playtime-window'];
+  if (validChannels.includes(channel)) {
+    ipcRenderer.send(channel, data);
+  }
 }
 }
 });
