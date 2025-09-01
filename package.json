@@ -15,7 +15,8 @@
     "copyright": "Copyright © 2025 JokerVerse",
     "asarUnpack": [
 	  "utils/**",
-      "utils/pslist-wrapper.mjs"
+      "utils/pslist-wrapper.mjs",
+	  "**/node_modules/screenshot-desktop/**"
     ],
     "directories": {
       "output": "dist"
