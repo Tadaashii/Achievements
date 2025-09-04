@@ -596,6 +596,17 @@ Save Config
     if (el) el.src = url;
   });
 
+//Achievements Images
+async function resolveAchievementIcon(imgEl, cfgPath, rel) {
+  try {
+    const url = await window.api.resolveIconUrl(cfgPath, rel);
+    imgEl.onerror = null;          
+    imgEl.src = url;               
+  } catch {
+    imgEl.src = 'https://cdn-icons-png.flaticon.com/512/11455/11455431.png';
+  }
+}
+
 async function buildMainAchievementsTable(selectedConfig, lang = 'english') {
   if (!selectedConfig) return;
 
@@ -656,20 +667,21 @@ async function buildMainAchievementsTable(selectedConfig, lang = 'english') {
     }
 
     const row = document.createElement('tr');
-    row.innerHTML = `
-      <td class="image">
-        <img src="${imagePath}" alt="Icon"
-             onerror="this.onerror=null; this.src='https://cdn-icons-png.flaticon.com/512/11455/11455431.png';" />
-      </td>
-      <td class="displayName">
-        <strong>${displayName}</strong><br>
-        <span class="description"><em>${description}</em>${progressText}</span>
-      </td>
-      <td class="status">${statusHTML} ${earnedTimeText}</td>
-    `;
-    tableBody.appendChild(row);
-  }
-
+	row.innerHTML = `
+	  <td class="image">
+		<img class="ach-icon" alt="Icon" />
+	  </td>
+	  <td class="displayName">
+		<strong>${displayName}</strong><br>
+		<span class="description"><em>${description}</em>${progressText}</span>
+	  </td>
+	  <td class="status">${statusHTML} ${earnedTimeText}</td>
+	`;
+	tableBody.appendChild(row);
+	const imgEl = row.querySelector('img.ach-icon');
+	resolveAchievementIcon(imgEl, achievementsDataObj.config_path, imgRel);
+}	
+	
   // Main Progress Bar
   updateAchievementStats(unique.map(a => ({ ...a, earned: isUnlocked(a.name) })));
   const achStats = document.getElementById('achStats');

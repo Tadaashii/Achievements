@@ -30,6 +30,7 @@ once: (channel, callback) => { ipcRenderer.once(channel, (_, data) => callback(d
 disableProgress: (value) => ipcRenderer.send('set-disable-progress', value),
 setDisablePlaytime: (value) => ipcRenderer.send('set-disable-playtime', value),
 getDisablePlaytimeSync: () => ipcRenderer.sendSync('disable-playtime-check'),
+resolveIconUrl: (configPath, rel) => ipcRenderer.invoke('resolve-icon-url', configPath, rel),
 
 // Event for receiving a new monitored achievement
 onNewAchievement: (callback) => ipcRenderer.on('new-achievement', (event, data) => callback(data)),
@@ -96,3 +97,27 @@ send: (channel, data) => {
 contextBridge.exposeInMainWorld('autoConfigApi', {
   generateConfigs: (folderPath) => ipcRenderer.invoke('generate-auto-configs', folderPath),
 });
+
+// --- Compat: preseturi vechi care folosesc window.electronAPI.onNotification
+(function () {
+  const normalizeFileUrl = (raw) => {
+    if (!raw) return '';
+    const s = String(raw);
+    return s.startsWith('file://') ? s : `file:///${s.replace(/\\/g, '/')}`;
+  };
+
+  contextBridge.exposeInMainWorld('electronAPI', {
+    onNotification: (cb) => {
+      ipcRenderer.on('show-notification', (_e, data) => {
+        // preferă iconPath calculat de main; dacă nu, cade pe icon
+        const raw = data?.iconPath || data?.icon || '';
+        const normalized = raw ? normalizeFileUrl(raw) : '';
+        cb({
+          ...data,
+          icon: normalized,      // preset-urile vechi citesc .icon
+          iconPath: normalized,  // preset-urile noi citesc .iconPath
+        });
+      });
+    }
+  });
+})();

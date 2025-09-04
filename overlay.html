@@ -249,6 +249,32 @@ let currentConfigName = null;
 let currentDataHash = null;
 let isLoading = false;
 
+function resolveAchievementIcon(imgEl, cfgPath, rel) {
+  const FALLBACK = 'https://cdn-icons-png.flaticon.com/512/11455/11455431.png';
+  const r = String(rel || '');
+  const base = r.split(/[\\/]/).pop();
+
+  const candidates = []
+    .concat(r ? [`${cfgPath}\\${r}`] : [])
+    .concat([
+      `${cfgPath}\\achievement_images\\${base}`,
+      `${cfgPath}\\steam_settings\\achievement_images\\${base}`,
+      `${cfgPath}\\img\\${base}`,
+      `${cfgPath}\\images\\${base}`
+    ])
+    .filter((v, i, a) => v && a.indexOf(v) === i)
+    .map(p => `file:///${p.replace(/\\/g, '/')}`);
+
+  let i = 0;
+  const tryNext = () => {
+    if (i >= candidates.length) { imgEl.src = FALLBACK; return; }
+    imgEl.onerror = () => { i++; tryNext(); };
+    imgEl.src = candidates[i];
+  };
+  tryNext();
+}
+
+
 function getSafeLocalizedText(input, lang = 'english') {
   if (!input) return 'Hidden';
   if (typeof input === 'string') return input.trim() || 'Hidden';
@@ -353,7 +379,9 @@ async function loadAchievements(configName) {
     let progressHTML = '';
 
     const saved = savedAchievementsObj?.achievements?.[achievement.name];
-
+	const isUnlocked = !!saved?.earned;
+	const rel = isUnlocked ? icon : iconGray;
+	
     if (saved?.earned) {
       imagePath = `${achievementsDataObj.config_path}\\${icon}`;
       statusHTML = `<div class="status-unlocked"><i class="fas fa-unlock"></i> Unlocked</div>`;
@@ -374,20 +402,36 @@ async function loadAchievements(configName) {
 
     const listItem = document.createElement('li');
     listItem.className = 'achievement-item';
-    listItem.innerHTML = `
-      <img class="achievement-icon" src="file:///${imagePath.replace(/\\/g, "/")}" alt="Icon"
-           onerror="this.onerror=null; this.src='https://cdn-icons-png.flaticon.com/512/11455/11455431.png';">
-      <div class="achievement-info">
-        <div class="achievement-name">${displayName}</div>
-        <div class="achievement-description">${description}</div>
-        ${progressHTML}
-      </div>
-      <div class="achievement-status">
-        ${statusHTML}
-        ${earnedTimeHTML}
-      </div>
-    `;
+    <!-- listItem.innerHTML = ` -->
+      <!-- <img class="achievement-icon" src="file:///${imagePath.replace(/\\/g, "/")}" alt="Icon" -->
+           <!-- onerror="this.onerror=null; this.src='https://cdn-icons-png.flaticon.com/512/11455/11455431.png';"> -->
+      <!-- <div class="achievement-info"> -->
+        <!-- <div class="achievement-name">${displayName}</div> -->
+        <!-- <div class="achievement-description">${description}</div> -->
+        <!-- ${progressHTML} -->
+      <!-- </div> -->
+      <!-- <div class="achievement-status"> -->
+        <!-- ${statusHTML} -->
+        <!-- ${earnedTimeHTML} -->
+      <!-- </div> -->
+    <!-- `; -->
+	
+	listItem.innerHTML = `
+	  <img class="achievement-icon" alt="Icon">
+	  <div class="achievement-info">
+		<div class="achievement-name">${displayName}</div>
+		<div class="achievement-description">${description}</div>
+		${progressHTML}
+	  </div>
+	  <div class="achievement-status">
+		${statusHTML}
+		${earnedTimeHTML}
+	  </div>
+	`;
     achievementsList.appendChild(listItem);
+	
+	const imgEl = listItem.querySelector('img.achievement-icon');
+	resolveAchievementIcon(imgEl, achievementsDataObj.config_path, rel);
   });
 
   currentConfigName = configName;

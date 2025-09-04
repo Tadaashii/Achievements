@@ -38,6 +38,28 @@ color: '#2196f3'
 }
 }
 
+//Achievements Image
+function resolveIconAbsolutePath(configPath, rel) {
+  try {
+    if (!rel) return null;
+    const base = path.basename(String(rel));
+    const candidates = [];
+	
+    candidates.push(path.join(configPath, rel));
+
+    candidates.push(path.join(configPath, 'achievement_images', base));
+    candidates.push(path.join(configPath, 'steam_settings', 'achievement_images', base));
+    candidates.push(path.join(configPath, 'img', base));
+    candidates.push(path.join(configPath, 'images', base));
+
+    for (const p of candidates) {
+      try { if (fs.existsSync(p)) return p; } catch {}
+    }
+  } catch {}
+  return null;
+}
+
+
 function registerOverlayShortcut(newShortcut) {
   if (!newShortcut || typeof newShortcut !== 'string') return;
 
@@ -45,6 +67,7 @@ function registerOverlayShortcut(newShortcut) {
     globalShortcut.unregisterAll();
 
     const registered = globalShortcut.register(newShortcut, () => {
+		console.log(`Overlay Shortcut Pressed : ${newShortcut}`);
       if (overlayWindow && !overlayWindow.isDestroyed()) {
         if (overlayWindow.isVisible()) {
           overlayWindow.close();
@@ -664,10 +687,11 @@ notificationWindow.setFocusable(false);
 notificationWindow.loadFile(presetHtml);
 
 notificationWindow.webContents.on('did-finish-load', () => {
+const iconPathToSend = message.iconPath || (message.icon ? path.join(message.config_path, message.icon) : '');	
 notificationWindow.webContents.send('show-notification', {
 displayName: message.displayName,
 description: message.description,
-iconPath: `${message.config_path}\\${message.icon}`,
+iconPath: iconPathToSend,
 scale
 });
 });
@@ -896,6 +920,14 @@ skipScreenshot: !!achievement.skipScreenshot,
 isTest: !!achievement.isTest
 };
 
+  const iconCandidate = notificationData.icon || notificationData.icon_gray;
+  let iconPathFinal = resolveIconAbsolutePath(notificationData.config_path, iconCandidate);
+
+  if (!iconPathFinal) {
+    iconPathFinal = ICON_PATH;
+  }
+  notificationData.iconPath = iconPathFinal;
+
 const preset = achievement.preset || 'default';
 // Check in both scalable and non-scalable folders
 const scalableFolder = path.join(userPresetsFolder, 'Scalable', preset);
@@ -928,27 +960,36 @@ mainWindow.webContents.send('play-sound', achievement.sound);
     disableByPrefs = !!prefs.disableAchievementScreenshot;
   } catch {}
 
- const shouldScreenshot = !notificationData.isTest
-                       && !notificationData.skipScreenshot
-                       && !disableByPrefs;
+  const shouldScreenshot =
+    !notificationData.isTest &&
+    !notificationData.skipScreenshot &&
+    !disableByPrefs;
 
-  if (!notificationData.skipScreenshot && !disableByPrefs) {
-	if (shouldScreenshot) {
-    notificationWindow.webContents.once('did-finish-load', () => {
-      setTimeout(async () => {
-        try {
-          if (!screenshot) return;
-          const gameName = selectedConfig || 'Unknown Game';
-          const achName  = notificationData.displayName || 'Achievement';
-          const saved = await saveFullScreenShot(gameName, achName);
-          console.log('📸 Screenshot saved:', saved);
-        } catch (err) {
-          console.warn('Screenshot failed:', err.message);
-        }
-      }, 250);
-    });
+  const doShot = async () => {
+    try {
+      if (!screenshot) {
+        console.warn('[shot] screenshot-desktop not installed');
+        return;
+      }
+      const gameName = selectedConfig || 'Unknown Game';
+      const achName  = notificationData.displayName || 'Achievement';
+      const saved = await saveFullScreenShot(gameName, achName);
+      console.log('📸 Screenshot saved:', saved);
+    } catch (err) {
+      console.warn('Screenshot failed:', err.message);
+    }
+  };
+
+  if (shouldScreenshot) {
+    if (notificationWindow.webContents.isLoading()) {
+      notificationWindow.webContents.once('did-finish-load', () => {
+        setTimeout(doShot, 250);
+      });
+    } else {
+      setTimeout(doShot, 250);
+    }
   }
- }
+
 
 notificationWindow.on('closed', () => {
 isNotificationShowing = false;
@@ -1971,7 +2012,18 @@ ipcMain.on('show-playtime', (event, playData) => {
   createPlaytimeWindow(playData);
 });
 
-
+ipcMain.handle('resolve-icon-url', async (_event, configPath, rel) => {
+  try {
+    const p = resolveIconAbsolutePath(configPath, rel);
+    if (!p) {
+      return pathToFileURL(ICON_PATH).toString();
+    }
+    await fs.promises.access(p, fs.constants.R_OK);
+    return pathToFileURL(p).toString();
+  } catch {
+    return pathToFileURL(ICON_PATH).toString();
+  }
+});
 
 const { generateGameConfigs } = require('./utils/auto-config-generator');
 

@@ -95,31 +95,45 @@ body {
 </div>
 </div>
 <script>
-window.addEventListener('DOMContentLoaded', () => {
-if (!window.api || !window.api.onProgressUpdate) {
-  return;
-}
-
-window.api.onProgressUpdate((data) => {
-  if (!data) return;
-
-  const titleEl = document.querySelector('.title');
-  const imgEl = document.querySelector('.progress-icon img');
-  const fill = document.querySelector('.progress-fill');
-
-  const percent = (data.progress / data.max_progress) * 100;
-
-  titleEl.textContent = `${data.displayName}: ${data.progress}/${data.max_progress}`;
-  imgEl.src = `file:///${data.config_path}\\${data.icon}`;
-  fill.style.width = `${percent}%`;
-});
-
-setTimeout(() => {
-  if (window.api && window.api.closeNotificationWindow) {
-	window.api.closeNotificationWindow();
+(async function () {
+  async function resolveAchievementIcon(imgEl, cfgPath, rel) {
+    try {
+      const url = await window.api.resolveIconUrl(cfgPath, rel);
+      imgEl.onerror = null;
+      imgEl.src = url;
+    } catch {
+      imgEl.src = 'https://cdn-icons-png.flaticon.com/512/11455/11455431.png';
+    }
   }
-}, 5000);
-});
+
+  window.api.onProgressUpdate(async (data) => {
+    try {
+      if (!data) return;
+
+      const titleEl = document.querySelector('.title');
+      const imgEl   = document.querySelector('.progress-icon img');
+      const fill    = document.querySelector('.progress-fill');
+
+      const name = typeof data.displayName === 'object'
+        ? (data.displayName.english || Object.values(data.displayName).find(v => typeof v === 'string') || 'Achievement')
+        : (data.displayName || 'Achievement');
+
+      const cur = Number(data.progress ?? 0);
+      const max = Number(data.max_progress ?? 0);
+      const pct = max > 0 ? Math.min(100, Math.round((cur / max) * 100)) : 0;
+
+      titleEl.textContent = `${name}: ${cur}/${max}`;
+      await resolveAchievementIcon(imgEl, data.config_path, data.icon);
+      fill.style.width = `${pct}%`;
+    } catch (e) {
+      console.error('[progress.html] render error:', e);
+    }
+  });
+
+  setTimeout(() => {
+    window.api?.closeNotificationWindow?.();
+  }, 5000);
+})();
 </script>
 </body>
 </html>
