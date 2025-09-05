@@ -59,6 +59,16 @@ function resolveIconAbsolutePath(configPath, rel) {
   return null;
 }
 
+//Config Name Sanitize
+function sanitizeConfigName(raw) {
+  const s = String(raw || '').replace(/[\/\\:*?"<>|]/g, '') // Windows-illegal
+                             .replace(/\s+/g, ' ')          // multiple spaces
+                             .trim()
+                             .replace(/[. ]+$/, '');        // without dot/space at end
+  const base = s || 'config';
+  return /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(base) ? `_${base}` : base;
+}
+
 
 function registerOverlayShortcut(newShortcut) {
   if (!newShortcut || typeof newShortcut !== 'string') return;
@@ -277,19 +287,26 @@ return files.filter(file => file.endsWith('.json')).map(file => file.replace('.j
 
 // Handler for config saving
 ipcMain.handle('saveConfig', (event, config) => {
-const configPath = path.join(configsDir, `${config.name}.json`);
+  try {
+    const safeName = sanitizeConfigName(config.name);
+    if (!fs.existsSync(configsDir)) {
+      fs.mkdirSync(configsDir, { recursive: true });
+    }
+    const filePath = path.join(configsDir, `${safeName}.json`);
 
-if (!fs.existsSync(configsDir)) {
-fs.mkdirSync(configsDir, { recursive: true });
-}
+    const payload = {
+      ...config,
+      name: safeName,
+      displayName: config.displayName || config.name
+    };
 
-try {
-fs.writeFileSync(configPath, JSON.stringify(config, null, 4));
-return { success: true, message: 'Configuration saved successfully!' };
-} catch (error) {
-return { success: false, message: 'Error saving configuration!' };
-}
+    fs.writeFileSync(filePath, JSON.stringify(payload, null, 2));
+    return { success: true, message: 'Configuration saved successfully!', name: safeName };
+  } catch (error) {
+    return { success: false, message: 'Error saving configuration!' };
+  }
 });
+
 
 
 // Handler for config load
@@ -439,18 +456,17 @@ return map;
 
 // Handler for config deletion
 ipcMain.handle('delete-config', async (event, configName) => {
-try {
-const configPath = path.join(process.env.APPDATA, 'Achievements', 'configs', `${configName}.json`);
-
-if (fs.existsSync(configPath)) {
-fs.unlinkSync(configPath);
-return { success: true };
-} else {
-return { success: false, error: "File not found." };
-}
-} catch (error) {
-return { success: false, error: error.message };
-}
+  try {
+    const safe = sanitizeConfigName(configName);
+    const configPath = path.join(process.env.APPDATA, 'Achievements', 'configs', `${safe}.json`);
+    if (fs.existsSync(configPath)) {
+      fs.unlinkSync(configPath);
+      return { success: true };
+    }
+    return { success: false, error: "File not found." };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 });
 
 ipcMain.on('set-animation-duration', (event, duration) => {
@@ -1370,8 +1386,10 @@ checkFileLoop();
 let fullAchievementsConfigPath;
 let selectedConfig = null;
 let selectedSound = 'mute';
-ipcMain.on('update-config', (event, { configName, preset, position }) => {
-if (!configName) {
+ipcMain.on('update-config', (event, { configName, preset, position }) => {	
+const safeName = configName ? sanitizeConfigName(configName) : null;	
+
+if (!safeName) {
 if (achievementsWatcher && achievementsFilePath) {
 fs.unwatchFile(achievementsFilePath, achievementsWatcher);
 achievementsWatcher = null;
@@ -1388,7 +1406,7 @@ overlayWindow.webContents.send('set-language', selectedLanguage);
 return;
 }
 
-const configPath = path.join(process.env.APPDATA, 'Achievements', 'configs', `${configName}.json`);
+const configPath = path.join(process.env.APPDATA, 'Achievements', 'configs', `${safeName}.json`);
 let config;
 try {
 config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
@@ -1427,43 +1445,48 @@ overlayWindow.webContents.send('set-language', selectedLanguage);
 });
 
 ipcMain.handle('get-config-by-name', async (event, name) => {
-try {
-const configPath = path.join(configsDir, `${name}.json`);
-
-if (!fs.existsSync(configPath)) {
-console.warn(`❌ Config not found: ${configPath}`);
-throw new Error('Config not found');
-}
-
-const data = fs.readFileSync(configPath, 'utf8');
-return JSON.parse(data);
-} catch (err) {
-throw err;
-}
+  const safe = sanitizeConfigName(name);
+  const configPath = path.join(configsDir, `${safe}.json`);
+  try {
+    if (!fs.existsSync(configPath)) throw new Error('Config not found');
+    const data = fs.readFileSync(configPath, 'utf8');
+    return JSON.parse(data);
+  } catch (err) {
+    throw err;
+  }
 });
 
 ipcMain.handle('renameAndSaveConfig', async (event, oldName, newConfig) => {
-const oldConfigPath = path.join(configsDir, `${oldName}.json`);
-const newConfigPath = path.join(configsDir, `${newConfig.name}.json`);
+  try {
+    const safeOld = sanitizeConfigName(oldName);
+    const safeNew = sanitizeConfigName(newConfig.name);
 
-const oldCachePath = getCachePath(oldName);
-const newCachePath = getCachePath(newConfig.name);
+	const oldConfigPath = path.join(configsDir, `${safeOld}.json`);
+	const newConfigPath = path.join(configsDir, `${safeNew}.json`);
 
-try {
-if (oldName !== newConfig.name && fs.existsSync(oldConfigPath)) {
-fs.renameSync(oldConfigPath, newConfigPath);
-}
-fs.writeFileSync(newConfigPath, JSON.stringify(newConfig, null, 2));
+	const oldCachePath = getCachePath(safeOld);
+	const newCachePath = getCachePath(safeNew);
 
-if (fs.existsSync(oldCachePath)) {
-fs.renameSync(oldCachePath, newCachePath);
-} else {
-}
+    if (safeOld !== safeNew && fs.existsSync(oldConfigPath)) {
+      fs.renameSync(oldConfigPath, newConfigPath);
+    }
+    const payload = {
+      ...newConfig,
+      name: safeNew,
+      displayName: newConfig.displayName || newConfig.name
+    };
+	
+	fs.writeFileSync(newConfigPath, JSON.stringify(newConfig, null, 2));
 
-return { success: true, message: `Config "${oldName}" has been renamed and saved.` };
-} catch (error) {
-return { success: false, message: "Failed to rename and save config." };
-}
+	if (fs.existsSync(oldCachePath)) {
+	fs.renameSync(oldCachePath, newCachePath);
+	} else {
+	}
+
+	return { success: true, message: `Config "${oldName}" has been renamed and saved.` };
+	} catch (error) {
+	return { success: false, message: "Failed to rename and save config." };
+	}
 });
 
 
