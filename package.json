@@ -1,22 +1,26 @@
 {
   "name": "Achievements",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Achievements",
   "author": "JokerVerse",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder --win --x64"
+    "dl-browsers": "cross-env PLAYWRIGHT_BROWSERS_PATH=0 node ./node_modules/playwright-core/cli.js install chromium chromium-headless-shell",
+    "dist": "npm run dl-browsers && electron-builder --win --x64"
   },
   "build": {
     "appId": "com.achievements.app",
     "productName": "Achievements",
     "copyright": "Copyright © 2025 JokerVerse",
     "asarUnpack": [
-	  "utils/**",
+      "utils/**",
       "utils/pslist-wrapper.mjs",
-	  "**/node_modules/screenshot-desktop/**"
+      "**/node_modules/screenshot-desktop/**",
+      "**/node_modules/playwright/**",
+      "**/node_modules/playwright-core/**",
+      "**/node_modules/**/.local-browsers/**"
     ],
     "directories": {
       "output": "dist"
@@ -28,7 +32,6 @@
       "index.html",
       "overlay.html",
       "progress.html",
-      "gameImage.html",
       "playtime.html",
       "playtime-log-watcher.js",
       "style.css",
@@ -50,6 +53,10 @@
       {
         "from": "icon.ico",
         "to": "icon.ico"
+      },
+      {
+        "from": "node_modules/playwright-core/.local-browsers",
+        "to": "playwright-browsers"
       }
     ],
     "win": {
@@ -74,18 +81,22 @@
     }
   },
   "dependencies": {
-    "axios": "^1.9.0",
-    "cheerio": "^1.0.0",
+    "axios": "^1.12.0",
+    "cheerio": "^1.1.2",
+    "chokidar": "^4.0.3",
     "crc-32": "^1.2.2",
     "ini": "^4.1.1",
     "jsdom": "^26.1.0",
+    "playwright": "^1.55.0",
     "ps-list": "^8.1.1",
     "screenshot-desktop": "^1.15.2",
     "ws": "^8.18.1"
   },
   "devDependencies": {
+    "cross-env": "^10.0.0",
     "electron": "^27.3.11",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^24.13.3",
+    "eslint": "^9.35.0"
   },
   "overrides": {
     "glob": "^9.0.0"

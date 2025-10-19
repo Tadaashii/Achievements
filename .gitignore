@@ -1,3 +1,6 @@
 node_modules/
 dist/
 /COMMITMSG.txt
+/.vs
+/.vscode
+/my_login.txt

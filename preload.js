@@ -1,123 +1,280 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer } = require("electron");
 
-contextBridge.exposeInMainWorld('customApi', {
-minimizeWindow: () => ipcRenderer.send('minimize-window'),
-maximizeWindow: () => ipcRenderer.send('maximize-window'),
-closeWindow: () => ipcRenderer.send('close-window')
+contextBridge.exposeInMainWorld("customApi", {
+  minimizeWindow: () => ipcRenderer.send("minimize-window"),
+  maximizeWindow: () => ipcRenderer.send("maximize-window"),
+  closeWindow: () => ipcRenderer.send("close-window"),
+});
+let overlayDataHandler = null;
+contextBridge.exposeInMainWorld("api", {
+  // Config management
+  saveConfig: (config) => ipcRenderer.invoke("saveConfig", config),
+  loadConfigs: () => ipcRenderer.invoke("loadConfigs"),
+  selectFolder: () => ipcRenderer.invoke("selectFolder"),
+  deleteConfig: (configName) => ipcRenderer.invoke("delete-config", configName),
+
+  // Achievements loading
+  loadAchievementData: async (configName) => {
+    try {
+      return await ipcRenderer.invoke("load-achievements", configName);
+    } catch (e) {
+      return { achievements: null, error: String(e?.message || e) };
+    }
+  },
+  loadSavedAchievements: async (configName) => {
+    try {
+      return await ipcRenderer.invoke("load-saved-achievements", configName);
+    } catch (e) {
+      return { achievements: {}, error: String(e?.message || e) };
+    }
+  },
+
+  // Presets
+  loadPresets: () => ipcRenderer.invoke("load-presets"),
+
+  // Notification
+  showNotification: (data) => ipcRenderer.send("show-notification", data),
+  showTestNotification: (options) =>
+    ipcRenderer.send("show-test-notification", options),
+  queueAchievementNotification: (data) =>
+    ipcRenderer.send("queue-achievement-notification", data),
+  queueProgressNotification: (data) =>
+    ipcRenderer.send("queue-progress-notification", data),
+  onNotification: (callback) =>
+    ipcRenderer.on("show-notification", (event, data) => callback(data)),
+  onNotify: (callback) => ipcRenderer.on("notify", (_, data) => callback(data)),
+  notifyMain: (msg) => ipcRenderer.send("notify-from-child", msg),
+  once: (channel, callback) => {
+    ipcRenderer.once(channel, (_, data) => callback(data));
+  },
+  disableProgress: (value) => ipcRenderer.send("set-disable-progress", value),
+  setDisablePlaytime: (value) =>
+    ipcRenderer.send("set-disable-playtime", value),
+  getDisablePlaytimeSync: () => ipcRenderer.sendSync("disable-playtime-check"),
+  resolveIconUrl: (configPath, rel) =>
+    ipcRenderer.invoke("resolve-icon-url", configPath, rel),
+  getDisplayWorkArea: () => ipcRenderer.invoke("get-display-workarea"),
+  // Event for receiving a new monitored achievement
+  onNewAchievement: (callback) =>
+    ipcRenderer.on("new-achievement", (event, data) => callback(data)),
+  onRefreshAchievementsTable: (callback) =>
+    ipcRenderer.on("refresh-achievements-table", (event, data) =>
+      callback(data)
+    ),
+
+  // Update the configuration (now uses the 'update-config' event)
+  updateConfig: (configData) => ipcRenderer.send("update-config", configData),
+  toggleOverlay: (selectedConfig) =>
+    ipcRenderer.send("toggle-overlay", selectedConfig),
+  onLoadOverlayData: (callback) => {
+    if (overlayDataHandler) {
+      ipcRenderer.removeListener("load-overlay-data", overlayDataHandler);
+    }
+    overlayDataHandler = (_event, config) => callback(config);
+    ipcRenderer.on("load-overlay-data", overlayDataHandler);
+  },
+  onToggleOverlayShortcut: (callback) =>
+    ipcRenderer.on("toggle-overlay-shortcut", () => callback()),
+  onSetLanguage: (callback) =>
+    ipcRenderer.on("set-language", (event, lang) => callback(lang)),
+
+  // Other functionalities
+  savePreferences: (prefs) => ipcRenderer.invoke("save-preferences", prefs),
+  loadPreferences: () => ipcRenderer.invoke("load-preferences"),
+  getSounds: () => ipcRenderer.invoke("get-sound-files"),
+  getSoundFullPath: (fileName) =>
+    ipcRenderer.invoke("get-sound-path", fileName),
+  onPlaySound: (callback) =>
+    ipcRenderer.on("play-sound", (event, sound) => callback(sound)),
+  onProgressUpdate: (callback) =>
+    ipcRenderer.on("show-progress", (event, data) => callback(data)),
+  closeNotificationWindow: () => ipcRenderer.send("close-notification-window"),
+  parseStatsBin: (filePath) => ipcRenderer.invoke("parse-stats-bin", filePath),
+  selectFile: () => ipcRenderer.invoke("select-file"),
+  getConfigByName: async (name) => {
+    try {
+      return await ipcRenderer.invoke("get-config-by-name", name);
+    } catch (e) {
+      return { __failed: true, __error: String(e?.message || e), name };
+    }
+  },
+  renameAndSaveConfig: (oldName, config) =>
+    ipcRenderer.invoke("renameAndSaveConfig", oldName, config),
+  selectExecutable: () => ipcRenderer.invoke("selectExecutable"),
+  launchExecutable: (exe, args) =>
+    ipcRenderer.invoke("launchExecutable", exe, args),
+  onAchievementsMissing: (callback) =>
+    ipcRenderer.on("achievements-missing", (e, configName) =>
+      callback(configName)
+    ),
+  checkLocalGameImage: (appid) =>
+    ipcRenderer.invoke("checkLocalGameImage", appid),
+  saveGameImage: (appid, buffer) =>
+    ipcRenderer.invoke("saveGameImage", appid, buffer),
+  onImageUpdate: (callback) =>
+    ipcRenderer.on("update-image", (_, url) => callback(url)),
+  on: (channel, callback) =>
+    ipcRenderer.on(channel, (_, data) => callback(data)),
+  setZoom: (zoomFactor) => ipcRenderer.send("set-zoom", zoomFactor),
+  updateOverlayShortcut: (combo) =>
+    ipcRenderer.send("update-overlay-shortcut", combo),
+  requestCurrentConfig: () => ipcRenderer.send("request-current-config"),
+  // language
+  refreshUILanguage: (language) =>
+    ipcRenderer.send("refresh-ui-after-language-change", language),
+  setLanguage: (lang) => {
+    window.currentLang = lang;
+  },
+  onConfigsChanged: (handler) => ipcRenderer.on("configs:changed", handler),
+  onSchemaReady: (handler) => ipcRenderer.on("config:schema-ready", handler),
+  onAutoSelectConfig: (handler) =>
+    ipcRenderer.on("auto-select-config", (_e, name) => handler(name)),
+  getSteamDbCover: (appid) => ipcRenderer.invoke("covers:steamdb", appid),
+  setStartWithWindows: (enabled) =>
+    ipcRenderer.invoke("startup:set-start-with-windows", enabled),
+  getStartWithWindows: () =>
+    ipcRenderer.invoke("startup:get-start-with-windows"),
+  getTotalPlaytime: (configName) =>
+    ipcRenderer.invoke("playtime:get-total", configName),
+  onPlaytimeUpdate: (callback) => {
+    if (typeof callback !== "function") return () => {};
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on("playtime:update", handler);
+    return () => ipcRenderer.removeListener("playtime:update", handler);
+  },
 });
 
-contextBridge.exposeInMainWorld('api', {
-// Config management
-saveConfig: (config) => ipcRenderer.invoke('saveConfig', config),
-loadConfigs: () => ipcRenderer.invoke('loadConfigs'),
-selectFolder: () => ipcRenderer.invoke('selectFolder'),
-deleteConfig: (configName) => ipcRenderer.invoke('delete-config', configName),
-
-// Achievements loading
-loadAchievementData: (configName) => ipcRenderer.invoke('load-achievements', configName),
-loadSavedAchievements: (configName) => ipcRenderer.invoke('load-saved-achievements', configName),
-
-// Presets
-loadPresets: () => ipcRenderer.invoke('load-presets'),
-
-// Notification
-showNotification: (data) => ipcRenderer.send('show-notification', data),
-showTestNotification: (options) => ipcRenderer.send('show-test-notification', options),
-onNotification: (callback) => ipcRenderer.on('show-notification', (event, data) => callback(data)),
-onNotify: (callback) => ipcRenderer.on('notify', (_, data) => callback(data)),
-notifyMain: (msg) => ipcRenderer.send('notify-from-child', msg),
-once: (channel, callback) => { ipcRenderer.once(channel, (_, data) => callback(data));},
-disableProgress: (value) => ipcRenderer.send('set-disable-progress', value),
-setDisablePlaytime: (value) => ipcRenderer.send('set-disable-playtime', value),
-getDisablePlaytimeSync: () => ipcRenderer.sendSync('disable-playtime-check'),
-resolveIconUrl: (configPath, rel) => ipcRenderer.invoke('resolve-icon-url', configPath, rel),
-
-// Event for receiving a new monitored achievement
-onNewAchievement: (callback) => ipcRenderer.on('new-achievement', (event, data) => callback(data)),
-onRefreshAchievementsTable: (callback) => ipcRenderer.on('refresh-achievements-table', (event, data) => callback(data)),
-
-// Update the configuration (now uses the 'update-config' event)
-updateConfig: (configData) => ipcRenderer.send('update-config', configData),
-toggleOverlay: (selectedConfig) => ipcRenderer.send('toggle-overlay', selectedConfig),
-onLoadOverlayData: (callback) => ipcRenderer.on('load-overlay-data', (event, config) => callback(config)),
-onToggleOverlayShortcut: (callback) => ipcRenderer.on('toggle-overlay-shortcut', () => callback()),
-onSetLanguage: (callback) => ipcRenderer.on('set-language', (event, lang) => callback(lang)),
-
-// Other functionalities
-savePreferences: (prefs) => ipcRenderer.invoke('save-preferences', prefs),
-loadPreferences: () => ipcRenderer.invoke('load-preferences'),
-getSounds: () => ipcRenderer.invoke('get-sound-files'),
-getSoundFullPath: (fileName) => ipcRenderer.invoke('get-sound-path', fileName),
-onPlaySound: (callback) => ipcRenderer.on('play-sound', (event, sound) => callback(sound)),
-onProgressUpdate: (callback) => ipcRenderer.on('show-progress', (event, data) => callback(data)),
-closeNotificationWindow: () => ipcRenderer.send('close-notification-window'),
-parseStatsBin: (filePath) => ipcRenderer.invoke('parse-stats-bin', filePath),
-selectFile: () => ipcRenderer.invoke('select-file'),
-getConfigByName: (name) => ipcRenderer.invoke('get-config-by-name', name),
-renameAndSaveConfig: (oldName, config) => ipcRenderer.invoke('renameAndSaveConfig', oldName, config),
-selectExecutable: () => ipcRenderer.invoke('selectExecutable'),
-launchExecutable: (exe, args) => ipcRenderer.invoke('launchExecutable', exe, args),
-onAchievementsMissing: (callback) => ipcRenderer.on('achievements-missing', (e, configName) => callback(configName)),
-checkLocalGameImage: (appid) => ipcRenderer.invoke('checkLocalGameImage', appid),
-saveGameImage: (appid, buffer) => ipcRenderer.invoke('saveGameImage', appid, buffer),
-onImageUpdate: (callback) => ipcRenderer.on('update-image', (_, url) => callback(url)),
-on: (channel, callback) => ipcRenderer.on(channel, (_, data) => callback(data)),
-setZoom: (zoomFactor) => ipcRenderer.send('set-zoom', zoomFactor),
-updateOverlayShortcut: (combo) => ipcRenderer.send('update-overlay-shortcut', combo),
-requestCurrentConfig: () => ipcRenderer.send('request-current-config'),
-// language
-refreshUILanguage: (language) => ipcRenderer.send('refresh-ui-after-language-change', language),
-setLanguage: (lang) => {
-  window.currentLang = lang;
-},
-setLanguageAndReload: async (language) => {
-  await ipcRenderer.invoke('save-preferences', { language });
-  ipcRenderer.send('refresh-ui-after-language-change', language);
-}
+contextBridge.exposeInMainWorld("electron", {
+  ipcRenderer: {
+    on: (channel, func) => {
+      const validChannels = [
+        "window-state-change",
+        "notify",
+        "achievements-missing",
+        "show-progress",
+        "show-playtime",
+        "playtime:update",
+        "start-close-animation",
+        "configs:changed",
+        "refresh-achievements-table",
+        "auto-select-config",
+        "achievements:file-updated",
+        "update-image",
+        "play-sound",
+        "achgen:log",
+        "set-language",
+        "load-overlay-data",
+        "show-notification",
+        "zoom-factor-changed",
+        "request-current-config",
+      ];
+      if (validChannels.includes(channel)) {
+        ipcRenderer.on(channel, (event, ...args) => func(...args));
+      }
+    },
+    send: (channel, data) => {
+      const validChannels = [
+        "refresh-ui-after-language-change",
+        "update-overlay-shortcut",
+        "close-playtime-window",
+        "request-current-config",
+      ];
+      if (validChannels.includes(channel)) {
+        ipcRenderer.send(channel, data);
+      }
+    },
+    invoke: (channel, ...args) => {
+      const valid = [
+        "folders:list",
+        "folders:add",
+        "folders:remove",
+        "folders:rescan",
+        "saveConfig",
+        "loadConfigs",
+        "selectFolder",
+        "delete-config",
+        "load-achievements",
+        "load-saved-achievements",
+        "load-presets",
+        "save-preferences",
+        "load-preferences",
+        "get-sound-files",
+        "get-sound-path",
+        "resolve-icon-url",
+        "get-config-by-name",
+        "renameAndSaveConfig",
+        "selectExecutable",
+        "launchExecutable",
+        "checkLocalGameImage",
+        "saveGameImage",
+        "generate-auto-configs",
+        "ui:confirm",
+        "ui:refocus",
+        "achgen:get-backlog",
+        "request-current-config",
+      ];
+      if (!valid.includes(channel))
+        throw new Error(`Blocked invoke on channel: ${channel}`);
+      return ipcRenderer.invoke(channel, ...args);
+    },
+  },
 });
 
-
-contextBridge.exposeInMainWorld('electron', {
-ipcRenderer: {
-on: (channel, func) => {
-  const validChannels = ['window-state-change', 'notify', 'achievements-missing', 'update-image', 'show-playtime', 'start-close-animation'];
-  if (validChannels.includes(channel)) {
-    ipcRenderer.on(channel, (event, ...args) => func(...args));
-  }
-},
-send: (channel, data) => {
-  const validChannels = ['refresh-ui-after-language-change', 'update-overlay-shortcut', 'close-playtime-window'];
-  if (validChannels.includes(channel)) {
-    ipcRenderer.send(channel, data);
-  }
-}
-}
+contextBridge.exposeInMainWorld("autoConfigApi", {
+  generateConfigs: (folderPath) =>
+    ipcRenderer.invoke("generate-auto-configs", folderPath),
 });
 
-contextBridge.exposeInMainWorld('autoConfigApi', {
-  generateConfigs: (folderPath) => ipcRenderer.invoke('generate-auto-configs', folderPath),
-});
-
-// --- Compat: preseturi vechi care folosesc window.electronAPI.onNotification
 (function () {
   const normalizeFileUrl = (raw) => {
-    if (!raw) return '';
+    if (!raw) return "";
     const s = String(raw);
-    return s.startsWith('file://') ? s : `file:///${s.replace(/\\/g, '/')}`;
+    return s.startsWith("file://") ? s : `file:///${s.replace(/\\/g, "/")}`;
   };
 
-  contextBridge.exposeInMainWorld('electronAPI', {
+  contextBridge.exposeInMainWorld("electronAPI", {
     onNotification: (cb) => {
-      ipcRenderer.on('show-notification', (_e, data) => {
-        // preferă iconPath calculat de main; dacă nu, cade pe icon
-        const raw = data?.iconPath || data?.icon || '';
-        const normalized = raw ? normalizeFileUrl(raw) : '';
+      ipcRenderer.on("show-notification", (_e, data) => {
+        const raw = data?.iconPath || data?.icon || "";
+        const normalized = raw ? normalizeFileUrl(raw) : "";
         cb({
           ...data,
-          icon: normalized,      // preset-urile vechi citesc .icon
-          iconPath: normalized,  // preset-urile noi citesc .iconPath
+          icon: normalized,
+          iconPath: normalized,
         });
       });
-    }
+    },
   });
 })();
+
+contextBridge.exposeInMainWorld("ui", {
+  confirm: (opts) => ipcRenderer.invoke("ui:confirm", opts),
+  refocus: () => ipcRenderer.invoke("ui:refocus"),
+});
+
+// Achievements schema
+contextBridge.exposeInMainWorld("achgen", {
+  onLog: (callback) => {
+    const handler = (_e, msg) => callback(msg); // msg: {type, level, message, ...}
+    ipcRenderer.on("achgen:log", handler);
+    return () => ipcRenderer.removeListener("achgen:log", handler); // unsubscribe
+  },
+  onStdout: (callback) => {
+    const handler = (_e, line) => callback(line);
+    ipcRenderer.on("achgen:stdout", handler);
+    return () => ipcRenderer.removeListener("achgen:stdout", handler);
+  },
+  onStderr: (callback) => {
+    const handler = (_e, line) => callback(line);
+    ipcRenderer.on("achgen:stderr", handler);
+    return () => ipcRenderer.removeListener("achgen:stderr", handler);
+  },
+});
+
+// Folders
+contextBridge.exposeInMainWorld("folders", {
+  list: () => ipcRenderer.invoke("folders:list"),
+  add: (dirPath) => ipcRenderer.invoke("folders:add", dirPath),
+  remove: (dirPath) => ipcRenderer.invoke("folders:remove", dirPath),
+  rescan: () => ipcRenderer.invoke("folders:rescan"),
+});
