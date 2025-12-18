@@ -154,8 +154,20 @@ Creates a standalone `.exe` installer in the `dist/` folder.
    - Download achievement data and images using Steam API
    - Create pre-configured entries for each detected game
    - Add configs to your dashboard automatically
-
-**Note**: Auto-configuration requires a Steam API key (optional) in `my_login.txt` with format: `key=YOUR_API_KEY`. Without a key, only English achievements will be fetched from SteamDB/Steam Hunters.
+3. Watched Folders:
+   - By default the following folders are watched and configs are load automatically, or schema is created when new APPID is created.
+   - ["PUBLIC", ["Documents", "Steam", "CODEX"]],
+   - ["PUBLIC", ["Documents", "Steam", "RUNE"]],
+   - ["PUBLIC", ["Documents", "OnlineFix"]],
+   - ["PUBLIC", ["Documents", "EMPRESS"]],
+   - ["APPDATA", ["Goldberg SteamEmu Saves"]],
+   - ["APPDATA", ["GSE Saves"]],
+   - ["APPDATA", ["EMPRESS"]],
+   - ["LOCALAPPDATA", ["anadius", "LSX emu", "achievement_watcher"]],
+   - ["APPDATA", ["Steam", "CODEX"]],
+   - ["APPDATA", ["SmartSteamEmu"]],
+   - ["LOCALAPPDATA", ["SKIDROW"]]
+     **Note**: Auto-configuration requires a Steam API key (optional) in `my_login.txt` with format: `key=YOUR_API_KEY`. Without a key, only English achievements will be fetched from SteamDB/Steam Hunters.
 
 ### Dashboard
 

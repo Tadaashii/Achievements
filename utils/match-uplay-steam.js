@@ -1,0 +1,628 @@
+/**
+ * Run with:  node utils/match-uplay-steam.js
+ * Output:    assets/uplay-steam.json
+ */
+
+const https = require("https");
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
+const HTTP_TIMEOUT_MS = 15000;
+
+const UPLAY_URL =
+  "https://raw.githubusercontent.com/Haoose/UPLAY_GAME_ID/master/README.md";
+const STEAM_URL = "https://api.steampowered.com/ISteamApps/GetAppList/v2/";
+const DEFAULT_STEAM_DB_ASSET = path.join(
+  __dirname,
+  "..",
+  "assets",
+  "steamdb.json"
+);
+const DEFAULT_STEAM_DB_RUNTIME = (() => {
+  const base =
+    process.env.APPDATA ||
+    (process.platform === "win32"
+      ? path.join(os.homedir(), "AppData", "Roaming")
+      : path.join(os.homedir(), ".local", "share"));
+  return path.join(base, "Achievements", "steamdb.json");
+})();
+const STEAM_DB_PATH = path.resolve(
+  process.env.STEAM_DB_PATH || DEFAULT_STEAM_DB_RUNTIME
+);
+_MS = 15000;
+const MIN_TOKEN_SCORE = 0.72;
+
+const DEFAULT_OUTPUT = path.join(__dirname, "..", "assets", "uplay-steam.json");
+const outputFlag = process.argv
+  .slice(2)
+  .find((arg) => arg.startsWith("--output="));
+const OUTPUT_FILE = path.resolve(
+  outputFlag
+    ? outputFlag.slice("--output=".length)
+    : process.env.UPLAY_STEAM_MAP_PATH || DEFAULT_OUTPUT
+);
+
+const STOP_WORDS = new Set([
+  "hd",
+  "remastered",
+  "edition",
+  "ultimate",
+  "definitive",
+  "complete",
+  "gold",
+  "deluxe",
+  "version",
+  "steam",
+  "uplay",
+  "asia",
+  "ru",
+  "jp",
+  "jpn",
+  "cz",
+  "pack",
+  "collection",
+  "trilogy",
+]);
+
+const GENERIC_SERIES_WORDS = new Set([
+  "tom",
+  "clancy",
+  "clancy's",
+  "ghost",
+  "recon",
+  "beta",
+  "closed",
+  "open",
+  "game",
+  "edition",
+  "demo",
+]);
+
+const NEGATIVE_NAME_PATTERNS = [
+  /activation/i,
+  /bundle/i,
+  /pack/i,
+  /dlc/i,
+  /beta/i,
+  /demo/i,
+  /soundtrack/i,
+  /test/i,
+  /companion/i,
+  /trailer/i,
+];
+
+function loadExistingData() {
+  if (!fs.existsSync(OUTPUT_FILE)) return [];
+  try {
+    const raw = fs.readFileSync(OUTPUT_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.warn("⚠️ Failed to load existing mapping:", err.message);
+    return [];
+  }
+}
+
+function loadLocalSteamDb() {
+  try {
+    if (!fs.existsSync(STEAM_DB_PATH)) {
+      // seed runtime copy from assets if available
+      if (fs.existsSync(DEFAULT_STEAM_DB_ASSET)) {
+        fs.mkdirSync(path.dirname(STEAM_DB_PATH), { recursive: true });
+        fs.copyFileSync(DEFAULT_STEAM_DB_ASSET, STEAM_DB_PATH);
+      } else {
+        fs.mkdirSync(path.dirname(STEAM_DB_PATH), { recursive: true });
+        fs.writeFileSync(STEAM_DB_PATH, "[]", "utf8");
+      }
+    }
+  } catch {}
+
+  if (!fs.existsSync(STEAM_DB_PATH)) return [];
+  try {
+    const raw = fs.readFileSync(STEAM_DB_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.warn("⚠️ Failed to load steamdb.json:", err.message);
+    return [];
+  }
+}
+
+function persistSteamDb(apps) {
+  try {
+    fs.mkdirSync(path.dirname(STEAM_DB_PATH), { recursive: true });
+    fs.writeFileSync(STEAM_DB_PATH, JSON.stringify(apps, null, 2), "utf8");
+    console.log(
+      `💾 updated Steam DB: ${apps.length} entries -> ${STEAM_DB_PATH}`
+    );
+  } catch (err) {
+    console.warn("⚠️ Failed to persist steamdb.json:", err.message);
+  }
+}
+
+function httpGet(url) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, (res) => {
+      if (res.statusCode !== 200) {
+        reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+        res.resume();
+        return;
+      }
+      let data = "";
+      res.setEncoding("utf8");
+      res.on("data", (chunk) => (data += chunk));
+      res.on("end", () => resolve(data));
+    });
+
+    req.setTimeout(HTTP_TIMEOUT_MS, () => {
+      req.destroy(new Error(`Request timed out for ${url}`));
+    });
+
+    req.on("error", reject);
+  });
+}
+
+function normalizeBase(str) {
+  return String(str || "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[™©®]/g, "")
+    .replace(/[^a-z0-9&'():/+\- ]/gi, " ")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function stripEdition(txt) {
+  return txt
+    .replace(
+      /\s*\((ru|jpn|jp|cz|asia|steam version|steam|uplay version(?:\/australia)?|australia|kr|cn)\)\s*/gi,
+      ""
+    )
+    .replace(
+      /\b(ultimate|gold|deluxe|definitive|complete|remastered|hd|pack)\b/gi,
+      ""
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeUplayName(str) {
+  return normalizeBase(stripEdition(str));
+}
+
+function normalizeSteamName(str) {
+  return normalizeBase(str);
+}
+
+function normalizeLoose(str) {
+  return normalizeBase(str)
+    .replace(/[:\-_,./+()]/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function normalizeTokenWord(word) {
+  let w = word.replace(/^'+/, "").replace(/'+$/, "");
+  if (w.endsWith("ies") && w.length > 4) {
+    w = w.slice(0, -3) + "y";
+  } else if (w.endsWith("ves") && w.length > 4) {
+    w = w.slice(0, -3) + "f";
+  } else if (w.endsWith("es") && w.length > 3) {
+    w = w.slice(0, -2);
+  } else if (w.endsWith("s") && w.length > 3) {
+    w = w.slice(0, -1);
+  }
+  const roman = romanToInt(w);
+  if (roman !== null) {
+    return String(roman);
+  }
+  return w;
+}
+
+function romanToInt(str) {
+  const upper = str.toUpperCase();
+  if (!/^[IVXLCDM]+$/.test(upper)) return null;
+  const map = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
+  let total = 0;
+  let prev = 0;
+  for (let i = upper.length - 1; i >= 0; i--) {
+    const val = map[upper[i]];
+    if (!val) return null;
+    if (val < prev) {
+      total -= val;
+    } else {
+      total += val;
+      prev = val;
+    }
+  }
+  if (total <= 0 || total > 50) return null;
+  return total;
+}
+
+function tokenizeImportant(str) {
+  return normalizeLoose(str)
+    .split(" ")
+    .map(normalizeTokenWord)
+    .filter((w) => w && !STOP_WORDS.has(w));
+}
+
+function buildDistinctiveTokens(str) {
+  const tokens = tokenizeImportant(str);
+  const filtered = tokens.filter((t) => !GENERIC_SERIES_WORDS.has(t));
+  return filtered.length ? filtered : tokens;
+}
+
+function containsAllDistinctiveTokens(app, requiredTokens) {
+  if (!requiredTokens.length) return true;
+  return requiredTokens.every((token) => app.tokens.includes(token));
+}
+
+function stripParentheses(str) {
+  return String(str || "")
+    .replace(/\s*\([^)]*\)\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function generateVariants(rawName) {
+  const variants = new Set();
+  const cleaned = stripParentheses(
+    String(rawName || "")
+      .replace(/[™®]/g, "")
+      .trim()
+  );
+  const base = stripEdition(cleaned);
+
+  const addVariant = (value) => {
+    if (!value) return;
+    const norm = value.replace(/\s+/g, " ").trim();
+    if (norm) variants.add(norm);
+  };
+
+  addVariant(base);
+  addVariant(stripEdition(stripParentheses(rawName)));
+
+  const withoutTomClancy = base.replace(/^tom clancy'?s\s+/i, "").trim();
+  addVariant(withoutTomClancy);
+
+  const withoutSeries = base.replace(/ghost\s+recon/gi, "").trim();
+  addVariant(withoutSeries);
+
+  const tokens = base.split(/\s+/).filter(Boolean);
+  for (let i = 0; i < tokens.length; i++) {
+    addVariant(tokens.slice(i).join(" "));
+  }
+  for (let len = tokens.length; len > 1; len--) {
+    addVariant(tokens.slice(0, len).join(" "));
+  }
+  if (tokens.length >= 2) {
+    addVariant(tokens.slice(-2).join(" "));
+  }
+
+  return Array.from(variants);
+}
+
+function scoreTokens(uTokens, sTokens) {
+  if (!uTokens.length || !sTokens.length) return 0;
+  const overlap = tokenOverlapCount(uTokens, sTokens);
+  if (!overlap) return 0;
+  const uSet = new Set(uTokens);
+  const sSet = new Set(sTokens);
+  return (2 * overlap) / (uSet.size + sSet.size);
+}
+
+function tokenOverlapCount(uTokens, sTokens) {
+  if (!uTokens.length || !sTokens.length) return 0;
+  const uSet = new Set(uTokens);
+  const sSet = new Set(sTokens);
+  let overlap = 0;
+  for (const token of uSet) {
+    if (sSet.has(token)) overlap++;
+  }
+  return overlap;
+}
+
+function collectTokenCandidates(tokens, tokenIndex) {
+  const seen = new Set();
+  const candidates = [];
+  for (const token of tokens) {
+    const bucket = tokenIndex.get(token);
+    if (!bucket) continue;
+    for (const app of bucket) {
+      if (seen.has(app.appid)) continue;
+      seen.add(app.appid);
+      candidates.push(app);
+    }
+  }
+  return candidates;
+}
+
+function hasRequiredBaseOverlap(app, baseTokens) {
+  if (!baseTokens.length) return true;
+  const baseNumbers = baseTokens.filter((tok) => /^\d+$/.test(tok));
+  if (baseNumbers.length) {
+    const hasAllNumbers = baseNumbers.every((num) => app.tokens.includes(num));
+    if (!hasAllNumbers) return false;
+  }
+  const overlap = tokenOverlapCount(baseTokens, app.tokens);
+  if (baseTokens.length <= 2) {
+    return overlap === baseTokens.length;
+  }
+  const minRequired = Math.min(2, baseTokens.length);
+  return overlap >= minRequired;
+}
+
+function hasNegativeKeywords(app) {
+  const lower = app.name.toLowerCase();
+  return NEGATIVE_NAME_PATTERNS.some((re) => re.test(lower));
+}
+
+function filterPreferred(list) {
+  const sanitized = list.filter((app) => !hasNegativeKeywords(app));
+  return sanitized.length ? sanitized : list;
+}
+
+function chooseBestCandidate(list, requiredTokens, baseTokens, variantLength) {
+  const pool = filterPreferred(list);
+  let best = null;
+  let bestScore = -Infinity;
+  for (const app of pool) {
+    if (!containsAllDistinctiveTokens(app, requiredTokens)) continue;
+    if (!hasRequiredBaseOverlap(app, baseTokens)) continue;
+    const overlap = tokenOverlapCount(baseTokens, app.tokens);
+    const negativePenalty = hasNegativeKeywords(app) ? 1 : 0;
+    const lengthDiff = Math.abs(app.name.length - variantLength);
+    const score = overlap * 1000 - negativePenalty * 100 - lengthDiff;
+    if (score > bestScore || (score === bestScore && app.appid < best.appid)) {
+      best = app;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+function tryMatchVariant(variant, indexes, baseTokens) {
+  const { byExact, byLoose, bySignature, tokenIndex, steamApps } = indexes;
+  const norm = normalizeUplayName(variant);
+  const loose = normalizeLoose(variant);
+  const tokens = tokenizeImportant(variant);
+  const requiredTokens = buildDistinctiveTokens(variant);
+  const signature = tokenSignature(tokens);
+  const variantLength = variant.length;
+
+  const accept = (app) =>
+    app &&
+    containsAllDistinctiveTokens(app, requiredTokens) &&
+    hasRequiredBaseOverlap(app, baseTokens);
+
+  if (norm && byExact.has(norm)) {
+    const app = byExact.get(norm);
+    if (accept(app)) return app;
+  }
+
+  if (loose && byLoose.has(loose)) {
+    const app = byLoose.get(loose);
+    if (accept(app)) return app;
+  }
+
+  if (signature && bySignature.has(signature)) {
+    const app = bySignature.get(signature);
+    if (accept(app)) return app;
+  }
+
+  const normMatches = steamApps.filter(
+    (app) => norm && app.normalized.startsWith(norm)
+  );
+  const bestNorm = chooseBestCandidate(
+    normMatches,
+    requiredTokens,
+    baseTokens,
+    variantLength
+  );
+  if (bestNorm) return bestNorm;
+
+  const looseMatches = steamApps.filter(
+    (app) => loose && app.loose.startsWith(loose)
+  );
+  const bestLoose = chooseBestCandidate(
+    looseMatches,
+    requiredTokens,
+    baseTokens,
+    variantLength
+  );
+  if (bestLoose) return bestLoose;
+
+  if (baseTokens.length < 2) {
+    return null;
+  }
+
+  const candidates = filterPreferred(
+    collectTokenCandidates(tokens, tokenIndex)
+  );
+  let best = null;
+  let bestScore = -Infinity;
+
+  for (const app of candidates) {
+    if (!accept(app)) continue;
+    const baseOverlap = tokenOverlapCount(baseTokens, app.tokens);
+    const looseScore = scoreTokens(tokens, app.tokens);
+    if (looseScore < MIN_TOKEN_SCORE) continue;
+    const negativePenalty = hasNegativeKeywords(app) ? 1 : 0;
+    const lengthDiff = Math.abs(app.name.length - variantLength);
+    const score =
+      baseOverlap * 1000 +
+      looseScore * 100 -
+      negativePenalty * 100 -
+      lengthDiff;
+    if (score > bestScore || (score === bestScore && app.appid < best.appid)) {
+      best = app;
+      bestScore = score;
+    }
+  }
+
+  return best;
+}
+
+function findBestSteamForUplay(uplayName, indexes) {
+  const baseTokens = buildDistinctiveTokens(uplayName);
+  const variants = generateVariants(uplayName);
+  for (const variant of variants) {
+    const match = tryMatchVariant(variant, indexes, baseTokens);
+    if (match) return match;
+  }
+  return null;
+}
+
+function tokenSignature(tokens) {
+  if (!tokens.length) return "";
+  return [...new Set(tokens)].sort().join("|");
+}
+
+async function fetchUplayList() {
+  const txt = await httpGet(UPLAY_URL);
+  const lines = txt.split(/\r?\n/);
+  const out = [];
+
+  for (const line of lines) {
+    const match = line.match(/^\s*(\d+)\s*-\s*(.+?)\s*$/);
+    if (!match) continue;
+    out.push({ uplay_id: match[1], uplay_name: match[2] });
+  }
+
+  if (!out.length) {
+    throw new Error("Uplay list parse failed - format changed?");
+  }
+
+  return out;
+}
+
+async function fetchSteamList() {
+  const local = loadLocalSteamDb().filter(
+    (app) => Number.isInteger(app.appid) && app.name?.trim()
+  );
+  let remote = null;
+
+  try {
+    const raw = await httpGet(STEAM_URL);
+    const json = JSON.parse(raw);
+    const apps = json?.applist?.apps || [];
+    if (apps.length) {
+      remote = apps.filter(
+        (app) => Number.isInteger(app.appid) && app.name?.trim()
+      );
+    } else {
+      throw new Error("Steam GetAppList returned no entries.");
+    }
+  } catch (err) {
+    console.warn(
+      "⚠️ Steam GetAppList failed, using local steamdb.json:",
+      err.message
+    );
+  }
+
+  if (remote && remote.length) {
+    const map = new Map(local.map((a) => [a.appid, a.name]));
+    let changed = false;
+    for (const app of remote) {
+      const existingName = map.get(app.appid);
+      if (existingName === undefined) {
+        map.set(app.appid, app.name);
+        changed = true;
+      } else if (existingName !== app.name) {
+        map.set(app.appid, app.name);
+        changed = true;
+      }
+    }
+    const merged = Array.from(map.entries())
+      .map(([appid, name]) => ({ appid, name }))
+      .sort((a, b) => a.appid - b.appid);
+    if (changed) persistSteamDb(merged);
+    return merged;
+  }
+
+  if (local.length) return local;
+  throw new Error(
+    "Steam app list unavailable (remote failed and no steamdb.json)."
+  );
+}
+
+function buildSteamIndexes(steamApps) {
+  const enriched = steamApps.map((app) => {
+    const normalized = normalizeSteamName(app.name);
+    const loose = normalizeLoose(app.name);
+    const tokens = tokenizeImportant(app.name);
+    const signature = tokenSignature(tokens);
+    return { ...app, normalized, loose, tokens, signature };
+  });
+
+  const byExact = new Map();
+  const byLoose = new Map();
+  const bySignature = new Map();
+  const tokenIndex = new Map();
+
+  for (const app of enriched) {
+    if (!byExact.has(app.normalized)) byExact.set(app.normalized, app);
+    if (!byLoose.has(app.loose)) byLoose.set(app.loose, app);
+    if (app.signature && !bySignature.has(app.signature)) {
+      bySignature.set(app.signature, app);
+    }
+
+    for (const token of new Set(app.tokens)) {
+      if (!tokenIndex.has(token)) tokenIndex.set(token, []);
+      tokenIndex.get(token).push(app);
+    }
+  }
+
+  return { steamApps: enriched, byExact, byLoose, bySignature, tokenIndex };
+}
+
+async function main() {
+  console.log("⬇️ downloading Uplay list.");
+  const uplay = await fetchUplayList();
+  console.log("✅ Uplay entries:", uplay.length);
+
+  console.log("⬇️ downloading Steam list.");
+  const steam = await fetchSteamList();
+  console.log("✅ Steam entries:", steam.length);
+
+  const indexes = buildSteamIndexes(steam);
+  const existing = loadExistingData();
+  const existingMap = new Map(
+    existing.map((item) => [String(item.uplay_id), item])
+  );
+  const result = existing.slice();
+  let added = 0;
+
+  for (const entry of uplay) {
+    if (existingMap.has(entry.uplay_id)) continue;
+    const match = findBestSteamForUplay(entry.uplay_name, indexes);
+
+    const record = {
+      uplay_id: entry.uplay_id,
+      uplay_name: entry.uplay_name,
+      steam_appid: match ? match.appid : null,
+      steam_name: match ? match.name : null,
+    };
+    result.push(record);
+    existingMap.set(entry.uplay_id, record);
+    added++;
+  }
+
+  if (existing.length && added === 0) {
+    console.log("ℹ️ No new Uplay entries detected. Mapping unchanged.");
+    return;
+  }
+
+  fs.mkdirSync(path.dirname(OUTPUT_FILE), { recursive: true });
+  fs.writeFileSync(OUTPUT_FILE, JSON.stringify(result, null, 2), "utf8");
+  console.log(
+    added
+      ? `💾 appended ${added} new entries to ${OUTPUT_FILE}`
+      : `💾 generated mapping with ${result.length} entries`
+  );
+}
+
+main().catch((err) => {
+  console.error("ERROR:", err);
+  process.exit(1);
+});

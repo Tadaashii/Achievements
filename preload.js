@@ -12,6 +12,11 @@ contextBridge.exposeInMainWorld("api", {
   loadConfigs: () => ipcRenderer.invoke("loadConfigs"),
   selectFolder: () => ipcRenderer.invoke("selectFolder"),
   deleteConfig: (configName) => ipcRenderer.invoke("delete-config", configName),
+  blacklistConfig: (payload) => ipcRenderer.invoke("config:blacklist", payload),
+  getBlacklist: () => ipcRenderer.invoke("blacklist:list"),
+  resetBlacklist: () => ipcRenderer.invoke("blacklist:reset"),
+  isAppIdBlacklisted: (appid) => ipcRenderer.invoke("blacklist:check", appid),
+  getConfigByAppId: (appid) => ipcRenderer.invoke("config:get-by-appid", appid),
 
   // Achievements loading
   loadAchievementData: async (configName) => {
@@ -79,7 +84,8 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("set-language", (event, lang) => callback(lang)),
 
   // Other functionalities
-  savePreferences: (prefs) => ipcRenderer.invoke("save-preferences", prefs),
+  savePreferences: (prefs) => ipcRenderer.invoke("preferences:update", prefs),
+  updatePreferences: (prefs) => ipcRenderer.invoke("preferences:update", prefs),
   loadPreferences: () => ipcRenderer.invoke("load-preferences"),
   getSounds: () => ipcRenderer.invoke("get-sound-files"),
   getSoundFullPath: (fileName) =>
@@ -103,14 +109,18 @@ contextBridge.exposeInMainWorld("api", {
   selectExecutable: () => ipcRenderer.invoke("selectExecutable"),
   launchExecutable: (exe, args) =>
     ipcRenderer.invoke("launchExecutable", exe, args),
+  requestPlatinumManual: (payload) =>
+    ipcRenderer.invoke("platinum:manual", payload),
   onAchievementsMissing: (callback) =>
     ipcRenderer.on("achievements-missing", (e, configName) =>
       callback(configName)
     ),
-  checkLocalGameImage: (appid) =>
-    ipcRenderer.invoke("checkLocalGameImage", appid),
-  saveGameImage: (appid, buffer) =>
-    ipcRenderer.invoke("saveGameImage", appid, buffer),
+  logCoverEvent: (level, message, meta) =>
+    ipcRenderer.invoke("covers:ui-log", { level, message, meta }),
+  checkLocalGameImage: (appid, platform) =>
+    ipcRenderer.invoke("checkLocalGameImage", appid, platform),
+  saveGameImage: (appid, buffer, platform) =>
+    ipcRenderer.invoke("saveGameImage", appid, buffer, platform),
   onImageUpdate: (callback) =>
     ipcRenderer.on("update-image", (_, url) => callback(url)),
   on: (channel, callback) =>
@@ -130,18 +140,26 @@ contextBridge.exposeInMainWorld("api", {
   onAutoSelectConfig: (handler) =>
     ipcRenderer.on("auto-select-config", (_e, name) => handler(name)),
   getSteamDbCover: (appid) => ipcRenderer.invoke("covers:steamdb", appid),
+  getSteamGridDbCover: (payload) =>
+    ipcRenderer.invoke("covers:steamgriddb", payload),
   setStartWithWindows: (enabled) =>
     ipcRenderer.invoke("startup:set-start-with-windows", enabled),
   getStartWithWindows: () =>
     ipcRenderer.invoke("startup:get-start-with-windows"),
   getTotalPlaytime: (configName) =>
     ipcRenderer.invoke("playtime:get-total", configName),
+  setDashboardOpen: (state) => ipcRenderer.invoke("dashboard:set-open", state),
+  isDashboardOpen: () => ipcRenderer.invoke("dashboard:is-open"),
+  onDashboardPollPause: (handler) =>
+    ipcRenderer.on("dashboard:poll-pause", (_e, state) => handler(state)),
   onPlaytimeUpdate: (callback) => {
     if (typeof callback !== "function") return () => {};
     const handler = (_event, data) => callback(data);
     ipcRenderer.on("playtime:update", handler);
     return () => ipcRenderer.removeListener("playtime:update", handler);
   },
+  getSteamLookupAppId: (appid) =>
+    ipcRenderer.invoke("uplay:steam-appid", appid),
 });
 
 contextBridge.exposeInMainWorld("electron", {
@@ -189,6 +207,9 @@ contextBridge.exposeInMainWorld("electron", {
         "folders:add",
         "folders:remove",
         "folders:rescan",
+        "folders:block",
+        "folders:unblock",
+        "config:blacklist",
         "saveConfig",
         "loadConfigs",
         "selectFolder",
@@ -196,6 +217,7 @@ contextBridge.exposeInMainWorld("electron", {
         "load-achievements",
         "load-saved-achievements",
         "load-presets",
+        "preferences:update",
         "save-preferences",
         "load-preferences",
         "get-sound-files",
@@ -208,10 +230,16 @@ contextBridge.exposeInMainWorld("electron", {
         "checkLocalGameImage",
         "saveGameImage",
         "generate-auto-configs",
+        "blacklist:list",
+        "blacklist:reset",
         "ui:confirm",
         "ui:refocus",
         "achgen:get-backlog",
         "request-current-config",
+        "uplay:steam-appid",
+        "dashboard:set-open",
+        "dashboard:is-open",
+        "dashboard:poll-pause",
       ];
       if (!valid.includes(channel))
         throw new Error(`Blocked invoke on channel: ${channel}`);
@@ -277,4 +305,6 @@ contextBridge.exposeInMainWorld("folders", {
   add: (dirPath) => ipcRenderer.invoke("folders:add", dirPath),
   remove: (dirPath) => ipcRenderer.invoke("folders:remove", dirPath),
   rescan: () => ipcRenderer.invoke("folders:rescan"),
+  block: (dirPath) => ipcRenderer.invoke("folders:block", dirPath),
+  unblock: (dirPath) => ipcRenderer.invoke("folders:unblock", dirPath),
 });

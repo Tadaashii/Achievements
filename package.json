@@ -1,6 +1,6 @@
 {
-  "name": "Achievements",
-  "version": "1.0.8",
+  "name": "achievements",
+  "version": "1.0.9",
   "description": "Achievements",
   "author": "JokerVerse",
   "main": "main.js",

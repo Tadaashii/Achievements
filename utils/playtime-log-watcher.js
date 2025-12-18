@@ -6,6 +6,51 @@ const https = require("https");
 const { preferencesPath } = require("./paths");
 const { pathToFileURL } = require("url");
 const { accumulatePlaytime, sanitizeConfigName } = require("./playtime-store");
+const { fetchSteamGridDbImage } = require("./game-cover");
+const { normalizePlatform } = require("./config-platform-migrator");
+
+const defaultUplaySteamMapPath = path.join(
+  __dirname,
+  "..",
+  "assets",
+  "uplay-steam.json"
+);
+const runtimeUplaySteamMapPath = path.join(
+  path.dirname(preferencesPath),
+  "uplay-steam.json"
+);
+
+let steamLookupCache = null;
+function loadUplaySteamMap() {
+  if (steamLookupCache) return steamLookupCache;
+  steamLookupCache = new Map();
+  const candidates = [runtimeUplaySteamMapPath, defaultUplaySteamMapPath];
+  for (const file of candidates) {
+    if (!file) continue;
+    try {
+      if (!fs.existsSync(file)) continue;
+      const raw = fs.readFileSync(file, "utf8");
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((row) => {
+          if (row?.uplay_id) {
+            steamLookupCache.set(String(row.uplay_id), row);
+          }
+        });
+      }
+      if (steamLookupCache.size) break;
+    } catch {}
+  }
+  return steamLookupCache;
+}
+
+function resolveSteamAppId(appid) {
+  const key = String(appid || "").trim();
+  if (!key) return null;
+  const lookup = loadUplaySteamMap();
+  const entry = lookup.get(key);
+  return entry?.steam_appid ? String(entry.steam_appid) : null;
+}
 
 const playtimeStartMap = new Map();
 const activeWatchers = new Map();
@@ -62,25 +107,57 @@ function downloadImage(url, dest) {
   });
 }
 
-function cacheHeaderImage(userDataDir, appid, headerUrl) {
-  const imageDir = path.join(userDataDir, "images", String(appid));
+async function cacheHeaderImage(
+  userDataDir,
+  appid,
+  headerUrl,
+  options = {}
+) {
+  const platform = normalizePlatform(options?.platform) || "steam";
+  const preferLocalOnly = platform === "gog" || platform === "epic";
+  const imageDir = path.join(userDataDir, "images", platform, String(appid));
   try {
     if (!fs.existsSync(imageDir)) fs.mkdirSync(imageDir, { recursive: true });
   } catch {}
   const headerPath = path.join(imageDir, "header.jpg");
-
-  const doDownload = async () => {
-    try {
-      if (!fs.existsSync(headerPath)) {
-        await downloadImage(headerUrl, headerPath);
+  const localUrl = () => pathToFileURL(headerPath).toString();
+  try {
+    if (fs.existsSync(headerPath)) {
+      const stats = fs.statSync(headerPath);
+      if (stats.size === 0) {
+        fs.unlinkSync(headerPath);
+      } else {
+        return { headerUrl: localUrl() };
       }
-    } catch (e) {
-      return { headerUrl };
     }
-    return { headerUrl: pathToFileURL(headerPath).toString() };
+  } catch {}
+  const fallbackName = String(options?.gameName || "").trim();
+  const fallbackSize = options?.gridSize || "460x215";
+  const downloadToLocal = async (url) => {
+    await downloadImage(url, headerPath);
+    return { headerUrl: localUrl() };
   };
-
-  return doDownload();
+  try {
+    if (!preferLocalOnly && headerUrl) {
+      return await downloadToLocal(headerUrl);
+    }
+  } catch (err) {
+    // fallthrough to steamgrid
+  }
+  if (fallbackName) {
+    try {
+      const gridUrl = await fetchSteamGridDbImage(fallbackName, {
+        size: fallbackSize,
+      });
+      return await downloadToLocal(gridUrl);
+    } catch (gridErr) {
+      console.warn(
+        `steamgriddb header fallback failed for ${appid}:`,
+        gridErr.message || gridErr
+      );
+    }
+  }
+  return { headerUrl };
 }
 
 async function getProcessesSafe() {
@@ -153,12 +230,17 @@ function formatDuration(ms) {
 function startPlaytimeLogWatcher(configData) {
   const appid = String(configData?.appid || "").trim();
   const processName = String(configData?.process_name || "").trim();
+  const platform = normalizePlatform(configData?.platform) || "steam";
+  const normalizedProcessName = path.basename(processName).toLowerCase();
   const existing = activeWatchers.get(appid);
   if (existing) {
     if (configData?.__playtimeKey) {
       existing.playtimeKey = configData.__playtimeKey;
     }
-    return existing.cleanup;
+    if (normalizedProcessName === existing.processNameNormalized) {
+      return existing.cleanup;
+    }
+    existing.cleanup();
   }
   const gameName =
     configData?.displayName || configData?.name || "Unknown Game";
@@ -176,7 +258,33 @@ function startPlaytimeLogWatcher(configData) {
   const userDataDir = path.dirname(preferencesPath);
 
   // Header URLs
-  const remoteHeaderUrl = `https://cdn.steamstatic.com/steam/apps/${appid}/header.jpg`;
+  const effectiveAppId = resolveSteamAppId(appid) || appid;
+  const remoteHeaderUrl = `https://cdn.steamstatic.com/steam/apps/${effectiveAppId}/header.jpg`;
+  const logoFallbackPath = path.join(__dirname, "..", "assets", "achievements-logo.png");
+  const headerPathLocal = path.join(
+    userDataDir,
+    "images",
+    platform,
+    String(appid),
+    "header.jpg"
+  );
+  const localHeaderIfExists = () => {
+    try {
+      if (fs.existsSync(headerPathLocal)) {
+        const stats = fs.statSync(headerPathLocal);
+        if (stats.size > 0) {
+          return pathToFileURL(headerPathLocal).toString();
+        }
+        // cleanup empty file
+        fs.unlinkSync(headerPathLocal);
+      }
+    } catch {}
+    return null;
+  };
+  const fallbackHeaderUrl =
+    platform === "gog" || platform === "epic"
+      ? pathToFileURL(logoFallbackPath).toString()
+      : remoteHeaderUrl;
 
   let interval = null;
   let closed = false;
@@ -186,6 +294,7 @@ function startPlaytimeLogWatcher(configData) {
       configData?.__playtimeKey ||
       sanitizeConfigName(configData?.name || configData?.displayName || appid),
     cleanup: () => {},
+    processNameNormalized: normalizedProcessName,
   };
   activeWatchers.set(appid, tracker);
   const cleanup = () => {
@@ -234,17 +343,26 @@ function startPlaytimeLogWatcher(configData) {
     }
   };
 
-  sendStart(remoteHeaderUrl);
+  const immediateLocal = localHeaderIfExists();
+  const initialHeader =
+    immediateLocal ||
+    (platform === "steam" || platform === "uplay"
+      ? remoteHeaderUrl
+      : fallbackHeaderUrl);
 
-  cacheHeaderImage(userDataDir, appid, remoteHeaderUrl)
+  cacheHeaderImage(userDataDir, appid, remoteHeaderUrl, {
+    gameName,
+    gridSize: "460x215",
+    platform,
+  })
     .then(({ headerUrl }) => {
       if (closed) return;
-      sendStart(headerUrl);
+      sendStart(headerUrl || initialHeader || fallbackHeaderUrl);
     })
     .catch((err) => {
       notifyError(`Header cache failed: ${err.message}`);
       if (!closed) {
-        sendStart(remoteHeaderUrl);
+        sendStart(initialHeader || fallbackHeaderUrl);
       }
     });
 
@@ -257,15 +375,25 @@ function startPlaytimeLogWatcher(configData) {
 
       if (!running) {
         try {
-          const headerPath = path.join(
+          const headerPathNew = path.join(
+            userDataDir,
+            "images",
+            platform,
+            String(appid),
+            "header.jpg"
+          );
+          const headerPathLegacy = path.join(
             userDataDir,
             "images",
             String(appid),
             "header.jpg"
           );
-          const headerLocal = fs.existsSync(headerPath)
-            ? pathToFileURL(headerPath).toString()
-            : remoteHeaderUrl;
+          let headerLocal = remoteHeaderUrl;
+          if (fs.existsSync(headerPathNew)) {
+            headerLocal = pathToFileURL(headerPathNew).toString();
+          } else if (fs.existsSync(headerPathLegacy)) {
+            headerLocal = pathToFileURL(headerPathLegacy).toString();
+          }
           await sendStop(headerLocal);
         } catch {
           await sendStop(remoteHeaderUrl);
@@ -274,7 +402,8 @@ function startPlaytimeLogWatcher(configData) {
         }
       }
     } catch (err) {
-      notifyError(`⛔ Playtime watcher error: ${err.message}`);
+      notifyError(`? Playtime watcher error: ${err.message}`);
+      cleanup();
     }
   }, 2000);
 

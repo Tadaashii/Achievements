@@ -4,11 +4,241 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const axios = require("axios");
-const { fork } = require("child_process");
+const { fork, execFileSync } = require("child_process");
 const ini = require("ini");
 const CRC32 = require("crc-32");
 const { loadAchievementsFromSaveFile } = require("./achievement-data");
+const { createLogger } = require("./logger");
+const autoConfigLogger = createLogger("autoconfig");
+const {
+  normalizePlatform,
+  inferPlatformAndSteamId,
+  sanitizeAppId,
+} = require("./config-platform-migrator");
+const userDataDir = app?.getPath("userData")
+  ? app.getPath("userData")
+  : path.join(os.tmpdir(), "Achievements");
+let preferencesPath = path.join(userDataDir, "preferences.json");
+const BLACKLIST_PREF_KEY = "blacklistedAppIds";
+const defaultUplaySteamMapPath = path.join(
+  __dirname,
+  "..",
+  "assets",
+  "uplay-steam.json"
+);
+let uplaySteamMapPath = path.join(userDataDir, "uplay-steam.json");
+function ensureUplayMappingFile() {
+  try {
+    if (fs.existsSync(uplaySteamMapPath)) return;
+    const source =
+      fs.existsSync(defaultUplaySteamMapPath) &&
+      fs.statSync(defaultUplaySteamMapPath).isFile()
+        ? defaultUplaySteamMapPath
+        : null;
+    fs.mkdirSync(path.dirname(uplaySteamMapPath), { recursive: true });
+    if (source) {
+      fs.copyFileSync(source, uplaySteamMapPath);
+    } else {
+      fs.writeFileSync(uplaySteamMapPath, "[]", "utf8");
+    }
+    autoConfigLogger.info("uplay-mapping:initialized", {
+      path: uplaySteamMapPath,
+      source: source || null,
+    });
+  } catch (err) {
+    autoConfigLogger.warn("uplay-mapping:init-failed", {
+      error: err?.message || String(err),
+      target: uplaySteamMapPath,
+    });
+  }
+}
+ensureUplayMappingFile();
+function loadUplayMapping() {
+  try {
+    const raw = fs.readFileSync(uplaySteamMapPath, "utf8");
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    autoConfigLogger.warn("uplay-mapping:load-failed", {
+      error: err?.message || String(err),
+    });
+    return [];
+  }
+}
+const uplaySteamMap = loadUplayMapping();
+const uplayToSteam = new Map(
+  uplaySteamMap.map((row) => [String(row.uplay_id), row])
+);
+const gogNameFallbackAppIds = new Set();
+function reloadUplayMappingFromDisk() {
+  try {
+    const refreshed = JSON.parse(fs.readFileSync(uplaySteamMapPath, "utf8"));
+    uplaySteamMap.length = 0;
+    refreshed.forEach((row) => uplaySteamMap.push(row));
+    uplayToSteam.clear();
+    refreshed.forEach((row) => {
+      uplayToSteam.set(String(row.uplay_id), row);
+    });
+    return true;
+  } catch (err) {
+    autoConfigLogger.warn("uplay-mapping:reload-failed", {
+      error: err?.message || String(err),
+    });
+    return false;
+  }
+}
+function refreshMappingViaScript() {
+  try {
+    execFileSync(process.execPath, [
+      "--run-as-node",
+      path.join(__dirname, "match-uplay-steam.js"),
+      `--output=${uplaySteamMapPath}`,
+    ]);
+    reloadUplayMappingFromDisk();
+  } catch (err) {
+    autoConfigLogger.warn("uplay-mapping:script-failed", {
+      error: err?.message || String(err),
+    });
+  }
+}
 
+function loadConfigVariantIndex(outputDir) {
+  const map = new Map();
+  try {
+    if (!fs.existsSync(outputDir)) return map;
+    const files = fs
+      .readdirSync(outputDir)
+      .filter((f) => f.toLowerCase().endsWith(".json"));
+    for (const file of files) {
+      const full = path.join(outputDir, file);
+      try {
+        const data = JSON.parse(fs.readFileSync(full, "utf8"));
+        const appid = sanitizeAppId(
+          data?.appid || data?.appId || data?.steamAppId
+        );
+        if (!appid) continue;
+        const platform = normalizePlatform(data?.platform) || "steam";
+        const name = data?.name || path.basename(file, ".json");
+        if (!map.has(appid)) map.set(appid, new Map());
+        map.get(appid).set(platform, { filePath: full, name });
+      } catch {}
+    }
+  } catch (err) {
+    autoConfigLogger.warn("config-index:build-failed", {
+      error: err?.message || String(err),
+    });
+  }
+  return map;
+}
+
+function registerConfigVariant(index, appid, platform, info) {
+  const key = sanitizeAppId(appid);
+  if (!key || !info?.filePath) return;
+  const normalizedPlatform = normalizePlatform(platform) || "steam";
+  if (!index.has(key)) index.set(key, new Map());
+  index.get(key).set(normalizedPlatform, {
+    filePath: info.filePath,
+    name: info.name,
+  });
+}
+
+function resolveExistingVariant(index, appid, platform) {
+  const key = sanitizeAppId(appid);
+  if (!key) return null;
+  const bucket = index.get(key);
+  if (!bucket) return null;
+  const normalizedPlatform = normalizePlatform(platform) || "steam";
+  return bucket.get(normalizedPlatform) || null;
+}
+
+function resolveConfigTarget({ outputDir, baseName, appid, platform, index }) {
+  const existing = resolveExistingVariant(index, appid, platform);
+  if (existing) {
+    return {
+      filePath: existing.filePath,
+      name: existing.name || baseName,
+      reused: true,
+    };
+  }
+  const platformLabel =
+    platform === "uplay"
+      ? "Uplay"
+      : platform === "gog"
+      ? "GOG"
+      : platform === "epic"
+      ? "Epic"
+      : "Steam";
+  let candidateName = baseName;
+  let candidatePath = path.join(outputDir, `${candidateName}.json`);
+  let suffix = 1;
+  while (fs.existsSync(candidatePath)) {
+    const label = suffix === 1 ? platformLabel : `${platformLabel} ${suffix}`;
+    candidateName = `${baseName} (${label})`;
+    candidatePath = path.join(outputDir, `${candidateName}.json`);
+    suffix++;
+  }
+  return { filePath: candidatePath, name: candidateName, reused: false };
+}
+
+function resolvePlatformMetadata({ appid, mapping, forcePlatform }) {
+  const normalizedForce = normalizePlatform(forcePlatform) || "";
+  const sanitizedMappingSteamId = mapping?.steam_appid
+    ? sanitizeAppId(mapping.steam_appid)
+    : "";
+  const mappingForInference =
+    normalizedForce === "steam" || normalizedForce === "epic" ? null : mapping;
+  const seed = {
+    appid,
+    platform: normalizedForce || undefined,
+    steamAppId: sanitizedMappingSteamId || undefined,
+  };
+  const { platform, steamAppId } = inferPlatformAndSteamId({
+    config: seed,
+    mapping: mappingForInference,
+  });
+  return {
+    platform: platform || normalizedForce || "steam",
+    steamAppId: steamAppId || "",
+  };
+}
+function stripAchievementPrefix(name) {
+  if (typeof name !== "string") return name;
+  const match = name.match(/Ach_(.+)$/i);
+  if (match && match[1]) return match[1];
+  return name;
+}
+function normalizeAchievementName(name, shouldStrip = false) {
+  if (typeof name !== "string") return name;
+  let result = name.trim();
+  if (shouldStrip) {
+    result = stripAchievementPrefix(result);
+    const m = result.match(/^(.*)_(\d+)$/);
+    if (m && m[1] && /[A-Za-z]/.test(m[1])) {
+      result = m[2];
+    }
+  }
+  return result;
+}
+function readPrefsSafe() {
+  try {
+    return fs.existsSync(preferencesPath)
+      ? JSON.parse(fs.readFileSync(preferencesPath, "utf8"))
+      : {};
+  } catch {
+    return {};
+  }
+}
+function getBlacklistedAppIdsSet() {
+  const prefs = readPrefsSafe();
+  const list = Array.isArray(prefs[BLACKLIST_PREF_KEY])
+    ? prefs[BLACKLIST_PREF_KEY]
+    : [];
+  return new Set(
+    list
+      .map((id) => String(id || "").trim())
+      .filter((id) => /^[0-9a-fA-F]+$/.test(id))
+  );
+}
 function readJsonSafe(fp) {
   try {
     return JSON.parse(fs.readFileSync(fp, "utf8"));
@@ -16,7 +246,6 @@ function readJsonSafe(fp) {
     return null;
   }
 }
-
 async function maybeSeedAchCache({
   appid,
   configName,
@@ -32,6 +261,8 @@ async function maybeSeedAchCache({
     path.join(save_path, id, "achievements.json"),
     path.join(save_path, "steam_settings", id, "achievements.json"),
     path.join(save_path, "achievements.ini"),
+    path.join(save_path, "SteamData", "user_stats.ini"),
+    path.join(save_path, id, "SteamData", "user_stats.ini"),
     path.join(save_path, "Stats", "achievements.ini"),
     path.join(save_path, id, "achievements.ini"),
     path.join(save_path, "stats.bin"),
@@ -49,22 +280,37 @@ async function maybeSeedAchCache({
       if (cur && Object.keys(cur).length) {
         snapshot = { ...(snapshot || {}), ...cur };
       }
-    } catch {}
+    } catch (err) {
+      autoConfigLogger.warn("seed-cache:candidate-failed", {
+        appid: id,
+        configName,
+        path: fp,
+        error: err?.message || String(err),
+      });
+    }
   }
   if (snapshot && Object.keys(snapshot).length) {
     try {
       onSeedCache({ appid: id, configName, snapshot });
-    } catch {}
+      autoConfigLogger.info("seed-cache:success", {
+        appid: id,
+        configName,
+        entries: Object.keys(snapshot).length,
+      });
+    } catch (err) {
+      autoConfigLogger.error("seed-cache:handler-error", {
+        appid: id,
+        configName,
+        error: err?.message || String(err),
+      });
+    }
   }
 }
-
 function sanitizeFilename(name) {
   return name.replace(/[\/\\:*?"<>|]/g, "");
 }
-
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121 Safari/537.36";
-
 function decodeHtml(s) {
   return String(s || "")
     .replace(/&amp;/g, "&")
@@ -73,21 +319,17 @@ function decodeHtml(s) {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'");
 }
-
 function cleanText(x) {
   return decodeHtml(String(x || "").replace(/<[^>]*>/g, ""))
     .replace(/\s+/g, " ")
     .trim();
 }
-
 function isBadName(name) {
   const n = (name || "").trim();
   return !n || /^steam hunters$/i.test(n);
 }
-
 function extractNameFromSteamHuntersHtml(html) {
   const H = String(html || "");
-
   // 1) Banner: <span.flex-link-underline> din <h1><a>…</a></h1>
   //    (not “Steam Hunters”, second)
   let m =
@@ -98,7 +340,6 @@ function extractNameFromSteamHuntersHtml(html) {
     const name = cleanText(m[1]);
     if (!isBadName(name)) return name;
   }
-
   // 2) Breadcrumb: <span class="text-ellipsis app-name after">
   m =
     /<header[\s\S]*?<span[^>]*class="[^"]*\btext-ellipsis\b[^"]*\bapp-name\b[^"]*(?:\bafter\b)?[^"]*"[^>]*>([\s\S]*?)<\/span>/i.exec(
@@ -108,10 +349,8 @@ function extractNameFromSteamHuntersHtml(html) {
     const name = cleanText(m[1]);
     if (!isBadName(name)) return name;
   }
-
   return null;
 }
-
 async function getGameNameFromSteamHunters(appid) {
   try {
     const url = `https://steamhunters.com/apps/${appid}/achievements`;
@@ -121,18 +360,184 @@ async function getGameNameFromSteamHunters(appid) {
       validateStatus: (s) => s >= 200 && s < 500,
     });
     if (res.status >= 400) return null;
-
     const name = extractNameFromSteamHuntersHtml(res.data || "");
+    if (!name) {
+      autoConfigLogger.warn("steam-hunters:name-missing", { appid });
+    }
     return name || null;
   } catch (e) {
-    console.warn(`[SteamHunters] ${appid}: ${e.message || e}`);
+    autoConfigLogger.warn("steam-hunters:request-failed", {
+      appid,
+      error: e?.message || String(e),
+    });
     return null;
   }
 }
 
-async function getGameName(appid, retries = 2) {
-  let nameFromStore = null;
+async function getGameNameFromGogDb(appid) {
+  try {
+    const url = `https://gamesdb.gog.com/platforms/gog/external_releases/${appid}`;
+    const res = await axios.get(url, { timeout: 15000 });
+    const payload = res.data;
+    let title = "";
+    if (payload) {
+      if (typeof payload === "string") {
+        title = payload;
+      } else if (Array.isArray(payload)) {
+        title =
+          payload.find((entry) => entry && entry.title)?.title ||
+          payload[0]?.title ||
+          "";
+      } else if (typeof payload === "object") {
+        const rawTitle =
+          payload.title ||
+          payload.name ||
+          payload.productTitle ||
+          payload.game?.title ||
+          payload.product?.title ||
+          "";
+        if (rawTitle && typeof rawTitle === "object" && rawTitle["*"]) {
+          title = rawTitle["*"];
+        } else if (typeof rawTitle === "string") {
+          title = rawTitle;
+        } else if (payload.title && payload.title.value) {
+          title = payload.title.value;
+        }
+      }
+    }
+    if (title) {
+      gogNameFallbackAppIds.add(String(appid));
+      autoConfigLogger.info("gog-db:name-resolved", { appid, title });
+      return title;
+    }
+    autoConfigLogger.warn("gog-db:title-missing", { appid });
+    return null;
+  } catch (err) {
+    autoConfigLogger.warn("gog-db:request-failed", {
+      appid,
+      error: err?.message || String(err),
+    });
+    return null;
+  }
+}
 
+// Epic name resolution helpers
+let epicProductMap = null;
+async function loadEpicProductMap() {
+  if (epicProductMap) return epicProductMap;
+  try {
+    const url =
+      "https://store-content.ak.epicgames.com/api/content/productmapping/";
+    const res = await axios.get(url, { timeout: 20000 });
+    if (res.data && typeof res.data === "object") {
+      epicProductMap = res.data;
+      return epicProductMap;
+    }
+  } catch (err) {
+    autoConfigLogger.warn("epic-productmap:fetch-failed", {
+      error: err?.message || String(err),
+    });
+  }
+  epicProductMap = {};
+  return epicProductMap;
+}
+
+async function getEpicSlug(appid) {
+  const map = await loadEpicProductMap();
+  const key = String(appid || "");
+  return map?.[key] || map?.[key.toLowerCase()] || null;
+}
+
+async function getEpicTitle(appid) {
+  const slug = await getEpicSlug(appid);
+  if (!slug) return null;
+  try {
+    const url = `https://store-content.ak.epicgames.com/api/en-US/content/products/${slug}`;
+    const res = await axios.get(url, { timeout: 15000 });
+    const data = res.data || {};
+    const candidates = [];
+    if (typeof data.productName === "string") candidates.push(data.productName);
+    else if (data.productName && typeof data.productName.value === "string")
+      candidates.push(data.productName.value);
+    // cache cover assets for epic
+    const hero =
+      data.hero ||
+      (Array.isArray(data.pages)
+        ? data.pages
+            .map((p) => p?.data?.hero || p?.hero)
+            .find(
+              (h) => h && (h.portraitBackgroundImageUrl || h.backgroundImageUrl)
+            )
+        : null);
+    if (hero) {
+      try {
+        const imagesRoot = path.join(
+          userDataDir,
+          "images",
+          "epic",
+          String(appid)
+        );
+        fs.mkdirSync(imagesRoot, { recursive: true });
+        const downloadIf = async (url, fileName) => {
+          if (!url) return;
+          try {
+            const resp = await axios.get(url, {
+              responseType: "arraybuffer",
+              timeout: 20000,
+            });
+            fs.writeFileSync(path.join(imagesRoot, fileName), resp.data);
+          } catch (e) {
+            autoConfigLogger.warn("epic:cover-download-failed", {
+              appid,
+              url,
+              error: e?.message || String(e),
+            });
+          }
+        };
+        await downloadIf(hero.portraitBackgroundImageUrl, `${appid}.jpg`);
+        await downloadIf(hero.backgroundImageUrl, "header.jpg");
+      } catch (e) {
+        autoConfigLogger.warn("epic:cover-save-failed", {
+          appid,
+          error: e?.message || String(e),
+        });
+      }
+    }
+    const title = candidates.find((t) => t && t.trim()) || "";
+    if (title) {
+      autoConfigLogger.info("epic:name-resolved", { appid, slug, title });
+      return title.trim();
+    }
+  } catch (err) {
+    autoConfigLogger.warn("epic:name-fetch-failed", {
+      appid,
+      slug,
+      error: err?.message || String(err),
+    });
+  }
+  return null;
+}
+
+async function getGameName(appid, opts = {}, retries = 2) {
+  const platformHint = normalizePlatform(opts?.platform);
+  const preferredName = (opts?.preferredName || "").trim();
+  if (preferredName && platformHint === "gog") {
+    return preferredName;
+  }
+  const hasHex = /[a-f]/i.test(String(appid || ""));
+  if (hasHex) {
+    const epicName = await getEpicTitle(appid);
+    if (epicName) return epicName;
+    // For Epic IDs, do not fall back to Steam/GOG
+    return null;
+  }
+  if (platformHint === "gog") {
+    const gogName = await getGameNameFromGogDb(appid);
+    if (gogName) return gogName;
+    return preferredName || null;
+  }
+
+  let nameFromStore = null;
   try {
     const url = `https://store.steampowered.com/api/appdetails?appids=${appid}`;
     const res = await axios.get(url, { timeout: 15000 });
@@ -140,107 +545,156 @@ async function getGameName(appid, retries = 2) {
     if (entry?.success && entry?.data?.name) {
       nameFromStore = entry.data.name;
     } else {
-      console.warn(
-        `[StoreAPI] ${appid}: success=${entry?.success} name missing -> will try fallback`
-      );
+      autoConfigLogger.warn("store-api:name-missing", {
+        appid,
+        success: entry?.success ?? null,
+      });
     }
   } catch (err) {
     if (err.response && err.response.status === 429 && retries > 0) {
-      console.warn(`⚠️ Rate limit for appid ${appid}. Retrying after delay...`);
+      autoConfigLogger.warn("store-api:rate-limit", { appid, retries });
       await new Promise((r) => setTimeout(r, 2000));
-      return getGameName(appid, retries - 1);
+      return getGameName(appid, opts, retries - 1);
     }
-    console.error(`[StoreAPI] ${appid}: ${err.message}`);
+    autoConfigLogger.error("store-api:request-failed", {
+      appid,
+      error: err?.message || String(err),
+    });
   }
-
   if (nameFromStore) return nameFromStore;
-
   // Fallback SteamHunters
-  console.warn(`[Fallback] Trying SteamHunters for ${appid}...`);
+  autoConfigLogger.info("fallback:steam-hunters", { appid });
   const shName = await getGameNameFromSteamHunters(appid);
   if (shName) return shName;
-
-  console.warn(`[Fallback] SteamHunters also failed for ${appid}`);
+  autoConfigLogger.warn("fallback:steam-hunters-failed", { appid });
+  autoConfigLogger.info("fallback:gog-db", { appid });
+  const gogName = await getGameNameFromGogDb(appid);
+  if (gogName) return gogName;
+  autoConfigLogger.warn("fallback:gog-db-failed", { appid });
   return null;
 }
-
-const userDataDir = app.getPath("userData");
-
 // run generate_achievements_schema.js
-function runAchievementsGenerator(appid, schemaBaseDir, userDataDir) {
+function runAchievementsGenerator(
+  appid,
+  schemaBaseDir,
+  userDataDir,
+  opts = {}
+) {
   return new Promise((resolve, reject) => {
     const script = path.join(__dirname, "generate_achievements_schema.js");
-
     const isElectron = !!process.versions.electron;
     const nodeBin = isElectron
       ? process.platform === "win32"
         ? "node.exe"
         : "node"
       : process.execPath;
-
+    const platform =
+      typeof opts.platform === "string" && opts.platform.length
+        ? opts.platform.toLowerCase()
+        : null;
     const args = [
       String(appid),
       "--apps-concurrency=1",
       `--out=${schemaBaseDir}`,
       `--user-data-dir=${userDataDir}`,
     ];
-
-    console.log(`↪ Generate achievements schema for ${appid}…`);
+    if (platform) args.push(`--platform=${platform}`);
+    const logDir = path.join(app.getPath("userData"), "logs");
+    try {
+      fs.mkdirSync(logDir, { recursive: true });
+    } catch {}
+    autoConfigLogger.info("achgen:spawn", {
+      appid,
+      args,
+      script,
+    });
     const cp = fork(script, args, {
       stdio: ["pipe", "pipe", "pipe", "ipc"],
-      env: { ...process.env, PLAYWRIGHT_BROWSERS_PATH: "0" },
+      env: {
+        ...process.env,
+        PLAYWRIGHT_BROWSERS_PATH: "0",
+        LOGGER_DIR: logDir,
+        LOGGER_SUPPRESS_CLEAR: "1",
+      },
       windowsHide: true,
     });
-
     // IPC messages
     cp.on("message", (msg) => {
       if (msg && msg.type === "achgen:log") {
         if (global.mainWindow) {
           global.mainWindow.webContents.send("achgen:log", msg);
         }
-        const tag =
+        const level =
           msg.level === "error"
             ? "error"
             : msg.level === "warn"
             ? "warn"
-            : "log";
-        console[tag](`${msg.message}`);
+            : "info";
+        const payload = {
+          appid,
+          message: msg.message,
+        };
+        try {
+          autoConfigLogger[level]?.("achgen:child-log", payload);
+        } catch {
+          autoConfigLogger.info("achgen:child-log", payload);
+        }
       }
     });
-
     cp.stdout.on("data", (buf) => {
       const line = buf.toString();
       if (global.mainWindow)
         global.mainWindow.webContents.send("achgen:stdout", line);
       process.stdout.write(line);
     });
-
     cp.stderr.on("data", (buf) => {
       const line = buf.toString();
       if (global.mainWindow)
         global.mainWindow.webContents.send("achgen:stderr", line);
       process.stderr.write(line);
     });
-    cp.on("error", reject);
-    cp.on("close", (code) =>
-      code === 0 ? resolve() : reject(new Error(`Code: ${code}`))
-    );
+    cp.on("error", (err) => {
+      autoConfigLogger.error("achgen:process-error", {
+        appid,
+        error: err?.message || String(err),
+      });
+      reject(err);
+    });
+    cp.on("close", (code) => {
+      if (code === 0) {
+        autoConfigLogger.info("achgen:process-exit", { appid, code });
+        resolve();
+      } else {
+        autoConfigLogger.error("achgen:process-exit", { appid, code });
+        reject(new Error(`Code: ${code}`));
+      }
+    });
   });
 }
-
 async function generateGameConfigs(folderPath, outputDir, opts = {}) {
   const onSeedCache = opts.onSeedCache || null;
+  const forcedPlatform = normalizePlatform(opts.forcePlatform) || null;
+  if (forcedPlatform) {
+    autoConfigLogger.info("generate:forced-platform", {
+      targetPlatform: forcedPlatform,
+      folderPath,
+    });
+  }
+  const configVariantIndex = loadConfigVariantIndex(outputDir);
   if (!folderPath || !fs.existsSync(folderPath)) {
     throw new Error("Folder is not valid.");
   }
-
+  autoConfigLogger.info("scan:start", {
+    inputDir: folderPath,
+    outputDir,
+  });
   const dirents = fs.readdirSync(folderPath, { withFileTypes: true });
   const folders = dirents.filter((d) => d.isDirectory()).map((d) => d.name);
-  const appidFolders = folders.filter((f) => /^\d+$/.test(f));
-
+  const appidFolders = folders.filter((f) => /^[0-9a-fA-F]+$/.test(f));
+  const blacklist = getBlacklistedAppIdsSet();
   // nothing found
   if (appidFolders.length === 0) {
-    console.warn(`No AppIDs found in: ${folderPath}`);
+    autoConfigLogger.warn("scan:no-appids", { folderPath });
     return {
       processed: 0,
       created: 0,
@@ -250,11 +704,9 @@ async function generateGameConfigs(folderPath, outputDir, opts = {}) {
       outputDir,
     };
   }
-
-  // <outputDir>/schema/<appid>
+  // <outputDir>/schema/<platform>/<appid>
   const schemaBase = path.join(outputDir, "schema");
   if (!fs.existsSync(schemaBase)) fs.mkdirSync(schemaBase, { recursive: true });
-
   let processed = 0,
     created = 0,
     updated = 0,
@@ -262,21 +714,76 @@ async function generateGameConfigs(folderPath, outputDir, opts = {}) {
     failed = 0;
   for (const appid of appidFolders) {
     processed++;
-
-    console.log(`Processing AppID: ${appid}...`);
-    const name = await getGameName(appid);
-    if (!name) {
-      console.warn(`${appid}: not exist!`);
+    if (blacklist.has(String(appid))) {
+      autoConfigLogger.info("scan:skip-blacklisted", { appid });
       skipped++;
       continue;
     }
-
-    const safeName = sanitizeFilename(name);
-    const fileName = `${safeName}.json`;
-    const filePath = path.join(outputDir, fileName);
-
+    const uplayId = String(appid);
+    let mapping = uplayToSteam.get(uplayId);
+    const isHexId = /[a-f]/i.test(uplayId);
+    let mappingForRun =
+      !forcedPlatform || forcedPlatform === "uplay" ? mapping : null;
+    const nameSourceId = isHexId
+      ? appid
+      : mappingForRun?.steam_appid && mappingForRun.steam_appid !== uplayId
+      ? String(mapping.steam_appid)
+      : appid;
+    autoConfigLogger.info("scan:processing-appid", {
+      appid,
+      nameAppId: nameSourceId,
+    });
+    const name = await getGameName(nameSourceId, {
+      platform: forcedPlatform,
+      preferredName: opts.preferredName || "",
+    });
+    const effectiveSteamId =
+      mappingForRun?.steam_appid && mappingForRun.steam_appid !== uplayId
+        ? String(mapping.steam_appid)
+        : null;
+    if (!name) {
+      autoConfigLogger.warn("scan:missing-game-name", { effectiveSteamId });
+      skipped++;
+      continue;
+    }
+    let safeName = sanitizeFilename(name);
+    const platformMeta = resolvePlatformMetadata({
+      appid: uplayId,
+      mapping: mappingForRun,
+      forcePlatform: forcedPlatform,
+    });
+    if (isHexId && !forcedPlatform) {
+      platformMeta.platform = "epic";
+      platformMeta.steamAppId = "";
+    } else {
+      const preferGogPlatform =
+        gogNameFallbackAppIds.has(String(nameSourceId)) ||
+        gogNameFallbackAppIds.has(uplayId);
+      if (preferGogPlatform && !forcedPlatform) {
+        platformMeta.platform = "gog";
+        platformMeta.steamAppId = "";
+      }
+    }
+    autoConfigLogger.info("generate:platform-selected", {
+      appid: uplayId,
+      platform: platformMeta.platform,
+      steamAppId: platformMeta.steamAppId || null,
+      forced: !!forcedPlatform,
+    });
+    const targetInfo = resolveConfigTarget({
+      outputDir,
+      baseName: safeName,
+      appid: uplayId,
+      platform: platformMeta.platform,
+      index: configVariantIndex,
+    });
+    safeName = targetInfo.name;
+    const filePath = targetInfo.filePath;
     //const gameSaveDir = path.join(folderPath);   // <folderPath>/
-    let gameSaveDir = path.join(folderPath);
+    let gameSaveDir =
+      opts.savePathOverride && opts.savePathOverride.trim()
+        ? opts.savePathOverride
+        : path.join(folderPath);
     const maybeRemote = path.join(folderPath, "remote", appid);
     if (
       folderPath.toLowerCase().includes("empress") &&
@@ -284,19 +791,68 @@ async function generateGameConfigs(folderPath, outputDir, opts = {}) {
     ) {
       gameSaveDir = maybeRemote;
     }
-    const destSchemaDir = path.join(schemaBase, String(appid));
+    const storagePlatform =
+      platformMeta.platform === "uplay"
+        ? "uplay"
+        : platformMeta.platform === "gog"
+        ? "gog"
+        : platformMeta.platform === "epic"
+        ? "epic"
+        : "steam";
+    const destSchemaDir = path.join(schemaBase, storagePlatform, String(appid));
     const destAchievementsJson = path.join(destSchemaDir, "achievements.json");
-
     if (!fs.existsSync(destSchemaDir))
       fs.mkdirSync(destSchemaDir, { recursive: true });
-
     const ensureSchema = async () => {
       try {
         if (!fs.existsSync(destAchievementsJson)) {
           const userDataDir = app.getPath("userData");
-          await runAchievementsGenerator(appid, schemaBase, userDataDir);
+          const attemptPlatforms = (() => {
+            if (platformMeta.platform === "steam") return ["steam"];
+            if (platformMeta.platform === "uplay") return ["uplay"];
+            if (platformMeta.platform === "gog") return ["gog"];
+            if (platformMeta.platform === "epic") return ["epic"];
+            return mappingForRun?.steam_appid &&
+              mappingForRun.steam_appid !== uplayId
+              ? ["uplay"]
+              : ["uplay", "auto"];
+          })();
+          let generated = false;
+          let lastError = null;
+          for (const platformMode of attemptPlatforms) {
+            try {
+              await runAchievementsGenerator(uplayId, schemaBase, userDataDir, {
+                platform: platformMode,
+              });
+              if (
+                platformMode === "uplay" &&
+                (!mappingForRun || !mappingForRun.steam_appid)
+              ) {
+                if (reloadUplayMappingFromDisk()) {
+                  mapping = uplayToSteam.get(uplayId) || mapping;
+                  mappingForRun =
+                    !forcedPlatform || forcedPlatform === "uplay"
+                      ? mapping
+                      : null;
+                }
+              }
+              generated = true;
+              break;
+            } catch (err) {
+              lastError = err;
+              autoConfigLogger.warn("achgen:attempt-failed", {
+                appid: uplayId,
+                platform: platformMode,
+                error: err?.message || String(err),
+              });
+            }
+          }
+          if (!generated) {
+            throw lastError || new Error("achievements-generator failed");
+          }
         } else {
-          const txt = `⏭ [${appid}] Achievements schema exists. Skip generating!`;
+          const displayId = effectiveSteamId || appid;
+          const txt = `⏭ [${displayId}] Achievements schema exists. Skip generating!`;
           if (global.mainWindow) {
             global.mainWindow.webContents.send("achgen:log", {
               type: "achgen:log",
@@ -308,39 +864,112 @@ async function generateGameConfigs(folderPath, outputDir, opts = {}) {
               `[achgen] ${txt}\n`
             );
           }
-          console.log(`${txt}`);
+          autoConfigLogger.info("achgen:schema-exists", {
+            appid,
+            path: destAchievementsJson,
+          });
+        }
+        if (mapping?.steam_appid) {
+          try {
+            const fileRaw = fs.readFileSync(destAchievementsJson, "utf8");
+            const parsed = JSON.parse(fileRaw);
+            const entries = Array.isArray(parsed)
+              ? parsed
+              : Array.isArray(parsed?.achievements)
+              ? parsed.achievements
+              : null;
+            if (entries) {
+              const normalized = entries.map((ach) => ({
+                ...ach,
+                name: normalizeAchievementName(ach.name, true),
+              }));
+              if (Array.isArray(parsed)) {
+                fs.writeFileSync(
+                  destAchievementsJson,
+                  JSON.stringify(normalized, null, 2)
+                );
+              } else {
+                parsed.achievements = normalized;
+                fs.writeFileSync(
+                  destAchievementsJson,
+                  JSON.stringify(parsed, null, 2)
+                );
+              }
+            }
+          } catch (err) {
+            autoConfigLogger.warn("schema:strip-prefix-failed", {
+              appid: uplayId,
+              error: err?.message || String(err),
+            });
+          }
         }
       } catch (e) {
-        console.warn(`Generate schema failed for ${appid}: ${e.message}`);
+        autoConfigLogger.error("achgen:schema-failed", {
+          appid,
+          error: e?.message || String(e),
+        });
         failed++;
         // continue
       }
     };
-
     if (fs.existsSync(filePath)) {
       // if config exist, complete only
       await ensureSchema();
       try {
         const curr = JSON.parse(fs.readFileSync(filePath, "utf8"));
         let changed = false;
-
+        if (curr.platform !== platformMeta.platform) {
+          curr.platform = platformMeta.platform;
+          changed = true;
+        }
+        const nextSteamId = platformMeta.steamAppId || "";
+        if (nextSteamId) {
+          if (curr.steamAppId !== nextSteamId) {
+            curr.steamAppId = nextSteamId;
+            changed = true;
+          }
+        } else if (curr.steamAppId) {
+          delete curr.steamAppId;
+          changed = true;
+        }
         if (!curr.config_path) {
           curr.config_path = destSchemaDir;
           changed = true;
         }
-        if (!curr.save_path) {
+        if (opts.savePathOverride) {
+          if (curr.save_path !== opts.savePathOverride) {
+            curr.save_path = opts.savePathOverride;
+            changed = true;
+          }
+        } else if (!curr.save_path) {
           curr.save_path = gameSaveDir;
           changed = true;
         }
-
+        if (opts.emu && curr.emu !== opts.emu) {
+          curr.emu = opts.emu;
+          changed = true;
+        }
         if (changed) {
           fs.writeFileSync(filePath, JSON.stringify(curr, null, 2));
-          console.log(`Updated: ${filePath}`);
+          autoConfigLogger.info("config:updated", {
+            filePath,
+            appid,
+            name: safeName,
+          });
           updated++;
         } else {
-          console.log(`Config for "${safeName}" exists (no changes).`);
+          autoConfigLogger.info("config:unchanged", { appid, name: safeName });
           skipped++;
         }
+        registerConfigVariant(
+          configVariantIndex,
+          uplayId,
+          platformMeta.platform,
+          {
+            filePath,
+            name: curr.name || safeName,
+          }
+        );
         await maybeSeedAchCache({
           appid,
           configName: safeName,
@@ -349,20 +978,21 @@ async function generateGameConfigs(folderPath, outputDir, opts = {}) {
           onSeedCache,
         });
       } catch (e) {
-        console.warn(
-          `Failed to update existing config for ${appid}: ${e.message}`
-        );
+        autoConfigLogger.error("config:update-failed", {
+          appid,
+          error: e?.message || String(e),
+        });
         failed++;
       }
       continue;
     }
-
     // generate schema if missing
     await ensureSchema();
-
     const gameData = {
       name: safeName,
       appid,
+      platform: platformMeta.platform,
+      steamAppId: platformMeta.steamAppId || undefined,
       // IMPORTANT: set path, if achievements.json missing
       config_path: destSchemaDir,
       save_path: gameSaveDir,
@@ -370,9 +1000,23 @@ async function generateGameConfigs(folderPath, outputDir, opts = {}) {
       arguments: "",
       process_name: "",
     };
-
+    if (!platformMeta.steamAppId) delete gameData.steamAppId;
+    if (opts.savePathOverride) {
+      gameData.save_path = opts.savePathOverride;
+    }
+    if (opts.emu) {
+      gameData.emu = opts.emu;
+    }
     fs.writeFileSync(filePath, JSON.stringify(gameData, null, 2));
-    console.log(`Saved: ${filePath}`);
+    registerConfigVariant(configVariantIndex, uplayId, platformMeta.platform, {
+      filePath,
+      name: safeName,
+    });
+    autoConfigLogger.info("config:saved", {
+      filePath,
+      appid,
+      name: safeName,
+    });
     created++;
     await maybeSeedAchCache({
       appid,
@@ -382,31 +1026,52 @@ async function generateGameConfigs(folderPath, outputDir, opts = {}) {
       onSeedCache,
     });
   }
-
   if (processed > 0) {
-    console.log(`Done! JSON files saved to ${outputDir}`);
+    autoConfigLogger.info("scan:complete", {
+      processed,
+      created,
+      updated,
+      skipped,
+      failed,
+      outputDir,
+    });
   } else {
-    console.warn(`No configs generated.`);
+    autoConfigLogger.warn("scan:no-configs-generated", { outputDir });
   }
   return { processed, created, updated, skipped, failed, outputDir };
 }
-
 async function generateConfigForAppId(appid, outputDir, opts = {}) {
   const onSeedCache = opts.onSeedCache || null;
   appid = String(appid);
-  if (!/^\d+$/.test(appid)) throw new Error(`Invalid appid: ${appid}`);
-
+  if (!/^[0-9a-fA-F]+$/.test(appid)) {
+    autoConfigLogger.error("generate-single:invalid-appid", { appid });
+    throw new Error(`Invalid appid: ${appid}`);
+  }
+  autoConfigLogger.info("generate-single:start", { appid, outputDir });
   const appDir = opts?.appDir || null;
   const tmpRoot = path.join(
     os.tmpdir(),
     `ach_single_root_${appid}_${Date.now()}`
   );
   const tmpAppDir = path.join(tmpRoot, appid);
-
   fs.mkdirSync(tmpAppDir, { recursive: true });
-
-  await generateGameConfigs(tmpRoot, outputDir, { onSeedCache });
-
+  autoConfigLogger.debug("generate-single:tmp-created", {
+    appid,
+    tmpRoot,
+  });
+  await generateGameConfigs(tmpRoot, outputDir, {
+    onSeedCache,
+    forcePlatform: opts.forcePlatform || null,
+    emu: opts.emu || null,
+    savePathOverride: opts.savePathOverride || null,
+    preferredName: opts.preferredName || null,
+  });
+  autoConfigLogger.debug("generate-single:batch-generated", {
+    appid,
+    tmpRoot,
+    outputDir,
+  });
+  const desiredPlatform = normalizePlatform(opts.forcePlatform) || null;
   const files = fs
     .readdirSync(outputDir)
     .filter((f) => f.toLowerCase().endsWith(".json"));
@@ -419,18 +1084,70 @@ async function generateConfigForAppId(appid, outputDir, opts = {}) {
         data?.appid || data?.appId || data?.steamAppId || ""
       ).trim();
       if (id === appid) {
+        const platform = normalizePlatform(data?.platform) || "steam";
+        if (desiredPlatform && platform !== desiredPlatform) {
+          continue;
+        }
         targetFile = full;
         break;
       }
-    } catch {}
+    } catch (err) {
+      autoConfigLogger.warn("generate-single:list-parse-failed", {
+        appid,
+        file: path.join(outputDir, f),
+        error: err?.message || String(err),
+      });
+    }
   }
-
+  if (!targetFile && desiredPlatform) {
+    for (const f of files) {
+      try {
+        const full = path.join(outputDir, f);
+        const data = JSON.parse(fs.readFileSync(full, "utf8"));
+        const id = String(
+          data?.appid || data?.appId || data?.steamAppId || ""
+        ).trim();
+        if (id === appid) {
+          targetFile = full;
+          break;
+        }
+      } catch {}
+    }
+  }
+  if ((opts.savePathOverride || opts.emu) && targetFile) {
+    try {
+      const data = JSON.parse(fs.readFileSync(targetFile, "utf8"));
+      if (opts.savePathOverride) data.save_path = opts.savePathOverride;
+      if (opts.emu) data.emu = opts.emu;
+      fs.writeFileSync(targetFile, JSON.stringify(data, null, 2));
+      autoConfigLogger.info("generate-single:override-config", {
+        appid,
+        targetFile,
+        save_path: opts.savePathOverride || data.save_path || null,
+        emu: data.emu || null,
+      });
+    } catch (err) {
+      autoConfigLogger.warn("generate-single:override-config-failed", {
+        appid,
+        targetFile,
+        error: err?.message || String(err),
+      });
+    }
+  }
   try {
     fs.rmSync(tmpRoot, { recursive: true, force: true });
-  } catch {}
-
-  if (!targetFile) return;
-
+    autoConfigLogger.debug("generate-single:tmp-cleaned", { appid, tmpRoot });
+  } catch (err) {
+    autoConfigLogger.warn("generate-single:tmp-clean-failed", {
+      appid,
+      tmpRoot,
+      error: err?.message || String(err),
+    });
+  }
+  if (!targetFile) {
+    autoConfigLogger.warn("generate-single:target-missing", { appid });
+    return;
+  }
   if (appDir) {
     try {
       const cfg = JSON.parse(fs.readFileSync(targetFile, "utf8"));
@@ -445,7 +1162,6 @@ async function generateConfigForAppId(appid, outputDir, opts = {}) {
       if (cfg.config_path) cfg.config_path = fixPath(cfg.config_path);
       if (cfg.save_path) cfg.save_path = fixPath(cfg.save_path);
       if (cfg.executable) cfg.executable = fixPath(cfg.executable);
-
       fs.writeFileSync(targetFile, JSON.stringify(cfg, null, 2));
       await maybeSeedAchCache({
         appid,
@@ -454,7 +1170,17 @@ async function generateConfigForAppId(appid, outputDir, opts = {}) {
         config_path: cfg.config_path,
         onSeedCache,
       });
-    } catch {}
+      autoConfigLogger.info("generate-single:completed", {
+        appid,
+        targetFile,
+        appDir,
+      });
+    } catch (err) {
+      autoConfigLogger.error("generate-single:repath-failed", {
+        appid,
+        error: err?.message || String(err),
+      });
+    }
   }
   if (!appDir) {
     try {
@@ -466,8 +1192,21 @@ async function generateConfigForAppId(appid, outputDir, opts = {}) {
         config_path: cfg.config_path,
         onSeedCache,
       });
-    } catch {}
+      autoConfigLogger.info("generate-single:seeded", {
+        appid,
+        targetFile,
+      });
+    } catch (err) {
+      autoConfigLogger.warn("generate-single:seed-failed", {
+        appid,
+        error: err?.message || String(err),
+      });
+    }
   }
+  autoConfigLogger.info("generate-single:finish", {
+    appid,
+    targetFile,
+    appDir: appDir || null,
+  });
 }
-
 module.exports = { generateGameConfigs, generateConfigForAppId };

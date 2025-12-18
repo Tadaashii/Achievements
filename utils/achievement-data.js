@@ -4,6 +4,34 @@ const ini = require("ini");
 const CRC32 = require("crc-32");
 const parseStatsBin = require("./parseStatsBin");
 
+function parseIniWithEncoding(filePath) {
+  try {
+    const buf = fs.readFileSync(filePath);
+    const looksUtf16le = buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe;
+    const looksUtf16be = buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff;
+    const hasNulls = buf.includes(0x00);
+
+    const decode = (enc) => {
+      const text = buf.toString(enc);
+      const clean = text.replace(/^\uFEFF/, "");
+      return ini.parse(clean);
+    };
+
+    if (looksUtf16le) return decode("utf16le");
+    if (looksUtf16be) return decode("utf16be");
+
+    // Try utf8 first; if we see NUL bytes, fallback to utf16le (UniverseLAN often Unicode)
+    try {
+      if (!hasNulls) return decode("utf8");
+    } catch {
+      /* fallthrough */
+    }
+    return decode("utf16le");
+  } catch {
+    return null;
+  }
+}
+
 function hexLE32FromAny(raw) {
   const hex = String(raw ?? "").replace(/[^0-9a-f]/gi, "");
   if (hex.length < 8) return undefined;
@@ -27,7 +55,19 @@ function parseType2Section(sec) {
     return undefined;
   };
 
-  const achRaw = get("Achieved", "achieved", "ACHIEVED", "Earned", "earned");
+  const achRaw = get(
+    "Achieved",
+    "achieved",
+    "ACHIEVED",
+    "Earned",
+    "earned",
+    "Unlock",
+    "unlock",
+    "UNLOCK",
+    "Unlocked",
+    "unlocked",
+    "UNLOCKED"
+  );
   const achieved =
     typeof achRaw === "boolean"
       ? achRaw
@@ -62,6 +102,9 @@ function parseType2Section(sec) {
   const tRaw = get(
     "UnlockTime",
     "unlockTime",
+    "UnlockedTime",
+    "unlockedTime",
+    "UNLOCKEDTIME",
     "timestamp",
     "earned_time",
     "earnedTime",
@@ -89,7 +132,21 @@ function parseType1Section(sec) {
     sec.Max ??
     sec.max;
   const timeRaw =
-    sec.Time ?? sec.UnlockTime ?? sec.unlockTime ?? sec.timestamp ?? sec.time;
+    sec.Time ??
+    sec.UnlockTime ??
+    sec.unlockTime ??
+    sec.UnlockedTime ??
+    sec.unlockedTime ??
+    sec.UNLOCKEDTIME ??
+    sec.timestamp ??
+    sec.time;
+  const unlockedRaw =
+    sec.Unlock ??
+    sec.unlock ??
+    sec.UNLOCK ??
+    sec.Unlocked ??
+    sec.unlocked ??
+    sec.UNLOCKED;
 
   const stateHex = hexLE32FromAny(sec.State);
   const curHex = hexLE32FromAny(curRaw);
@@ -102,9 +159,18 @@ function parseType1Section(sec) {
   const curVal = curHex !== undefined ? curHex : toNumber(curRaw);
   const maxVal = maxHex !== undefined ? maxHex : toNumber(maxRaw);
   const timeVal = timeHex !== undefined ? timeHex : toNumber(timeRaw);
+  const unlocked =
+    typeof unlockedRaw === "boolean"
+      ? unlockedRaw
+      : typeof unlockedRaw === "number"
+      ? unlockedRaw === 1
+      : typeof unlockedRaw === "string"
+      ? ["1", "true", "yes"].includes(unlockedRaw.trim().toLowerCase())
+      : false;
 
   const earned =
     String(sec.achieved ?? sec.Achieved ?? "").trim() === "1" ||
+    unlocked ||
     (typeof stateHex === "number" && stateHex > 0) ||
     (typeof curVal === "number" &&
       typeof maxVal === "number" &&
@@ -123,8 +189,15 @@ function parseAchievementIniSection(sec) {
   const hasType2 =
     "Achieved" in sec ||
     "achieved" in sec ||
+    "Unlocked" in sec ||
+    "unlocked" in sec ||
+    "Unlock" in sec ||
+    "unlock" in sec ||
     "UnlockTime" in sec ||
-    "unlocktime" in sec;
+    "unlocktime" in sec ||
+    "UnlockedTime" in sec ||
+    "unlockedTime" in sec ||
+    "UNLOCKEDTIME" in sec;
   const hasType1 =
     "State" in sec ||
     "Time" in sec ||
@@ -152,7 +225,12 @@ function flattenIniSections(obj) {
       "MaxProgress" in o ||
       "Achieved" in o ||
       "achieved" in o ||
+      "Unlock" in o ||
+      "unlock" in o ||
+      "Unlocked" in o ||
+      "unlocked" in o ||
       "UnlockTime" in o ||
+      "UnlockedTime" in o ||
       "timestamp" in o);
 
   const walk = (node, parts) => {
@@ -188,7 +266,12 @@ function buildNameOnlyIndex(configArray) {
   const byName = new Map();
   for (const a of configArray || []) {
     if (!a || !a.name) continue;
-    byName.set(normSectionTitle(a.name), a.name);
+    const canonical = String(a.name);
+    byName.set(normSectionTitle(canonical), canonical);
+    if (!/^ach_/i.test(canonical)) {
+      const alias = `ach_${canonical}`;
+      byName.set(normSectionTitle(alias), canonical);
+    }
   }
   return byName;
 }
@@ -247,21 +330,42 @@ function canonNameFromIniSection(sectionTitle, nameIndex) {
 }
 
 function resolveConfigSchemaPath(meta, fallbackConfigPath = null) {
-  if (meta?.config_path) {
-    const p1 = path.join(meta.config_path, "achievements.json");
-    if (fs.existsSync(p1)) return p1;
-    if (meta?.appid != null) {
-      const nested = path.join(
-        meta.config_path,
-        String(meta.appid),
-        "achievements.json"
-      );
-      if (fs.existsSync(nested)) return nested;
-    }
+  const appid =
+    meta?.appid != null && String(meta.appid).trim().length
+      ? String(meta.appid).trim()
+      : "";
+  const normalizedPlatform = (meta?.platform || "")
+    .toString()
+    .trim()
+    .toLowerCase();
+  const baseCandidates = [];
+  if (typeof meta?.config_path === "string" && meta.config_path.length) {
+    baseCandidates.push(meta.config_path);
   }
-  if (fallbackConfigPath) {
-    const guess = path.join(fallbackConfigPath, "achievements.json");
-    if (fs.existsSync(guess)) return guess;
+  if (fallbackConfigPath) baseCandidates.push(fallbackConfigPath);
+
+  for (const base of baseCandidates) {
+    if (!base) continue;
+    const candidates = new Set();
+    candidates.add(path.join(base, "achievements.json"));
+    if (appid) {
+      candidates.add(path.join(base, appid, "achievements.json"));
+      if (normalizedPlatform) {
+        candidates.add(
+          path.join(base, normalizedPlatform, appid, "achievements.json")
+        );
+      }
+      ["uplay", "steam", "epic", "gog"].forEach((plat) =>
+        candidates.add(path.join(base, plat, appid, "achievements.json"))
+      );
+    }
+    for (const candidate of candidates) {
+      try {
+        if (fs.existsSync(candidate)) return candidate;
+      } catch {
+        /* ignore */
+      }
+    }
   }
   return null;
 }
@@ -294,6 +398,101 @@ function getSafeLocalizedText(input, lang = "english") {
   }
   return "Hidden";
 }
+function canonNameFromEntry(rawName, nameIndex) {
+  const key = normSectionTitle(rawName);
+  return nameIndex?.byName.get(key) || nameIndex?.byDisp.get(key) || rawName;
+}
+
+function parseTenokeAchievementsIni(filePath, nameIndex) {
+  try {
+    const raw = fs.readFileSync(filePath, "utf8");
+    const lines = raw.split(/\r?\n/);
+    let section = "";
+    const statsMap = new Map();
+    const achievementsMap = new Map();
+
+    const toBool = (value) => {
+      const v = String(value || "")
+        .trim()
+        .toLowerCase();
+      return v === "true" || v === "1" || v === "yes";
+    };
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith(";") || trimmed.startsWith("#"))
+        continue;
+
+      const sectionMatch = trimmed.match(/^\[(.+?)\]$/);
+      if (sectionMatch) {
+        section = sectionMatch[1].trim().toUpperCase();
+        continue;
+      }
+
+      const kvMatch = trimmed.match(/^"([^"]+)"\s*=\s*(.+)$/);
+      if (!kvMatch) continue;
+
+      const entryName = kvMatch[1];
+      const value = kvMatch[2].trim();
+
+      if (section === "STATS") {
+        const numeric = Number(value.replace(/,$/, ""));
+        if (Number.isFinite(numeric)) statsMap.set(entryName, numeric);
+        continue;
+      }
+
+      if (section === "ACHIEVEMENTS") {
+        let unlocked = false;
+        let time = 0;
+        let progress = undefined;
+
+        if (value.startsWith("{") && value.endsWith("}")) {
+          const inner = value.slice(1, -1);
+          for (const part of inner.split(",")) {
+            const [rawKey, rawVal] = part.split("=").map((p) => p && p.trim());
+            if (!rawKey) continue;
+            const key = rawKey.toLowerCase();
+            if (key === "unlocked") {
+              unlocked = toBool(rawVal);
+            } else if (key === "time") {
+              const t = Number(rawVal);
+              if (Number.isFinite(t)) time = t;
+            } else if (key === "progress" || key === "value") {
+              const p = Number(rawVal);
+              if (Number.isFinite(p)) progress = p;
+            }
+          }
+        }
+
+        achievementsMap.set(entryName, { unlocked, time, progress });
+      }
+    }
+
+    const allNames = new Set([...statsMap.keys(), ...achievementsMap.keys()]);
+
+    const result = {};
+    for (const rawName of allNames) {
+      const canonical = canonNameFromEntry(rawName, nameIndex);
+      const statVal = statsMap.get(rawName);
+      const achData = achievementsMap.get(rawName) || {};
+
+      const entry = {
+        earned: achData.unlocked === true,
+        earned_time: normalizeEpoch(achData.time || 0),
+      };
+
+      const progressValue =
+        achData.progress !== undefined ? achData.progress : statVal;
+      if (Number.isFinite(progressValue)) entry.progress = progressValue;
+
+      result[canonical] = entry;
+    }
+
+    return Object.keys(result).length ? result : null;
+  } catch {
+    return null;
+  }
+}
 
 function loadAchievementsFromSaveFile(saveDir, fallback = {}, options = {}) {
   const {
@@ -312,19 +511,69 @@ function loadAchievementsFromSaveFile(saveDir, fallback = {}, options = {}) {
     appid
   );
 
-  const saveJsonPath = path.join(saveDir, "achievements.json");
-  const iniPath = path.join(saveDir, "achievements.ini");
+  const findCaseInsensitive = (dir, target, options = {}) => {
+    const maxDepth = Number.isFinite(options.maxDepth)
+      ? Math.max(0, options.maxDepth)
+      : 0;
+    const targetLc = String(target || "").toLowerCase();
+    if (!dir || !targetLc) return null;
+    const stack = [{ dir, depth: 0 }];
+
+    while (stack.length) {
+      const { dir: curDir, depth } = stack.pop();
+      try {
+        const entries = fs.readdirSync(curDir, { withFileTypes: true });
+        for (const ent of entries) {
+          if (ent.isFile() && ent.name.toLowerCase() === targetLc) {
+            return path.join(curDir, ent.name);
+          }
+        }
+        if (depth < maxDepth) {
+          for (const ent of entries) {
+            if (ent.isDirectory()) {
+              stack.push({
+                dir: path.join(curDir, ent.name),
+                depth: depth + 1,
+              });
+            }
+          }
+        }
+      } catch {
+        /* ignore this branch */
+      }
+    }
+    return null;
+  };
+
+  const saveJsonPath =
+    findCaseInsensitive(saveDir, "achievements.json") ||
+    path.join(saveDir, "achievements.json");
+  // UniverseLAN sometimes nests the ini; allow a shallow search (depth 2)
+  const iniPath =
+    findCaseInsensitive(saveDir, "achievements.ini", { maxDepth: 2 }) ||
+    path.join(saveDir, "achievements.ini");
+  const tenokeIniDirect = path.join(saveDir, "user_stats.ini");
+  const tenokeIniNested = path.join(saveDir, "SteamData", "user_stats.ini");
+  const tenokeIniPath = fs.existsSync(tenokeIniDirect)
+    ? tenokeIniDirect
+    : tenokeIniNested;
   const isStatsDir = path.basename(saveDir).toLowerCase() === "stats";
-  const onlineFixIniPath = isStatsDir
-    ? iniPath
-    : path.join(saveDir, "Stats", "achievements.ini");
+  const statsDir = path.join(saveDir, "Stats");
+  const statsIni =
+    findCaseInsensitive(statsDir, "achievements.ini", { maxDepth: 2 }) ||
+    path.join(statsDir, "achievements.ini");
+  const onlineFixIniPath = isStatsDir ? iniPath : statsIni;
   const binPath = path.join(saveDir, "stats.bin");
   const fromIniSection = (sec) => parseAchievementIniSection(sec);
 
   if (fs.existsSync(saveJsonPath)) {
     try {
       const parsed = JSON.parse(fs.readFileSync(saveJsonPath, "utf-8"));
+      if (parsed === null) return fallback || {};
+
       const out = {};
+      const hasRawUnlockTime = (item) =>
+        item && typeof item.unlock_time !== "undefined";
       const put = (name, item) => {
         if (!name) return;
         const achRaw =
@@ -353,11 +602,12 @@ function loadAchievementsFromSaveFile(saveDir, fallback = {}, options = {}) {
           item?.unlockTime ??
           item?.timestamp ??
           item?.earned_time ??
-          item?.earnedTime;
+          item?.earnedTime ??
+          item?.unlock_time;
         const ts = Number(tsRaw) || 0;
 
         out[name] = {
-          earned,
+          earned: earned || normalizeEpoch(ts) > 0,
           earned_time: ts,
           ...(prog !== undefined ? { progress: Number(prog) } : {}),
           ...(maxp !== undefined ? { max_progress: Number(maxp) } : {}),
@@ -366,21 +616,105 @@ function loadAchievementsFromSaveFile(saveDir, fallback = {}, options = {}) {
 
       if (Array.isArray(parsed)) {
         parsed.forEach((item) =>
-          put(item?.name || item?.Name || item?.id, item)
+          put(
+            item?.name ||
+              item?.Name ||
+              item?.id ||
+              item?.AchievementId ||
+              item?.achievementId,
+            item
+          )
         );
       } else if (parsed && typeof parsed === "object") {
         for (const [name, item] of Object.entries(parsed)) put(name, item);
       }
 
-      return out;
+      const normalized = {};
+      for (const [rawName, entry] of Object.entries(out)) {
+        if (!rawName) continue;
+        const canonical = canonNameFromEntry(rawName, nameIndex);
+        if (!canonical) continue;
+        normalized[canonical] = entry;
+      }
+
+      if (Object.keys(normalized).length) return normalized;
+
+      // Epic-style: array of objects with AchievementId + UnlockTime
+      const epicOut = {};
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (!item || typeof item !== "object") continue;
+          const rawName =
+            item.AchievementId ||
+            item.achievementId ||
+            item.id ||
+            item.ID ||
+            item.name ||
+            item.Name;
+          if (!rawName) continue;
+          const t =
+            Number(
+              item.UnlockTime ??
+                item.unlock_time ??
+                item.unlockTime ??
+                item.timestamp ??
+                item.time
+            ) || 0;
+          const earned =
+            item.Achieved === true ||
+            item.achieved === true ||
+            item.Achieved === 1 ||
+            item.achieved === 1 ||
+            normalizeEpoch(t) > 0;
+          const canonical = canonNameFromEntry(rawName, nameIndex);
+          epicOut[canonical || rawName] = {
+            earned,
+            earned_time: normalizeEpoch(t),
+          };
+        }
+      }
+      if (Object.keys(epicOut).length) return epicOut;
+
+      // GOG-style: flat object with unlock_time +/- unlocked
+      const gogOut = {};
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        for (const [rawName, item] of Object.entries(parsed)) {
+          if (!rawName || !item || typeof item !== "object") continue;
+          const t =
+            Number(
+              item.unlock_time ??
+                item.UnlockTime ??
+                item.unlockTime ??
+                item.timestamp ??
+                item.time
+            ) || 0;
+          const earned =
+            item.unlocked === true ||
+            item.unlocked === 1 ||
+            normalizeEpoch(t) > 0;
+          const canonical = canonNameFromEntry(rawName, nameIndex);
+          gogOut[canonical || rawName] = {
+            earned,
+            earned_time: normalizeEpoch(t),
+          };
+        }
+      }
+      if (Object.keys(gogOut).length) return gogOut;
+
+      return fallback || {};
     } catch {
       return fallback || {};
     }
   }
 
+  if (fs.existsSync(tenokeIniPath)) {
+    const tenokeData = parseTenokeAchievementsIni(tenokeIniPath, nameIndex);
+    if (tenokeData) return tenokeData;
+  }
+
   if (fs.existsSync(onlineFixIniPath)) {
     try {
-      const parsed = ini.parse(fs.readFileSync(onlineFixIniPath, "utf8"));
+      const parsed = parseIniWithEncoding(onlineFixIniPath);
       const flat = flattenIniSections(parsed);
       const converted = {};
       for (const [secTitle, secObj] of Object.entries(flat)) {
@@ -396,7 +730,7 @@ function loadAchievementsFromSaveFile(saveDir, fallback = {}, options = {}) {
 
   if (fs.existsSync(iniPath)) {
     try {
-      const parsed = ini.parse(fs.readFileSync(iniPath, "utf8"));
+      const parsed = parseIniWithEncoding(iniPath);
       const flat = flattenIniSections(parsed);
       const converted = {};
       for (const [secTitle, secObj] of Object.entries(flat)) {

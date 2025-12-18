@@ -256,6 +256,17 @@
 
     <script>
       let overlayLang = "english";
+      let overlayPrefs = null;
+
+      async function loadOverlayPrefs() {
+        if (overlayPrefs) return overlayPrefs;
+        try {
+          overlayPrefs = await window.api.loadPreferences?.();
+        } catch (e) {
+          overlayPrefs = null;
+        }
+        return overlayPrefs || {};
+      }
       let currentConfigName = null;
       let currentDataHash = null;
       let isLoading = false;
@@ -391,6 +402,7 @@
             configName
           );
           const lang = overlayLang;
+          const prefs = await loadOverlayPrefs();
 
           if (!Array.isArray(achievementsDataObj.achievements)) {
             emptyState.style.display = "flex";
@@ -442,30 +454,36 @@
             return bUnlocked - aUnlocked;
           });
 
-          achievements.forEach((achievement) => {
-            const displayName = getSafeLocalizedText(
-              achievement.displayName,
-              lang
-            );
+            achievements.forEach((achievement) => {
+              const displayName = getSafeLocalizedText(
+                achievement.displayName,
+                lang
+              );
             const description = getSafeLocalizedText(
               achievement.description,
               lang
             );
             const iconGray = achievement.icon_gray || achievement.icongray;
             const icon = achievement.icon || iconGray;
+            const isHidden = Number(achievement.hidden) === 1;
 
-            let statusHTML = `<div class="status-locked"><i class="fas fa-lock"></i> Locked</div>`;
-            let earnedTimeHTML = "";
-            let progressHTML = "";
-            const saved =
-              savedAchievementsObj?.achievements?.[achievement.name];
-            const isUnlocked = !!saved?.earned;
-            const rel = isUnlocked ? icon : iconGray;
+              let statusHTML = `<div class="status-locked"><i class="fas fa-lock"></i> Locked</div>`;
+              let earnedTimeHTML = "";
+              let progressHTML = "";
+              const saved =
+                savedAchievementsObj?.achievements?.[achievement.name];
+              const isUnlocked = !!saved?.earned;
+              const rel = isUnlocked ? icon : iconGray;
+              const showHidden = prefs?.showHiddenDescription === true;
+              const descText =
+                isHidden && !isUnlocked && !showHidden
+                  ? "Hidden"
+                  : description;
 
-            if (saved?.earned) {
-              statusHTML = `<div class="status-unlocked"><i class="fas fa-unlock"></i> Unlocked</div>`;
-              earnedTimeHTML = `<div class="achievement-time">${formatTimestamp(
-                saved.earned_time
+              if (saved?.earned) {
+                statusHTML = `<div class="status-unlocked"><i class="fas fa-unlock"></i> Unlocked</div>`;
+                earnedTimeHTML = `<div class="achievement-time">${formatTimestamp(
+                  saved.earned_time
               )}</div>`;
             }
 
@@ -491,9 +509,9 @@
             listItem.className = "achievement-item";
             listItem.innerHTML = `
           <img class="achievement-icon" alt="Icon">
-          <div class="achievement-info">
-            <div class="achievement-name">${displayName}</div>
-            <div class="achievement-description">${description}</div>
+            <div class="achievement-info">
+              <div class="achievement-name">${displayName}</div>
+            <div class="achievement-description">${descText}</div>
             ${progressHTML}
           </div>
           <div class="achievement-status">

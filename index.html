@@ -206,6 +206,9 @@
           <button id="tab-folders" class="settings-tab" data-tab="folders">
             Folders
           </button>
+          <button id="tab-advanced" class="settings-tab" data-tab="advanced">
+            Advanced
+          </button>
           <button
             id="tab-shortcuts"
             class="settings-tab"
@@ -247,11 +250,20 @@
                 </div>
               </div>
               <div class="settings-section">
+                <h4>Hidden Achievements</h4>
+                <div class="checkbox-control">
+                  <input type="checkbox" id="settings-showHiddenDescription" />
+                  <label for="settings-showHiddenDescription">
+                    Show Hidden Description
+                  </label>
+                </div>
+              </div>
+              <div class="settings-section">
                 <h4>Startup</h4>
                 <div class="checkbox-control">
                   <input type="checkbox" id="settings-startWindowsCheckbox" />
                   <label for="settings-startWindowsCheckbox"
-                    >Start with Windows (Run as admin before enabling)</label
+                    >Start with Windows (Run as admin to enable)</label
                   >
                 </div>
                 <div class="checkbox-control">
@@ -298,7 +310,10 @@
                     </button>
                   </div>
                 </div>
-                <div class="checkbox-control" style="margin-top: -10px">
+                <div
+                  class="checkbox-control"
+                  style="margin-top: -10px; margin-bottom: 5px"
+                >
                   <input
                     type="checkbox"
                     id="settings-disableScreenshotCheckbox"
@@ -349,6 +364,16 @@
                   >
                 </div>
 
+                <div class="checkbox-control">
+                  <input
+                    type="checkbox"
+                    id="settings-disablePlatinumCheckbox"
+                  />
+                  <label for="settings-disablePlatinumCheckbox"
+                    >Disable Platinum Notification</label
+                  >
+                </div>
+
                 <div class="settings-slider">
                   <label for="settings-scaleSlider"
                     >Achievement Scale:
@@ -394,6 +419,36 @@
                   <label for="settings-soundSelect">Achievement Sound:</label>
                   <select id="settings-soundSelect"></select>
                 </div>
+
+                <hr />
+                <h4 style="margin-top: 10px">Platinum Notification</h4>
+                <div class="settings-control">
+                  <label for="settings-platinumPositionDropdown"
+                    >Platinum Achievement Position:</label
+                  >
+                  <select id="settings-platinumPositionDropdown">
+                    <option value="center-bottom">Center Bottom</option>
+                    <option value="center-top">Center Top</option>
+                    <option value="top-right">Top Right</option>
+                    <option value="bottom-right">Bottom Right</option>
+                    <option value="top-left">Top Left</option>
+                    <option value="bottom-left">Bottom Left</option>
+                  </select>
+                </div>
+
+                <div class="settings-control">
+                  <label for="settings-platinumPresetDropdown"
+                    >Platinum Achievement Presets:</label
+                  >
+                  <select id="settings-platinumPresetDropdown"></select>
+                </div>
+
+                <div class="settings-control">
+                  <label for="settings-platinumSoundSelect"
+                    >Platinum Achievement Sound:</label
+                  >
+                  <select id="settings-platinumSoundSelect"></select>
+                </div>
               </div>
             </div>
           </div>
@@ -415,6 +470,61 @@
                   <button id="foldersRescanBtn" type="button">Rescan</button>
                 </div>
                 <div id="foldersList" style="margin-top: 2px"></div>
+              </div>
+            </div>
+          </div>
+          <div
+            id="advancedTab"
+            class="tab-content"
+            role="tabpanel"
+            aria-labelledby="tab-advanced"
+            hidden
+          >
+            <div style="padding: 0 5px">
+              <div class="settings-section">
+                <div class="settings-section" style="margin-bottom: 5px">
+                  <h4>Steam Web API</h4>
+                  <div class="settings-control">
+                    <input
+                      type="password"
+                      id="settings-steamApiKeyInput"
+                      placeholder="No key saved. Enter your Steam Web API key"
+                      autocomplete="off"
+                    />
+                  </div>
+                  <div class="settings-control" style="gap: 8px">
+                    <button type="button" id="settings-steamApiKeySave">
+                      Save
+                    </button>
+                    <button type="button" id="settings-steamApiKeyClear">
+                      Remove
+                    </button>
+                  </div>
+                </div>
+                <div class="settings-section">
+                  <h4>Blacklist</h4>
+                  <div class="checkbox-control">
+                    <input
+                      type="checkbox"
+                      id="settings-showBlacklistedCheckbox"
+                    />
+                    <label for="settings-showBlacklistedCheckbox">
+                      Show blacklisted games
+                    </label>
+                  </div>
+                  <div
+                    id="blacklistList"
+                    class="wf-list"
+                    role="list"
+                    aria-label="Blacklisted AppIDs"
+                    style="margin-top: 8px"
+                  ></div>
+                  <div class="settings-control" style="gap: 8px">
+                    <button type="button" id="settings-resetBlacklistBtn">
+                      Reset Blacklist
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1258,6 +1368,27 @@
                         id="processName"
                         placeholder="Optional – real .exe name"
                       />
+                      <label for="platformSelect">Platform:</label>
+                      <select id="platformSelect">
+                        <option value="auto" selected>Auto</option>
+                        <option value="steam">Steam</option>
+                        <option value="uplay">Uplay</option>
+                        <option value="epic">Epic</option>
+                        <option value="gog">GOG</option>
+                      </select>
+
+                      <div
+                        id="steamAppIdRow"
+                        class="input-with-button"
+                        style="display: none"
+                      >
+                        <input
+                          type="text"
+                          id="steamAppIdInput"
+                          placeholder="Mapped Steam AppID"
+                        />
+                        <button type="button" id="lookupSteamIdBtn">??</button>
+                      </div>
                     </div>
                   </div>
 
@@ -1294,14 +1425,15 @@
             <select id="configList" class="field-input">
               <option value="" disabled selected>Select</option>
             </select>
-
             <button
               id="deleteConfigBtn"
               style="display: none; margin-top: 25px"
             >
               Delete
             </button>
-
+            <button id="blacklistConfigBtn" style="display: none">
+              Add to Blacklist
+            </button>
             <div class="button-row">
               <button id="editConfigBtn" style="display: none">
                 Edit Config
@@ -1432,6 +1564,9 @@
       </select>
       <select id="presetDropdown"></select>
       <select id="soundSelect"></select>
+      <input type="hidden" id="platinumPresetValue" />
+      <input type="hidden" id="platinumPositionValue" />
+      <input type="hidden" id="platinumSoundValue" />
     </div>
 
     <!-- DASHBOARD -->
@@ -1526,6 +1661,182 @@
     </div>
 
     <script>
+      window.__coverNameCache = window.__coverNameCache || {};
+      function rememberCoverName(appid, displayName) {
+        if (!appid || !displayName) return;
+        const key = String(appid);
+        window.__coverNameCache[key] = String(displayName).trim();
+      }
+      function rememberCoverNamesFromList(list) {
+        if (!Array.isArray(list)) return;
+        list.forEach((cfg) => {
+          if (cfg?.appid && (cfg.displayName || cfg.name)) {
+            rememberCoverName(cfg.appid, cfg.displayName || cfg.name);
+          }
+        });
+      }
+      function getCoverSearchTerm(appid) {
+        if (!appid) return "";
+        const key = String(appid);
+        return window.__coverNameCache[key] || "";
+      }
+
+      window.__preferencesCache = window.__preferencesCache || null;
+      window.__preferencesLoadPromise = null;
+      const blacklistLabelCache = new Map();
+
+      function deepEqual(a, b) {
+        if (a === b) return true;
+        if (Array.isArray(a) && Array.isArray(b)) {
+          if (a.length !== b.length) return false;
+          for (let i = 0; i < a.length; i += 1) {
+            if (!deepEqual(a[i], b[i])) return false;
+          }
+          return true;
+        }
+        if (
+          a &&
+          b &&
+          typeof a === "object" &&
+          typeof b === "object" &&
+          a.constructor === Object &&
+          b.constructor === Object
+        ) {
+          const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+          for (const k of keys) {
+            if (!deepEqual(a[k], b[k])) return false;
+          }
+          return true;
+        }
+        return false;
+      }
+
+      async function loadPreferencesCached() {
+        if (window.__preferencesLoadPromise) {
+          return window.__preferencesLoadPromise;
+        }
+        window.__preferencesLoadPromise = (async () => {
+          try {
+            const prefs = await window.api.loadPreferences();
+            window.__preferencesCache = { ...(prefs || {}) };
+            return window.__preferencesCache;
+          } catch (err) {
+            console.error("Failed to load preferences:", err);
+            return window.__preferencesCache || {};
+          } finally {
+            window.__preferencesLoadPromise = null;
+          }
+        })();
+        return window.__preferencesLoadPromise;
+      }
+
+      function getCachedPreferences() {
+        return window.__preferencesCache || {};
+      }
+
+      async function refreshPreferencesCache() {
+        try {
+          await loadPreferencesCached();
+        } catch (err) {
+          console.warn("Failed to refresh preferences cache:", err);
+        }
+      }
+      async function maybeRequestPlatinum(
+        configMeta,
+        achievementsList,
+        savedAchievementsObj
+      ) {
+        if (!configMeta) return;
+        if (configMeta.platinum === true) return; // already flagged, skip
+        const total = Array.isArray(achievementsList)
+          ? achievementsList.length
+          : 0;
+        if (!total) return;
+        const saved = savedAchievementsObj?.achievements || {};
+        const earned = Object.values(saved).filter((x) => x?.earned).length;
+        if (earned !== total) return;
+
+        window.__platinumManualSent = window.__platinumManualSent || new Set();
+        const key =
+          configMeta.name ||
+          configMeta.configName ||
+          configMeta.appid ||
+          configMeta.appId ||
+          "";
+        if (!key || window.__platinumManualSent.has(key)) return;
+        window.__platinumManualSent.add(key);
+
+        const payload = {
+          configName: configMeta.name || configMeta.configName || "",
+          appid: configMeta.appid || configMeta.appId || null,
+          savePath: configMeta.save_path || configMeta.savePath || null,
+          configPath: configMeta.config_path || configMeta.configPath || null,
+          suppressNotify: false,
+        };
+
+        try {
+          if (window.api?.requestPlatinumManual) {
+            await window.api.requestPlatinumManual(payload);
+          } else if (window.electron?.ipcRenderer?.invoke) {
+            await window.electron.ipcRenderer.invoke(
+              "platinum:manual",
+              payload
+            );
+          }
+        } catch (err) {
+          console.warn("Failed to trigger manual platinum:", err);
+        }
+      }
+
+      if (!window.__savePrefsPatched && window.api?.savePreferences) {
+        window.__savePrefsPatched = true;
+        const originalSavePreferences = window.api.savePreferences;
+        window.api.savePreferences = async (prefs) => {
+          const current = getCachedPreferences();
+          const pending = { ...(prefs || {}) };
+          Object.keys(pending).forEach((key) => {
+            if (deepEqual(pending[key], current[key])) {
+              delete pending[key];
+            }
+          });
+          if (!Object.keys(pending).length) return current;
+          const result = await originalSavePreferences(pending);
+          try {
+            const merged = {
+              ...current,
+              ...pending,
+            };
+            delete merged.steamApiKeyMasked;
+            window.__preferencesCache = merged;
+          } catch (err) {
+            console.warn("Failed to update preferences cache:", err);
+          }
+          return result;
+        };
+      }
+
+      function patchApiWithCacheRefresh(target, method) {
+        if (!target || typeof target[method] !== "function") return;
+        const flag = `__prefsCacheWrapped_${method}`;
+        if (target[flag]) return;
+        const original = target[method];
+        target[method] = async (...args) => {
+          const result = await original(...args);
+          await refreshPreferencesCache();
+          return result;
+        };
+        target[flag] = true;
+      }
+
+      patchApiWithCacheRefresh(window.api, "blacklistConfig");
+      patchApiWithCacheRefresh(window.api, "resetBlacklist");
+      patchApiWithCacheRefresh(window.api, "getBlacklist");
+      if (window.folders) {
+        ["add", "remove", "block", "unblock"].forEach((method) =>
+          patchApiWithCacheRefresh(window.folders, method)
+        );
+      }
+
       //Start with Windows
       async function handleStartWithWindowsToggle(enabled) {
         const checkbox = document.getElementById(
@@ -1552,7 +1863,61 @@
           "./assets/achievements-logo.png",
           window.location.href
         ).toString();
-
+        const downloadIdCache = new Map();
+        const steamGridUrlCache = new Map();
+        function buildSteamGridSearchTerm(input) {
+          return String(input || "")
+            .trim()
+            .replace(/\+/g, " ")
+            .replace(/\s+/g, "+");
+        }
+        async function downloadFromSteamGrid(
+          targetAppId,
+          rawTerm,
+          size = "600x900"
+        ) {
+          const term = buildSteamGridSearchTerm(rawTerm);
+          if (!term) return false;
+          const cacheKey = `${size}::${term.toLowerCase()}`;
+          if (steamGridUrlCache.has(cacheKey)) {
+            const cached = steamGridUrlCache.get(cacheKey);
+            if (cached === null) return false;
+            try {
+              await downloadAndSave(targetAppId, cached);
+              return true;
+            } catch (err) {
+              steamGridUrlCache.delete(cacheKey);
+            }
+          }
+          try {
+            const response = await window.api.getSteamGridDbCover({
+              term,
+              size,
+            });
+            if (response?.ok && response.url) {
+              steamGridUrlCache.set(cacheKey, response.url);
+              await downloadAndSave(targetAppId, response.url);
+              return true;
+            }
+          } catch (err) {}
+          steamGridUrlCache.set(cacheKey, null);
+          return false;
+        }
+        async function resolveRemoteAppId(appid) {
+          const key = String(appid || "");
+          if (!/^\d+$/.test(key)) return key;
+          if (downloadIdCache.has(key)) return downloadIdCache.get(key);
+          try {
+            const mapped = await window.api.getSteamLookupAppId(key);
+            const effective =
+              mapped && /^\d+$/.test(String(mapped)) ? String(mapped) : key;
+            downloadIdCache.set(key, effective);
+            return effective;
+          } catch {
+            downloadIdCache.set(key, key);
+            return key;
+          }
+        }
         if (!embedRoot || !imgWrap || !imgEl) return;
 
         // --- fallback logo ---
@@ -1611,56 +1976,199 @@
           "https://shared.cloudflare.steamstatic.com",
           "https://cdn.akamai.steamstatic.com/",
         ];
-        async function downloadAndSave(targetAppId, url) {
+        const remoteAppIdCache = new Map();
+        async function resolveRemoteAppId(appid) {
+          const key = String(appid || "");
+          if (!/^\d+$/.test(key)) return key;
+          if (remoteAppIdCache.has(key)) return remoteAppIdCache.get(key);
+          try {
+            const mapped = await window.api.getSteamLookupAppId(key);
+            const effective =
+              mapped && /^\d+$/.test(String(mapped)) ? String(mapped) : key;
+            remoteAppIdCache.set(key, effective);
+            return effective;
+          } catch {
+            remoteAppIdCache.set(key, key);
+            return key;
+          }
+        }
+        async function downloadAndSave(targetAppId, url, platformHint = null) {
+          const logCover = (level, message, meta = {}) => {
+            try {
+              if (window.api?.logCoverEvent) {
+                window.api.logCoverEvent(level, message, meta);
+              }
+            } catch {}
+          };
+          logCover("info", "download:start", {
+            appid: targetAppId,
+            platform: platformHint || "auto",
+            url,
+          });
           const res = await fetch(url, { cache: "no-store" });
           if (!res.ok) throw new Error("HTTP " + res.status);
           const blob = await res.blob();
           const buf = new Uint8Array(await blob.arrayBuffer());
-          await window.api.saveGameImage(String(targetAppId), buf);
+          const platform =
+            platformHint ||
+            (await resolvePlatformForCurrentApp(targetAppId)) ||
+            null;
+          await window.api.saveGameImage(String(targetAppId), buf, platform);
+          logCover("info", "download:saved", {
+            appid: targetAppId,
+            platform: platform || "auto",
+            url,
+          });
         }
-        async function downloadFromCdnAndCache(appid) {
-          const plain = [
-            `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appid}/library_600x900.jpg`,
-            `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appid}/library_600x900.jpg`,
-            `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appid}/portrait.png`,
-            `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appid}/portrait.png`,
-            `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`,
-            `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`,
-          ];
-
-          for (const url of plain) {
-            try {
-              await downloadAndSave(appid, url);
-              return true;
-            } catch (err) {}
-          }
-
+        async function resolvePlatformForCurrentApp(appid) {
           try {
-            const r = await window.api.getSteamDbCover(appid);
-            if (r?.url) {
-              await downloadAndSave(appid, r.url);
-              return true;
+            const selectedConfig = document.getElementById("configList")?.value;
+            if (selectedConfig && window.api.getConfigByName) {
+              const cfg = await window.api.getConfigByName(selectedConfig);
+              const cfgAppId = cfg?.appid || cfg?.appId;
+              if (cfg && String(cfgAppId || "") === String(appid || cfgAppId)) {
+                return cfg.platform || null;
+              }
             }
-          } catch (err) {}
-
-          try {
-            await downloadFromStoreHeader(appid);
-            return true;
-          } catch (err) {}
-
-          console.warn(appid, ":: all sources failed");
-          return false;
+          } catch {}
+          return null;
         }
-        async function downloadFromStoreHeader(appid) {
+
+        const inFlightCovers = new Map();
+        async function downloadFromCdnAndCache(
+          targetAppId,
+          fetchAppIdOverride = null,
+          options = {}
+        ) {
+          const key = String(targetAppId);
+          if (inFlightCovers.has(key)) {
+            return inFlightCovers.get(key);
+          }
+          const task = (async () => {
+            const fetchAppId = fetchAppIdOverride || targetAppId;
+            const fallbackName = String(
+              options?.gameName || getCoverSearchTerm(targetAppId) || ""
+            ).trim();
+            const platform =
+              options?.platform ||
+              (await resolvePlatformForCurrentApp(targetAppId)) ||
+              null;
+            const steamGridSize =
+              options?.gridSize && String(options.gridSize).trim().length
+                ? String(options.gridSize)
+                : "600x900";
+            const logCover = (level, message, meta = {}) => {
+              try {
+                if (window.api?.logCoverEvent) {
+                  window.api.logCoverEvent(level, message, meta);
+                }
+              } catch {}
+            };
+            logCover("info", "cascade:start", {
+              targetAppId,
+              fetchAppId,
+              platform,
+              coverName: fallbackName || null,
+              steamGridSize,
+            });
+            const plain = [
+              `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${fetchAppId}/library_600x900.jpg`,
+              `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${fetchAppId}/library_600x900.jpg`,
+              `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${fetchAppId}/portrait.png`,
+              `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${fetchAppId}/portrait.png`,
+              `https://cdn.akamai.steamstatic.com/steam/apps/${fetchAppId}/library_600x900.jpg`,
+              `https://cdn.akamai.steamstatic.com/steam/apps/${fetchAppId}/header.jpg`,
+            ];
+
+            for (const url of plain) {
+              try {
+                await downloadAndSave(targetAppId, url, platform);
+                logCover("info", "cdn:hit", { targetAppId, fetchAppId, url });
+                return true;
+              } catch (err) {
+                logCover("warn", "cdn:miss", {
+                  targetAppId,
+                  fetchAppId,
+                  url,
+                  error: err?.message || String(err),
+                });
+              }
+            }
+
+            try {
+              const r = await window.api.getSteamDbCover(fetchAppId);
+              if (r?.url) {
+                await downloadAndSave(targetAppId, r.url, platform);
+                logCover("info", "steamdb:hit", {
+                  targetAppId,
+                  fetchAppId,
+                  url: r.url,
+                });
+                return true;
+              }
+            } catch (err) {
+              logCover("warn", "steamdb:fail", {
+                targetAppId,
+                fetchAppId,
+                error: err?.message || String(err),
+              });
+            }
+
+            try {
+              await downloadFromStoreHeader(fetchAppId, targetAppId);
+              logCover("info", "store:hit", {
+                targetAppId,
+                fetchAppId,
+              });
+              return true;
+            } catch (err) {
+              logCover("warn", "store:fail", {
+                targetAppId,
+                fetchAppId,
+                error: err?.message || String(err),
+              });
+            }
+
+            if (fallbackName) {
+              const ok = await downloadFromSteamGrid(
+                targetAppId,
+                fallbackName,
+                steamGridSize
+              );
+              if (ok) {
+                logCover("info", "steamgrid:hit", {
+                  targetAppId,
+                  fetchAppId,
+                  term: fallbackName,
+                  steamGridSize,
+                });
+                return true;
+              }
+            }
+
+            logCover("warn", "covers:all-sources-failed", {
+              targetAppId,
+              fetchAppId,
+            });
+            return false;
+          })().finally(() => inFlightCovers.delete(key));
+
+          inFlightCovers.set(key, task);
+          return task;
+        }
+        async function downloadFromStoreHeader(
+          fetchAppId,
+          targetAppId = fetchAppId
+        ) {
           try {
             const res = await fetch(
-              `https://store.steampowered.com/api/appdetails?appids=${appid}`,
+              `https://store.steampowered.com/api/appdetails?appids=${fetchAppId}`,
               { cache: "no-store" }
             );
             if (!res.ok) throw new Error(`Store API HTTP ${res.status}`);
 
             const data = await res.json();
-            const entry = data?.[String(appid)];
+            const entry = data?.[String(fetchAppId)];
             const headerUrl =
               entry?.data?.library_assets?.library_600x900 ||
               entry?.data?.library_assets?.logo ||
@@ -1673,7 +2181,7 @@
               throw err;
             }
 
-            await downloadAndSave(appid, headerUrl);
+            await downloadAndSave(targetAppId, headerUrl);
             return true;
           } catch (err) {
             if (!err.tag) err.tag = NOT_FOUND_TAG;
@@ -1688,9 +2196,15 @@
             return;
           }
 
+          const fetchAppId = await resolveRemoteAppId(appid);
+          const coverNameHint = getCoverSearchTerm(appid) || "";
+          const platform =
+            (await resolvePlatformForCurrentApp(appid)) || "steam";
+
           try {
             const localPath = await window.api.checkLocalGameImage(
-              String(appid)
+              String(appid),
+              platform
             );
 
             if (localPath) {
@@ -1705,11 +2219,16 @@
             }
             showFallbackLogo();
 
-            const ok = await downloadFromCdnAndCache(String(appid));
+            const ok = await downloadFromCdnAndCache(
+              String(appid),
+              fetchAppId,
+              { gameName: coverNameHint, platform }
+            );
             if (!ok) return;
 
             const newLocal = await window.api.checkLocalGameImage(
-              String(appid)
+              String(appid),
+              platform
             );
             if (newLocal) {
               try {
@@ -1766,38 +2285,36 @@
           const currentConfig = selectedConfig
             ? await window.api.getConfigByName(selectedConfig)
             : null;
-          const currentAppId = currentConfig?.appid || alt;
-
-          let ok = false;
-          if (await downloadFromCdnAndCache(alt)) {
-            ok = true;
+          const currentAppId =
+            currentConfig?.appid && /^\d+$/.test(String(currentConfig.appid))
+              ? String(currentConfig.appid)
+              : alt;
+          const platform =
+            currentConfig?.platform ||
+            (await resolvePlatformForCurrentApp(currentAppId)) ||
+            null;
+          const coverName =
+            getCoverSearchTerm(currentAppId) ||
+            currentConfig?.displayName ||
+            currentConfig?.name ||
+            "";
+          if (coverName) {
+            rememberCoverName(currentAppId, coverName);
           }
+
+          const ok = await downloadFromCdnAndCache(String(currentAppId), alt, {
+            gameName: coverName,
+            platform,
+          });
 
           if (!ok) {
             alert("No image available for the alternate AppID.");
             return;
           }
 
-          // 2) copy the freshly cached file under the current game's image slot
-          const tmpPath = await window.api.checkLocalGameImage(String(alt));
-          if (tmpPath) {
-            const blob = await (await fetch(`file:///${tmpPath}`)).blob();
-            await window.api.saveGameImage(
-              String(currentAppId),
-              new Uint8Array(await blob.arrayBuffer())
-            );
-          }
-
-          const newLocal = await window.api.checkLocalGameImage(
-            String(currentAppId)
-          );
-          if (newLocal) {
-            try {
-              await setImgFromLocal(newLocal);
-              if (fallbackBox) fallbackBox.style.display = "none";
-              imgWrap.style.display = "flex";
-            } catch (err) {}
-          }
+          await loadLocalCover(String(currentAppId));
+          if (fallbackBox) fallbackBox.style.display = "none";
+          imgWrap.style.display = "flex";
         };
 
         // update main
@@ -1884,6 +2401,12 @@
         }
         const savedAchievementsObj = await window.api.loadSavedAchievements(
           selectedConfig
+        );
+        const currentConfig = await window.api.getConfigByName(selectedConfig);
+        maybeRequestPlatinum(
+          { name: selectedConfig, ...(currentConfig || {}) },
+          achievementsDataObj?.achievements || [],
+          savedAchievementsObj
         );
 
         const tableBody = document.getElementById("achievementsTableBody");
@@ -1980,8 +2503,19 @@
           const descWrap = document.createElement("span");
           descWrap.className = "description";
           descWrap.style.display = "block";
+          const prefs = getCachedPreferences() || {};
+          const isHiddenInSchema = Number(achievement.hidden) === 1;
+          const isUnlockedState = !!saved?.earned;
+          const canShowHiddenDesc =
+            isUnlockedState && description
+              ? true
+              : prefs.showHiddenDescription === true;
+          const descText =
+            isHiddenInSchema && !canShowHiddenDesc
+              ? "Hidden"
+              : description || "";
           descWrap.appendChild(document.createElement("em")).textContent =
-            description || "";
+            descText;
           tdText.appendChild(strong);
           tdText.appendChild(document.createElement("br"));
           tdText.appendChild(descWrap);
@@ -2256,6 +2790,86 @@
           });
       });
 
+      const platformSelect = document.getElementById("platformSelect");
+      const steamAppIdInput = document.getElementById("steamAppIdInput");
+      const steamAppIdRow = document.getElementById("steamAppIdRow");
+      const lookupSteamIdBtn = document.getElementById("lookupSteamIdBtn");
+
+      function toggleSteamAppIdRow(shouldShow) {
+        if (!steamAppIdRow) return;
+        steamAppIdRow.style.display = shouldShow ? "flex" : "none";
+        if (!shouldShow && steamAppIdInput) {
+          steamAppIdInput.value = "";
+        }
+      }
+
+      async function lookupSteamAppId(manualTrigger = false) {
+        if (!steamAppIdInput) return;
+        const appidInput = document.getElementById("appid");
+        const appIdValue = appidInput?.value.trim();
+        if (!appIdValue) {
+          if (manualTrigger) {
+            showNotification("Enter the AppID.", "#FFC107");
+          }
+          return;
+        }
+        try {
+          const mapped = await window.api.getSteamLookupAppId(appIdValue);
+          if (mapped) {
+            steamAppIdInput.value = mapped;
+            if (manualTrigger) {
+              showNotification(`Steam AppID found: ${mapped}`, "#4CAF50");
+            }
+            console.info("[platform] steam-id-resolved", {
+              appid: appIdValue,
+              steamAppId: mapped,
+              manual: manualTrigger,
+            });
+          } else if (manualTrigger) {
+            showNotification(
+              "No mapping found. Enter Steam AppID manually.",
+              "#FFC107"
+            );
+          }
+          if (!mapped) {
+            console.warn("[platform] steam-id-miss", {
+              appid: appIdValue,
+              manual: manualTrigger,
+            });
+          }
+        } catch (err) {
+          if (manualTrigger) {
+            showNotification("Lookup Steam ID failed.", "#f44336");
+          }
+          console.error("[platform] steam-id-lookup-error", {
+            appid: appIdValue,
+            error: err?.message || String(err),
+          });
+        }
+      }
+
+      if (platformSelect) {
+        platformSelect.addEventListener("change", async (event) => {
+          const nextValue = (event.target.value || "").toLowerCase();
+          const showSteamField = nextValue === "uplay";
+          toggleSteamAppIdRow(showSteamField);
+          if (
+            showSteamField &&
+            steamAppIdInput &&
+            !steamAppIdInput.value.trim()
+          ) {
+            await lookupSteamAppId(false);
+          }
+        });
+      }
+
+      if (lookupSteamIdBtn) {
+        lookupSteamIdBtn.addEventListener("click", async (e) => {
+          e.preventDefault();
+          await lookupSteamAppId(true);
+        });
+      }
+
       let editingConfigName = null;
 
       function resetConfigForm() {
@@ -2268,6 +2882,15 @@
         document.getElementById("executablePath").value = "";
         document.getElementById("exeArgs").value = "";
         document.getElementById("processName").value = "";
+        if (platformSelect) {
+          platformSelect.value = "auto";
+          platformSelect.disabled = false;
+          platformSelect.title = "";
+        }
+        toggleSteamAppIdRow(false);
+        if (steamAppIdInput) {
+          steamAppIdInput.value = "";
+        }
 
         editingConfigName = null;
 
@@ -2316,6 +2939,23 @@
               currentConfig.arguments || "";
             document.getElementById("processName").value =
               currentConfig.process_name || "";
+            const currentPlatform = (
+              currentConfig.platform || "auto"
+            ).toLowerCase();
+            if (platformSelect) {
+              platformSelect.value = ["steam", "uplay", "epic", "gog"].includes(
+                currentPlatform
+              )
+                ? currentPlatform
+                : "auto";
+              platformSelect.disabled = true;
+              platformSelect.title =
+                "Platform is locked for existing configs. Create a new config to change it.";
+              toggleSteamAppIdRow(platformSelect.value === "uplay");
+            }
+            if (steamAppIdInput) {
+              steamAppIdInput.value = currentConfig.steamAppId || "";
+            }
 
             editingConfigName = currentConfig.name;
             const form = document.getElementById("new-config-form");
@@ -2361,6 +3001,8 @@
         const executable = document.getElementById("executablePath").value;
         const arguments = document.getElementById("exeArgs").value;
         const processName = document.getElementById("processName").value;
+        const selectedPlatform = platformSelect?.value?.toLowerCase() || "auto";
+        const steamAppId = steamAppIdInput?.value.trim() || "";
 
         if (!configName || !appid) {
           const notif = document.createElement("div");
@@ -2383,6 +3025,19 @@
           return;
         }
 
+        try {
+          const check = await window.api.isAppIdBlacklisted(appid);
+          if (check?.blacklisted) {
+            showNotification(
+              `${check.appid} is on Blacklist. Please remove it to continue.`,
+              "#f44336"
+            );
+            return;
+          }
+        } catch (err) {
+          console.error("Blacklist check failed:", err);
+        }
+
         const config = {
           name: configName,
           appid: appid,
@@ -2392,6 +3047,17 @@
           arguments: arguments || "",
           process_name: processName || "",
         };
+        if (
+          selectedPlatform === "steam" ||
+          selectedPlatform === "uplay" ||
+          selectedPlatform === "epic" ||
+          selectedPlatform === "gog"
+        ) {
+          config.platform = selectedPlatform;
+        }
+        if (steamAppId) {
+          config.steamAppId = steamAppId;
+        }
 
         const result =
           editingConfigName && editingConfigName !== configName
@@ -2482,6 +3148,224 @@
       const deleteConfigBtn = document.getElementById("deleteConfigBtn");
       const editConfigBtn = document.getElementById("editConfigBtn");
       const backButton = document.getElementById("backButton");
+      const blacklistConfigBtn = document.getElementById("blacklistConfigBtn");
+      const showBlacklistedCheckbox = document.getElementById(
+        "settings-showBlacklistedCheckbox"
+      );
+      const resetBlacklistBtn = document.getElementById(
+        "settings-resetBlacklistBtn"
+      );
+
+      const configMetaIndex = new Map();
+      const blacklistState = {
+        appids: new Set(),
+        showBlacklisted: false,
+      };
+      let lastSelectedConfigMeta = null;
+
+      function normalizeConfigEntry(entry) {
+        if (!entry) return null;
+        if (typeof entry === "string") {
+          return {
+            name: entry,
+            displayName: entry,
+            appid: null,
+            blacklisted: false,
+          };
+        }
+        const name = entry.name || entry.configName || "";
+        if (!name) return null;
+        return {
+          name,
+          displayName:
+            entry.displayName || entry.title || entry.name || entry.configName,
+          appid: entry.appid ? String(entry.appid) : null,
+          blacklisted: !!entry.blacklisted,
+        };
+      }
+
+      function normalizeConfigList(list) {
+        return Array.isArray(list)
+          ? list
+              .map((item) => normalizeConfigEntry(item))
+              .filter((item) => item && item.name)
+          : [];
+      }
+
+      function cacheConfigMeta(list) {
+        configMetaIndex.clear();
+        list.forEach((cfg) => {
+          if (cfg && cfg.name) {
+            configMetaIndex.set(cfg.name, cfg);
+          }
+        });
+      }
+
+      function isAppIdInBlacklist(appid) {
+        if (!appid) return false;
+        return blacklistState.appids.has(String(appid));
+      }
+
+      async function syncBlacklistList() {
+        try {
+          const res = await window.api.getBlacklist();
+          blacklistState.appids = new Set(res?.appids || []);
+        } catch (err) {
+          console.warn("Failed to load blacklist:", err);
+          blacklistState.appids = new Set();
+        }
+      }
+
+      function resolveBlacklistName(appid) {
+        if (!appid) return null;
+        // Prefer cached meta by appid
+        for (const meta of configMetaIndex.values()) {
+          if (!meta?.appid) continue;
+          if (String(meta.appid) === String(appid)) {
+            return (
+              meta.displayName ||
+              meta.name ||
+              meta.appid ||
+              meta.appId ||
+              `App ${appid}`
+            );
+          }
+        }
+        if (
+          lastSelectedConfigMeta &&
+          String(lastSelectedConfigMeta.appid || "") === String(appid || "")
+        ) {
+          return (
+            lastSelectedConfigMeta.displayName ||
+            lastSelectedConfigMeta.name ||
+            `App ${appid}`
+          );
+        }
+        return null;
+      }
+
+      async function renderBlacklistList() {
+        const listEl = document.getElementById("blacklistList");
+        if (!listEl) return;
+        listEl.innerHTML = "";
+
+        const entries = Array.from(blacklistState.appids || []);
+        if (entries.length === 0) {
+          listEl.innerHTML =
+            '<div style="padding:10px; color:#aaa;"><small>No blacklisted apps.</small></div>';
+          return;
+        }
+
+        // Build a map appid -> displayName from cached configs
+        const nameById = new Map();
+        configMetaIndex.forEach((cfg) => {
+          if (cfg?.appid) {
+            const id = String(cfg.appid);
+            const name =
+              cfg.displayName ||
+              cfg.name ||
+              cfg.appid ||
+              cfg.appId ||
+              `App ${id}`;
+            nameById.set(id, name);
+          }
+        });
+
+        for (const appid of entries) {
+          const row = document.createElement("div");
+          row.className = "wf-row";
+          row.setAttribute("role", "listitem");
+          row.dataset.appid = appid;
+
+          const pathEl = document.createElement("div");
+          pathEl.className = "wf-path";
+          const cachedLabel = blacklistLabelCache.get(appid);
+          const label =
+            cachedLabel ||
+            nameById.get(appid) ||
+            resolveBlacklistName(appid) ||
+            `App ${appid}`;
+          pathEl.textContent = `${appid} — ${label}`;
+          pathEl.title = pathEl.textContent;
+
+          const actions = document.createElement("div");
+          actions.className = "wf-actions";
+
+          const btnRemove = document.createElement("button");
+          btnRemove.className = "icon-btn remove";
+          btnRemove.title = "Remove from blacklist";
+          btnRemove.innerHTML = '<i class="fa-regular fa-trash-can"></i>';
+          btnRemove.addEventListener("click", async () => {
+            try {
+              await window.api.blacklistConfig({
+                appid,
+                remove: true,
+              });
+              await syncBlacklistList();
+              renderBlacklistList();
+              await reloadConfigsDropdown(true);
+              if (typeof buildDashboard === "function") {
+                await buildDashboard();
+              }
+            } catch (err) {
+              console.error("Failed to remove from blacklist:", err);
+              alert("Failed to remove this AppID from blacklist.");
+            }
+          });
+
+          actions.appendChild(btnRemove);
+          row.appendChild(pathEl);
+          row.appendChild(actions);
+          listEl.appendChild(row);
+
+          // Async resolve label from config if missing
+          if (
+            !cachedLabel &&
+            (!nameById.has(appid) || label === `App ${appid}`)
+          ) {
+            (async () => {
+              try {
+                const res = await window.api.getConfigByAppId(appid);
+                const fetchedLabel =
+                  res?.displayName || res?.name || `App ${appid}`;
+                blacklistLabelCache.set(appid, fetchedLabel);
+                const currentRow = listEl.querySelector(
+                  `.wf-row[data-appid="${appid}"] .wf-path`
+                );
+                if (currentRow) {
+                  currentRow.textContent = `${appid} — ${fetchedLabel}`;
+                  currentRow.title = currentRow.textContent;
+                }
+              } catch {}
+            })();
+          }
+        }
+      }
+
+      function applyShowBlacklistPreference(value) {
+        const next = !!value;
+        blacklistState.showBlacklisted = next;
+        if (showBlacklistedCheckbox) {
+          showBlacklistedCheckbox.checked = next;
+        }
+        renderBlacklistList();
+      }
+
+      function updateBlacklistButtonState(appid) {
+        if (!blacklistConfigBtn) return;
+        if (!appid) {
+          blacklistConfigBtn.disabled = true;
+          blacklistConfigBtn.textContent = "Ignore Game";
+          return;
+        }
+        blacklistConfigBtn.disabled = false;
+        const isBlacklisted = isAppIdInBlacklist(appid);
+        if (blacklistState.showBlacklisted && isBlacklisted) {
+          blacklistConfigBtn.textContent = "Remove from Blacklist";
+        } else {
+          blacklistConfigBtn.textContent = "Ignore Game";
+        }
+      }
 
       function updateMainConfig() {
         const selectedConfig = configList.value;
@@ -2520,14 +3404,32 @@
       }
 
       window.addEventListener("DOMContentLoaded", async () => {
-        const configs = await window.api.loadConfigs();
-        const configList = document.getElementById("configList");
-        configs.forEach((config) => {
-          const option = document.createElement("option");
-          option.value = config;
-          option.textContent = config;
-          configList.appendChild(option);
-        });
+        try {
+          await syncBlacklistList();
+          const configsRaw = await window.api.loadConfigs();
+          const configs = normalizeConfigList(configsRaw);
+          cacheConfigMeta(configs);
+          rememberCoverNamesFromList(configs);
+          const configList = document.getElementById("configList");
+          if (configList) {
+            configList.innerHTML =
+              '<option value="" disabled selected>Select</option>';
+            const visibleConfigs = blacklistState.showBlacklisted
+              ? configs
+              : configs.filter((cfg) => !isAppIdInBlacklist(cfg.appid));
+            visibleConfigs.forEach((config) => {
+              const option = document.createElement("option");
+              option.value = config.name;
+              option.textContent = config.displayName || config.name;
+              if (isAppIdInBlacklist(config.appid)) {
+                option.textContent += " (Ignored)";
+              }
+              configList.appendChild(option);
+            });
+          }
+        } catch (error) {
+          console.error("Config Load Error:", error);
+        }
 
         function formatTimestamp(timestamp) {
           if (!timestamp) return "N/A";
@@ -2537,8 +3439,14 @@
 
         configList.addEventListener("change", async () => {
           const selectedConfig = configList.value;
+          const cachedMeta = configMetaIndex.get(selectedConfig) || null;
+          const blocked =
+            !!cachedMeta?.appid &&
+            blacklistState.appids.has(String(cachedMeta.appid));
 
-          if (selectedConfig) {
+          updateBlacklistButtonState(cachedMeta?.appid || null);
+
+          if (selectedConfig && !blocked) {
             window.api.updateConfig({
               configName: selectedConfig,
               preset: presetDropdown.value,
@@ -2554,10 +3462,23 @@
           const currentConfig = await window.api.getConfigByName(
             selectedConfig
           );
-          if (currentConfig && currentConfig.appid) {
-          }
+          maybeRequestPlatinum(
+            currentConfig,
+            achievementsDataObj?.achievements || [],
+            savedAchievementsObj
+          );
+          lastSelectedConfigMeta = currentConfig || null;
+          updateBlacklistButtonState(currentConfig?.appid || null);
           if (currentConfig?.appid) {
-            await window.__applyEmbeddedGameImageForAppId(currentConfig.appid);
+            const resolvedName =
+              currentConfig.displayName ||
+              currentConfig.name ||
+              currentConfig.appid;
+            rememberCoverName(currentConfig.appid, resolvedName);
+            window.__showFallbackLogo?.();
+            window
+              .__applyEmbeddedGameImageForAppId(currentConfig.appid)
+              ?.catch(() => {});
           } else {
             window.__showFallbackLogo?.();
           }
@@ -2699,16 +3620,7 @@
       document.addEventListener("DOMContentLoaded", async function () {
         async function loadConfigs() {
           try {
-            const configs = await window.api.loadConfigs();
-            const configList = document.getElementById("configList");
-            configList.innerHTML =
-              '<option value="" disabled selected>Select</option>';
-            configs.forEach((config) => {
-              const option = document.createElement("option");
-              option.value = config;
-              option.textContent = config;
-              configList.appendChild(option);
-            });
+            await reloadConfigsDropdown(true);
           } catch (error) {
             console.error("Config Load Error:", error);
           }
@@ -2718,6 +3630,15 @@
             deleteConfigBtn.style.display = configList.value
               ? "inline-block"
               : "none";
+          }
+          if (blacklistConfigBtn) {
+            blacklistConfigBtn.style.display = configList.value
+              ? "inline-block"
+              : "none";
+          }
+          if (!configList.value) {
+            lastSelectedConfigMeta = null;
+            updateBlacklistButtonState(null);
           }
         });
 
@@ -2748,6 +3669,8 @@
               }
 
               document.getElementById("deleteConfigBtn").style.display = "none";
+              document.getElementById("blacklistConfigBtn").style.display =
+                "none";
               document.getElementById("editConfigBtn").style.display = "none";
               document.getElementById("playBtn").style.display = "none";
               document.getElementById("achStats").style.display = "none";
@@ -2773,7 +3696,120 @@
             console.error("Error on delete:", error);
           }
         });
+        blacklistConfigBtn.addEventListener("click", async () => {
+          const selectedConfig = configList.value;
+          if (!selectedConfig) return;
+          const configMeta =
+            lastSelectedConfigMeta ||
+            (await window.api.getConfigByName(selectedConfig));
+          const targetAppId = configMeta?.appid
+            ? String(configMeta.appid)
+            : null;
+          if (!targetAppId) {
+            alert("Missing AppID for this configuration.");
+            return;
+          }
+
+          const currentlyBlacklisted = isAppIdInBlacklist(targetAppId);
+          const removeMode =
+            blacklistState.showBlacklisted && currentlyBlacklisted;
+
+          const confirmed = await window.ui.confirm({
+            title: removeMode ? "Remove from blacklist" : "Add to blacklist",
+            message: removeMode
+              ? `Remove ${selectedConfig} from blacklist?`
+              : `Ignore ${selectedConfig} and stop tracking it?`,
+          });
+          if (!confirmed) return;
+
+          await window.ui.refocus();
+
+          const response = await window.api.blacklistConfig({
+            configName: selectedConfig,
+            appid: targetAppId,
+            remove: removeMode,
+          });
+          if (!response?.success) {
+            alert(response?.error || "Failed to update blacklist");
+            return;
+          }
+
+          if (Array.isArray(response.blacklist)) {
+            blacklistState.appids = new Set(response.blacklist);
+          } else {
+            await syncBlacklistList();
+          }
+          renderBlacklistList();
+
+          await reloadConfigsDropdown(true);
+          if (!blacklistState.showBlacklisted) {
+            configList.value = "";
+            [
+              "deleteConfigBtn",
+              "blacklistConfigBtn",
+              "editConfigBtn",
+              "playBtn",
+            ].forEach((id) => {
+              const el = document.getElementById(id);
+              if (el) el.style.display = "none";
+            });
+            document.getElementById("backButton").style.display = "none";
+            window.__showFallbackLogo?.();
+          } else {
+            configList.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+
+          if (typeof buildDashboard === "function") {
+            await buildDashboard();
+          }
+        });
       });
+
+      if (showBlacklistedCheckbox) {
+        showBlacklistedCheckbox.addEventListener("change", async (e) => {
+          const next = !!e.target.checked;
+          try {
+            await window.api.savePreferences({
+              showBlacklistedGames: next,
+            });
+            applyShowBlacklistPreference(next);
+            await reloadConfigsDropdown(true);
+            if (typeof buildDashboard === "function") {
+              await buildDashboard();
+            }
+            await syncBlacklistList();
+            renderBlacklistList();
+          } catch (err) {
+            console.error("Failed to toggle blacklist visibility:", err);
+            alert("Failed to update blacklist visibility setting.");
+            e.target.checked = !next;
+          }
+        });
+      }
+
+      if (resetBlacklistBtn) {
+        resetBlacklistBtn.addEventListener("click", async () => {
+          const confirmed = await window.ui.confirm({
+            title: "Reset blacklist",
+            message: "Remove all blacklisted games?",
+          });
+          if (!confirmed) return;
+
+          await window.ui.refocus();
+          try {
+            await window.api.resetBlacklist();
+            await syncBlacklistList();
+            renderBlacklistList();
+            await reloadConfigsDropdown(true);
+            if (typeof buildDashboard === "function") {
+              await buildDashboard();
+            }
+          } catch (err) {
+            console.error("Failed to reset blacklist:", err);
+            alert(err?.message || "Failed to reset blacklist");
+          }
+        });
+      }
 
       //Dashboard
       function enableDashboardHoverSync() {
@@ -2890,7 +3926,7 @@
           hide("editConfigBtn");
           hide("playBtn");
           hide("achStats");
-
+          hide("blacklistConfigBtn");
           const tableBody = document.getElementById("achievementsTableBody");
           if (tableBody) tableBody.innerHTML = "";
 
@@ -2907,7 +3943,8 @@
           window.__showFallbackLogo?.();
 
           try {
-            const prefs = await window.api.loadPreferences();
+            await loadPreferencesCached();
+            const prefs = getCachedPreferences();
             if (prefs?.showDashboardOnStart) {
               await window.openDashboard?.();
             }
@@ -2934,7 +3971,8 @@
         }
         if (deleteConfigBtn) deleteConfigBtn.style.display = "inline-block";
         if (editConfigBtn) editConfigBtn.style.display = "inline-block";
-
+        if (blacklistConfigBtn)
+          blacklistConfigBtn.style.display = "inline-block";
         resetConfigForm();
       });
 
@@ -2942,18 +3980,32 @@
         const soundSelect = document.getElementById("soundSelect");
 
         try {
+          await loadPreferencesCached();
+
+          const prefs = getCachedPreferences();
+
           const sounds = await window.api.getSounds();
+
           const muteOption = document.createElement("option");
+
           muteOption.value = "mute";
+
           muteOption.textContent = "🔇 Mute";
+
           soundSelect.appendChild(muteOption);
+
           sounds.forEach((sound) => {
             const option = document.createElement("option");
+
             option.value = sound;
+
             option.textContent = sound;
+
             soundSelect.appendChild(option);
           });
-          const prefs = await window.api.loadPreferences();
+
+          renderSteamApiKeyStatusFromPrefs(prefs);
+
           if (
             prefs &&
             prefs.sound &&
@@ -2961,19 +4013,24 @@
           ) {
             soundSelect.value = prefs.sound;
           }
+
           if (prefs.disableProgress !== undefined) {
             document.getElementById("disableProgressCheckbox").checked =
               prefs.disableProgress;
           }
+
           if (prefs.disablePlaytime !== undefined) {
             const cb = document.getElementById(
               "settings-disablePlaytimeCheckbox"
             );
+
             if (cb) cb.checked = !!prefs.disablePlaytime;
           }
+
           if (typeof window.api.disableProgress === "function") {
             window.api.disableProgress(!!prefs?.disableProgress);
           }
+
           if (typeof window.api.setDisablePlaytime === "function") {
             window.api.setDisablePlaytime(!!prefs?.disablePlaytime);
           }
@@ -2987,6 +4044,20 @@
           await playCustomSound(soundName);
         }
       });
+
+      if (window.api?.on) {
+        window.api.on("blacklist:updated", async (_evt, payload) => {
+          try {
+            await syncBlacklistList();
+            renderBlacklistList();
+            if (payload?.appids) {
+              blacklistState.appids = new Set(payload.appids);
+            }
+          } catch (err) {
+            console.warn("Blacklist update handling failed:", err);
+          }
+        });
+      }
 
       function playSelectedSound() {
         const soundSelect = document.getElementById("soundSelect");
@@ -3015,18 +4086,86 @@
       }
 
       async function loadPreferences() {
-        const prefs = await window.api.loadPreferences();
+        await loadPreferencesCached();
+        const prefs = getCachedPreferences();
+        renderSteamApiKeyStatusFromPrefs(prefs);
+        applyShowBlacklistPreference(prefs?.showBlacklistedGames);
+        await syncBlacklistList();
+        renderBlacklistList();
 
         if (prefs.position)
           document.getElementById("positionDropdown").value = prefs.position;
+        const settingsPositionDropdown = document.getElementById(
+          "settings-positionDropdown"
+        );
+        if (settingsPositionDropdown && prefs.position) {
+          settingsPositionDropdown.value = prefs.position;
+        }
         if (prefs.preset)
           document.getElementById("presetDropdown").value = prefs.preset;
+        const settingsPresetDropdown = document.getElementById(
+          "settings-presetDropdown"
+        );
+        if (settingsPresetDropdown && prefs.preset) {
+          settingsPresetDropdown.value = prefs.preset;
+        }
         if (prefs.sound)
           document.getElementById("soundSelect").value = prefs.sound;
+        const settingsSoundSelect = document.getElementById(
+          "settings-soundSelect"
+        );
+        if (settingsSoundSelect && prefs.sound) {
+          settingsSoundSelect.value = prefs.sound;
+        }
         if (prefs.notificationScale) {
           const scaleSlider = document.getElementById("scaleSlider");
           scaleSlider.value = prefs.notificationScale;
           updateScaleLabel();
+          const settingsScaleSlider = document.getElementById(
+            "settings-scaleSlider"
+          );
+          if (settingsScaleSlider) {
+            settingsScaleSlider.value = prefs.notificationScale;
+            updateSettingsScaleLabel();
+          }
+        }
+        const hiddenPlatPos = document.getElementById("platinumPositionValue");
+        if (prefs.platinumPosition) {
+          const el = document.getElementById(
+            "settings-platinumPositionDropdown"
+          );
+          if (el) el.value = prefs.platinumPosition;
+        }
+        if (hiddenPlatPos) {
+          hiddenPlatPos.value =
+            prefs.platinumPosition ||
+            hiddenPlatPos.value ||
+            prefs.position ||
+            "center-bottom";
+        }
+        const hiddenPlatPreset = document.getElementById("platinumPresetValue");
+        if (prefs.platinumPreset) {
+          const el = document.getElementById("settings-platinumPresetDropdown");
+          if (el) el.value = prefs.platinumPreset;
+        }
+        if (hiddenPlatPreset) {
+          hiddenPlatPreset.value =
+            prefs.platinumPreset ||
+            hiddenPlatPreset.value ||
+            prefs.preset ||
+            "default";
+        }
+        const hiddenPlatSound = document.getElementById("platinumSoundValue");
+        if (prefs.platinumSound) {
+          const el = document.getElementById("settings-platinumSoundSelect");
+          if (el) el.value = prefs.platinumSound;
+        }
+        if (hiddenPlatSound) {
+          hiddenPlatSound.value =
+            prefs.platinumSound ||
+            hiddenPlatSound.value ||
+            prefs.sound ||
+            "mute";
         }
         if (prefs.disableProgress !== undefined) {
           const cb = document.getElementById("disableProgressCheckbox");
@@ -3049,6 +4188,12 @@
             window.api.setZoom(prefs.windowZoomFactor);
           }
         }
+        if (prefs.disablePlatinum !== undefined) {
+          const cb = document.getElementById(
+            "settings-disablePlatinumCheckbox"
+          );
+          if (cb) cb.checked = prefs.disablePlatinum;
+        }
         if (prefs.overlayShortcut) {
           document.getElementById("overlay-shortcut-btn").textContent =
             prefs.overlayShortcut;
@@ -3057,19 +4202,94 @@
 
       window.addEventListener("DOMContentLoaded", async () => {
         try {
-          const prefs = await window.api.loadPreferences();
+          await loadPreferencesCached();
+          const prefs = getCachedPreferences();
+          renderSteamApiKeyStatusFromPrefs(prefs);
+          applyShowBlacklistPreference(prefs?.showBlacklistedGames);
           if (prefs) {
             if (prefs.position)
               document.getElementById("positionDropdown").value =
                 prefs.position;
+            const settingsPositionDropdown = document.getElementById(
+              "settings-positionDropdown"
+            );
+            if (settingsPositionDropdown && prefs.position) {
+              settingsPositionDropdown.value = prefs.position;
+            }
             if (prefs.preset)
               document.getElementById("presetDropdown").value = prefs.preset;
+            const settingsPresetDropdown = document.getElementById(
+              "settings-presetDropdown"
+            );
+            if (settingsPresetDropdown && prefs.preset) {
+              settingsPresetDropdown.value = prefs.preset;
+            }
             if (prefs.sound)
               document.getElementById("soundSelect").value = prefs.sound;
+            const settingsSoundSelect = document.getElementById(
+              "settings-soundSelect"
+            );
+            if (settingsSoundSelect && prefs.sound) {
+              settingsSoundSelect.value = prefs.sound;
+            }
             if (prefs.notificationScale) {
               const scaleSlider = document.getElementById("scaleSlider");
               scaleSlider.value = prefs.notificationScale;
               updateScaleLabel();
+              const settingsScaleSlider = document.getElementById(
+                "settings-scaleSlider"
+              );
+              if (settingsScaleSlider) {
+                settingsScaleSlider.value = prefs.notificationScale;
+                updateSettingsScaleLabel();
+              }
+            }
+            const hiddenPlatPos = document.getElementById(
+              "platinumPositionValue"
+            );
+            if (prefs.platinumPosition) {
+              const el = document.getElementById(
+                "settings-platinumPositionDropdown"
+              );
+              if (el) el.value = prefs.platinumPosition;
+            }
+            if (hiddenPlatPos) {
+              hiddenPlatPos.value =
+                prefs.platinumPosition ||
+                hiddenPlatPos.value ||
+                prefs.position ||
+                "center-bottom";
+            }
+            const hiddenPlatPreset = document.getElementById(
+              "platinumPresetValue"
+            );
+            if (prefs.platinumPreset) {
+              const el = document.getElementById(
+                "settings-platinumPresetDropdown"
+              );
+              if (el) el.value = prefs.platinumPreset;
+            }
+            if (hiddenPlatPreset) {
+              hiddenPlatPreset.value =
+                prefs.platinumPreset ||
+                hiddenPlatPreset.value ||
+                prefs.preset ||
+                "default";
+            }
+            const hiddenPlatSound =
+              document.getElementById("platinumSoundValue");
+            if (prefs.platinumSound) {
+              const el = document.getElementById(
+                "settings-platinumSoundSelect"
+              );
+              if (el) el.value = prefs.platinumSound;
+            }
+            if (hiddenPlatSound) {
+              hiddenPlatSound.value =
+                prefs.platinumSound ||
+                hiddenPlatSound.value ||
+                prefs.sound ||
+                "mute";
             }
             if (prefs.disableProgress !== undefined) {
               const cb = document.getElementById("disableProgressCheckbox");
@@ -3081,6 +4301,12 @@
                 "settings-disablePlaytimeCheckbox"
               );
               if (cb1) cb1.checked = prefs.disablePlaytime;
+            }
+            if (prefs.disablePlatinum !== undefined) {
+              const cb = document.getElementById(
+                "settings-disablePlatinumCheckbox"
+              );
+              if (cb) cb.checked = prefs.disablePlatinum;
             }
 
             if (prefs.windowZoomFactor) {
@@ -3133,13 +4359,56 @@
               });
             }
           }
+
+          const steamApiKeyInput = document.getElementById(
+            "settings-steamApiKeyInput"
+          );
+          const steamApiKeySaveBtn = document.getElementById(
+            "settings-steamApiKeySave"
+          );
+          const steamApiKeyClearBtn = document.getElementById(
+            "settings-steamApiKeyClear"
+          );
+
+          steamApiKeySaveBtn.addEventListener("click", async () => {
+            const input = document.getElementById("settings-steamApiKeyInput");
+            if (!input) return;
+            const raw = input.value.trim();
+            if (!raw || raw === input.placeholder) return;
+
+            try {
+              await window.api.savePreferences({ steamApiKey: raw });
+              await refreshSteamApiKeyStatus();
+              console.log("Steam API key saved.");
+            } catch (err) {
+              console.error("Steam API key save error:", err);
+            }
+          });
+
+          if (steamApiKeyClearBtn) {
+            steamApiKeyClearBtn.addEventListener("click", async () => {
+              const confirmed = window.confirm(
+                "Remove the stored Steam API key?"
+              );
+              if (!confirmed) return;
+              try {
+                await window.api.savePreferences({ steamApiKey: "" });
+                if (steamApiKeyInput) steamApiKeyInput.value = "";
+                await refreshSteamApiKeyStatus();
+              } catch (err) {
+                console.error("Steam API key clear error:", err);
+              }
+            });
+          }
         } catch (e) {
           console.warn("Settings cannot be load:", e);
         }
       });
 
       window.addEventListener("DOMContentLoaded", async () => {
-        const prefs = await window.api.loadPreferences();
+        await loadPreferencesCached();
+        const prefs = getCachedPreferences();
+        renderSteamApiKeyStatusFromPrefs(prefs);
         const startMaxEl = document.getElementById(
           "settings-startMaximizedCheckbox"
         );
@@ -3185,6 +4454,27 @@
           );
         }
 
+        const showHiddenDescEl = document.getElementById(
+          "settings-showHiddenDescription"
+        );
+        if (showHiddenDescEl) {
+          showHiddenDescEl.checked = !!prefs.showHiddenDescription;
+          showHiddenDescEl.addEventListener("change", async (e) => {
+            await window.api.savePreferences({
+              showHiddenDescription: e.target.checked,
+            });
+            await loadPreferencesCached().catch(() => {});
+            const cfg = document.getElementById("configList")?.value;
+            const lang =
+              document.getElementById("languageSelect")?.value || "english";
+            if (cfg) {
+              try {
+                await buildMainAchievementsTable(cfg, lang);
+              } catch {}
+            }
+          });
+        }
+
         const showDashEl = document.getElementById(
           "settings-showDashboardOnStartCheckbox"
         );
@@ -3208,7 +4498,6 @@
         }
       });
       window.api.onPlaytimeUpdate?.((payload = {}) => {
-        //console.log("playtime:update received", payload);
         const activeRaw = document.getElementById("configList")?.value || "";
         const activeSafe = sanitizeConfigName(activeRaw);
         const payloadSafe = sanitizeConfigName(payload.configName || "");
@@ -3293,23 +4582,59 @@
         }
       }
       let __watcherAutoSelect = null;
-      window.api.on("auto-select-config", (configName) => {
+      window.api.on("auto-select-config", async (configName) => {
         const configList = document.getElementById("configList");
         __watcherAutoSelect = sanitizeConfigName(configName);
-        if (configList) {
-          configList.value = configName;
-          configList.dispatchEvent(new Event("change", { bubbles: true }));
+        if (!configList) return;
+
+        const currentSafe = sanitizeConfigName(configList.value || "");
+        if (currentSafe === __watcherAutoSelect) {
+          return; // already selected, avoid duplicate reloads
         }
+
+        const cached = configMetaIndex.get(configName);
+        if (
+          !blacklistState.showBlacklisted &&
+          cached?.appid &&
+          isAppIdInBlacklist(cached.appid)
+        ) {
+          return;
+        }
+
+        const ensureOption = async () => {
+          const hasOption = !!configList.querySelector(
+            `option[value="${configName.replace(/"/g, '\\"')}"]`
+          );
+          if (!hasOption) {
+            await reloadConfigsDropdown();
+          }
+        };
+
+        await ensureOption();
+
+        // if still missing, abort gracefully
+        const optionExists = !!configList.querySelector(
+          `option[value="${configName.replace(/"/g, '\\"')}"]`
+        );
+        if (!optionExists) return;
+
+        configList.value = configName;
+        configList.dispatchEvent(new Event("change", { bubbles: true }));
       });
 
-      async function reloadConfigsDropdown() {
-        const configs = await window.api.loadConfigs();
+      async function reloadConfigsDropdown(forceRefreshBlacklist = false) {
+        if (forceRefreshBlacklist) {
+          await syncBlacklistList();
+        }
         const dropdown = document.getElementById("configList");
         if (!dropdown) {
           console.error("⚠️ configList element not found.");
           return;
         }
 
+        const configsRaw = await window.api.loadConfigs();
+        const configs = normalizeConfigList(configsRaw);
+        cacheConfigMeta(configs);
         const selectedBefore = dropdown.value;
 
         dropdown.innerHTML = "";
@@ -3321,16 +4646,49 @@
         defaultOption.selected = true;
         dropdown.appendChild(defaultOption);
 
-        configs.forEach((config) => {
+        const visibleConfigs = blacklistState.showBlacklisted
+          ? configs
+          : configs.filter((cfg) => !isAppIdInBlacklist(cfg.appid));
+
+        visibleConfigs.forEach((config) => {
           const option = document.createElement("option");
-          option.value = config;
-          option.textContent = config;
+          option.value = config.name;
+          option.textContent = config.displayName || config.name;
+          if (isAppIdInBlacklist(config.appid)) {
+            option.textContent += " (Ignored)";
+          }
           dropdown.appendChild(option);
         });
 
-        if (selectedBefore && configs.includes(selectedBefore)) {
-          dropdown.value = selectedBefore;
-          dropdown.querySelector('option[value=""]').selected = false;
+        const prevSanitized = sanitizeConfigName(selectedBefore || "");
+        const autoSelectSanitized = sanitizeConfigName(
+          __watcherAutoSelect || ""
+        );
+        const findMatchingValue = () => {
+          const byPrev = visibleConfigs.find(
+            (cfg) => sanitizeConfigName(cfg.name) === prevSanitized
+          );
+          if (byPrev) return byPrev.name;
+          const byAuto = visibleConfigs.find(
+            (cfg) => sanitizeConfigName(cfg.name) === autoSelectSanitized
+          );
+          if (byAuto) return byAuto.name;
+          return "";
+        };
+        const matchValue = findMatchingValue();
+        if (matchValue) {
+          dropdown.value = matchValue;
+          const defaultOpt = dropdown.querySelector('option[value=""]');
+          if (defaultOpt) defaultOpt.selected = false;
+        }
+        const currentValue = dropdown.value;
+        if (currentValue) {
+          const cachedMeta = configMetaIndex.get(currentValue);
+          lastSelectedConfigMeta = cachedMeta || null;
+          updateBlacklistButtonState(cachedMeta?.appid || null);
+        } else {
+          lastSelectedConfigMeta = null;
+          updateBlacklistButtonState(null);
         }
       }
 
@@ -3690,17 +5048,19 @@
 
       document
         .getElementById("closeSettingsBtn")
-        .addEventListener("click", () => {
+        .addEventListener("click", async () => {
           syncSettingsFromModal();
+          await persistSettingsPreferences();
           closeSettingsModal();
         });
 
       document
         .getElementById("settingsMenu")
-        .addEventListener("click", (event) => {
+        .addEventListener("click", async (event) => {
           const settingsContent = document.querySelector(".settings-content");
           if (!settingsContent.contains(event.target)) {
             syncSettingsFromModal();
+            await persistSettingsPreferences();
             closeSettingsModal();
           }
         });
@@ -3752,7 +5112,6 @@
             sound,
             scale,
           });
-          refocusSettings(140);
         });
 
       // Settings scale slider
@@ -3770,6 +5129,32 @@
         settingsScaleValue.textContent = value.toFixed(2);
         settingsScaleValueDisplay.textContent = `${percentage}%`;
         settingsScaleSlider.style.background = `linear-gradient(to right, var(--dracula-cyan) 0%, var(--dracula-cyan) ${percentage}%, #ccc ${percentage}%, #ccc 100%)`;
+      }
+
+      function renderSteamApiKeyStatus(masked) {
+        const inputEl = document.getElementById("settings-steamApiKeyInput");
+        if (!inputEl) return;
+
+        if (masked) {
+          inputEl.value = masked;
+          inputEl.placeholder = "Enter your Steam Web API key";
+        } else {
+          inputEl.value = "";
+          inputEl.placeholder = "No key saved. Enter your Steam Web API key";
+        }
+      }
+
+      function renderSteamApiKeyStatusFromPrefs(prefs) {
+        renderSteamApiKeyStatus(prefs?.steamApiKeyMasked || "");
+      }
+
+      async function refreshSteamApiKeyStatus() {
+        try {
+          await loadPreferencesCached();
+          renderSteamApiKeyStatusFromPrefs(getCachedPreferences());
+        } catch (err) {
+          console.error("Steam API key status error:", err);
+        }
       }
 
       settingsScaleSlider.addEventListener("input", () => {
@@ -3797,10 +5182,26 @@
         });
 
       document
+        .getElementById("settings-disablePlatinumCheckbox")
+        .addEventListener("change", async (e) => {
+          await window.api.savePreferences({
+            disablePlatinum: e.target.checked,
+          });
+        });
+
+      document
         .getElementById("settings-positionDropdown")
         .addEventListener("change", (e) =>
           window.api.savePreferences({ position: e.target.value })
         );
+
+      document
+        .getElementById("settings-platinumPositionDropdown")
+        .addEventListener("change", (e) => {
+          const hidden = document.getElementById("platinumPositionValue");
+          if (hidden) hidden.value = e.target.value;
+          window.api.savePreferences({ platinumPosition: e.target.value });
+        });
 
       document
         .getElementById("settings-presetDropdown")
@@ -3809,9 +5210,25 @@
         );
 
       document
+        .getElementById("settings-platinumPresetDropdown")
+        .addEventListener("change", (e) => {
+          const hidden = document.getElementById("platinumPresetValue");
+          if (hidden) hidden.value = e.target.value;
+          window.api.savePreferences({ platinumPreset: e.target.value });
+        });
+
+      document
         .getElementById("settings-soundSelect")
         .addEventListener("change", (e) => {
           window.api.savePreferences({ sound: e.target.value });
+        });
+
+      document
+        .getElementById("settings-platinumSoundSelect")
+        .addEventListener("change", (e) => {
+          const hidden = document.getElementById("platinumSoundValue");
+          if (hidden) hidden.value = e.target.value;
+          window.api.savePreferences({ platinumSound: e.target.value });
         });
 
       // Function to sync values between main UI and settings menu
@@ -3827,6 +5244,15 @@
           if (mainPresetDropdown.value) {
             settingsPresetDropdown.value = mainPresetDropdown.value;
           }
+          const prefs = getCachedPreferences();
+          const platinumPresetDropdown = document.getElementById(
+            "settings-platinumPresetDropdown"
+          );
+          if (platinumPresetDropdown) {
+            platinumPresetDropdown.innerHTML = mainPresetDropdown.innerHTML;
+            platinumPresetDropdown.value =
+              prefs.platinumPreset || platinumPresetDropdown.value || "default";
+          }
         }
 
         // Copy sound options
@@ -3840,6 +5266,15 @@
           if (mainSoundSelect.value) {
             settingsSoundSelect.value = mainSoundSelect.value;
           }
+          const prefs = getCachedPreferences();
+          const platinumSoundSelect = document.getElementById(
+            "settings-platinumSoundSelect"
+          );
+          if (platinumSoundSelect) {
+            platinumSoundSelect.innerHTML = mainSoundSelect.innerHTML;
+            platinumSoundSelect.value =
+              prefs.platinumSound || platinumSoundSelect.value || "mute";
+          }
         }
 
         // Sync position dropdown
@@ -3851,6 +5286,14 @@
 
         if (mainPositionDropdown && settingsPositionDropdown) {
           settingsPositionDropdown.value = mainPositionDropdown.value;
+        }
+        const settingsPlatinumPositionDropdown = document.getElementById(
+          "settings-platinumPositionDropdown"
+        );
+        if (settingsPlatinumPositionDropdown && mainPositionDropdown) {
+          if (!settingsPlatinumPositionDropdown.value) {
+            settingsPlatinumPositionDropdown.value = mainPositionDropdown.value;
+          }
         }
 
         // Sync scale slider
@@ -3876,6 +5319,19 @@
           settingsDisableProgressCheckbox.checked =
             mainDisableProgressCheckbox.checked;
         }
+        const settingsDisablePlatinumCheckbox = document.getElementById(
+          "settings-disablePlatinumCheckbox"
+        );
+        if (settingsDisablePlatinumCheckbox) {
+          // no main checkbox; leave as stored
+        }
+        const steamApiKeyInput = document.getElementById(
+          "settings-steamApiKeyInput"
+        );
+        if (steamApiKeyInput) {
+          steamApiKeyInput.value = "";
+        }
+        refreshSteamApiKeyStatus();
       }
 
       function syncSettingsFromModal() {
@@ -3942,10 +5398,108 @@
           mainDisableProgressCheckbox.checked =
             settingsDisableProgressCheckbox.checked;
         }
-        ["presetDropdown", "positionDropdown", "soundSelect"].forEach((id) => {
-          const el = document.getElementById(id);
-          if (el) el.dispatchEvent(new Event("change")); // savePreferences()
-        });
+        const settingsDisablePlatinumCheckbox = document.getElementById(
+          "settings-disablePlatinumCheckbox"
+        );
+        if (settingsDisablePlatinumCheckbox) {
+          settingsDisablePlatinumCheckbox.dispatchEvent(new Event("change"));
+        }
+        if (typeof updateMainConfig === "function") {
+          try {
+            updateMainConfig();
+          } catch (err) {
+            console.warn(
+              "Failed to update config after syncing settings:",
+              err
+            );
+          }
+        }
+      }
+
+      function collectSettingsPreferences() {
+        const byId = (id) => document.getElementById(id);
+        const checkbox = (id) => !!byId(id)?.checked;
+        const getVal = (id) => byId(id)?.value || "";
+        const zoomValue = parseFloat(getVal("app-zoom-dropdown"));
+        const settingsScale = parseFloat(getVal("settings-scaleSlider"));
+        const overlayLabel = (byId("overlay-shortcut-btn")?.textContent || "")
+          .trim()
+          .replace(/\s+/g, " ");
+        const base = { ...getCachedPreferences() };
+        delete base.steamApiKeyMasked;
+
+        const pick = (value, fallback) => {
+          return value !== undefined && value !== null && value !== ""
+            ? value
+            : fallback;
+        };
+
+        const snapshot = {
+          ...base,
+          preset: pick(
+            getVal("settings-presetDropdown") || getVal("presetDropdown"),
+            base.preset || "default"
+          ),
+          position: pick(
+            getVal("settings-positionDropdown") || getVal("positionDropdown"),
+            base.position || "center-bottom"
+          ),
+          sound: pick(
+            getVal("settings-soundSelect") || getVal("soundSelect"),
+            base.sound || "mute"
+          ),
+          notificationScale: Number.isFinite(settingsScale)
+            ? settingsScale
+            : base.notificationScale || 1,
+          disableProgress: checkbox("settings-disableProgressCheckbox"),
+          disablePlaytime: checkbox("settings-disablePlaytimeCheckbox"),
+          disablePlatinum: checkbox("settings-disablePlatinumCheckbox"),
+          startMaximized: checkbox("settings-startMaximizedCheckbox"),
+          startInTray: checkbox("settings-startInTrayCheckbox"),
+          showDashboardOnStart: checkbox(
+            "settings-showDashboardOnStartCheckbox"
+          ),
+          screenshotFolder: pick(
+            getVal("settings-screenshotFolder").trim(),
+            base.screenshotFolder || ""
+          ),
+          disableAchievementScreenshot: checkbox(
+            "settings-disableScreenshotCheckbox"
+          ),
+          windowZoomFactor: Number.isFinite(zoomValue)
+            ? zoomValue
+            : base.windowZoomFactor || 1,
+          language: pick(getVal("languageSelect"), base.language || undefined),
+        };
+
+        snapshot.platinumPreset = pick(
+          getVal("settings-platinumPresetDropdown") ||
+            getVal("platinumPresetValue"),
+          base.platinumPreset || snapshot.preset
+        );
+        snapshot.platinumPosition = pick(
+          getVal("settings-platinumPositionDropdown") ||
+            getVal("platinumPositionValue"),
+          base.platinumPosition || snapshot.position
+        );
+        snapshot.platinumSound = pick(
+          getVal("settings-platinumSoundSelect") ||
+            getVal("platinumSoundValue"),
+          base.platinumSound || snapshot.sound
+        );
+
+        return snapshot;
+      }
+
+      async function persistSettingsPreferences() {
+        await refreshPreferencesCache();
+        try {
+          const payload = collectSettingsPreferences();
+          await window.api.savePreferences(payload);
+          await refreshPreferencesCache();
+        } catch (err) {
+          console.error("Failed to persist settings snapshot:", err);
+        }
       }
 
       // Zoom level control
@@ -4036,7 +5590,8 @@
       }
 
       async function restoreSavedShortcutLabel() {
-        const prefs = await window.api.loadPreferences();
+        await loadPreferencesCached();
+        const prefs = getCachedPreferences();
         overlayShortcutBtn.textContent =
           prefs?.overlayShortcut || "Set Shortcut";
       }
@@ -4063,23 +5618,47 @@
           const arr = Array.isArray(folders) ? folders : [];
           if (arr.length === 0) {
             listEl.innerHTML =
-              '<div style="padding:8px; color:#aaa;"><small>No watched folders yet.</small></div>';
+              '<div style="padding:15px; color:#aaa;"><small>No watched folders yet.</small></div>';
             return;
           }
 
           for (const f of arr) {
+            const folderPath = typeof f === "string" ? f : f?.path;
+            const blocked = typeof f === "object" && !!f?.blocked;
+            const isDefault = typeof f === "object" && !!f?.isDefault;
+
             const row = document.createElement("div");
             row.className = "wf-row";
+            if (blocked) row.classList.add("wf-row--blocked");
             row.setAttribute("role", "listitem");
-            row.dataset.folder = f;
+            row.dataset.folder = folderPath;
 
             const pathEl = document.createElement("div");
             pathEl.className = "wf-path";
-            pathEl.title = f;
-            pathEl.textContent = f;
+            pathEl.title = folderPath;
+            if (blocked) pathEl.dataset.status = "Ignored";
+            else delete pathEl.dataset.status;
+            pathEl.textContent = folderPath;
 
             const actions = document.createElement("div");
             actions.className = "wf-actions";
+
+            //BLOCK
+            const btnBlock = document.createElement("button");
+            btnBlock.className = blocked
+              ? "icon-btn unblock"
+              : "icon-btn block";
+            btnBlock.title = blocked ? "Resume watching" : "Ignore this folder";
+            btnBlock.setAttribute("aria-label", btnBlock.title);
+            btnBlock.innerHTML = blocked
+              ? '<i class="fa-solid fa-bell-slash"></i>' // ignore
+              : '<i class="fa-solid fa-bell"></i>'; // active
+            btnBlock.addEventListener("click", async () => {
+              const channel = blocked ? "folders:unblock" : "folders:block";
+              const res = await invoke(channel, folderPath);
+              if (res?.ok) renderFoldersList(res.folders);
+              else alert(res?.error || "Failed to update folder");
+            });
 
             // EDIT (✎)
             const btnEdit = document.createElement("button");
@@ -4092,9 +5671,8 @@
               if (typeof window.api?.selectFolder === "function") {
                 next = await window.api.selectFolder();
               }
-              if (!next || next === f) return;
-
-              const rem = await invoke("folders:remove", f);
+              if (!next || next === folderPath) return;
+              const rem = await invoke("folders:remove", folderPath);
               if (!rem?.ok) {
                 alert(rem?.error || "Failed to replace folder (remove step).");
                 return;
@@ -4103,7 +5681,7 @@
               const add = await invoke("folders:add", next);
               if (!add?.ok) {
                 alert(add?.error || "Failed to replace folder (add step).");
-                await invoke("folders:add", f); // best-effort rollback
+                await invoke("folders:add", folderPath);
                 return;
               }
               renderFoldersList(add.folders);
@@ -4116,12 +5694,16 @@
             btnRemove.setAttribute("aria-label", "Remove folder");
             btnRemove.innerHTML = '<i class="fa-regular fa-trash-can"></i>';
             btnRemove.addEventListener("click", async () => {
-              const res = await invoke("folders:remove", f);
+              const res = await invoke("folders:remove", folderPath);
               if (res?.ok) renderFoldersList(res.folders);
               else alert(res?.error || "Failed to remove folder");
             });
+            if (isDefault) {
+              btnRemove.style.display = "none";
+              btnEdit.style.display = "none";
+            }
 
-            actions.append(btnEdit, btnRemove);
+            actions.append(btnEdit, btnRemove, btnBlock);
             row.append(pathEl, actions);
             listEl.appendChild(row);
           }
@@ -4129,8 +5711,8 @@
 
         async function loadFolders() {
           try {
-            const folders = await invoke("folders:list");
-            renderFoldersList(folders);
+            const res = await invoke("folders:list");
+            renderFoldersList(res?.folders || []);
           } catch (e) {
             console.warn("Failed to load folders:", e);
             renderFoldersList([]);
@@ -4143,7 +5725,7 @@
               invoke("selectFolder"));
             if (!dir) return;
             const res = await invoke("folders:add", dir);
-            if (res?.ok) renderFoldersList(res.folders);
+            if (res?.ok) renderFoldersList(res.folders || []);
             else alert(res?.error || "Failed to add folder");
           } catch (e) {
             console.error("Add folder error:", e);
@@ -4154,7 +5736,7 @@
           try {
             const res = await invoke("folders:rescan");
             if (res?.ok) {
-              await loadFolders();
+              renderFoldersList(res.folders || []);
             } else {
               alert(res?.error || "Failed to restart watchers");
             }
@@ -4406,6 +5988,9 @@
           dashboard.classList.add("open");
           document.body.style.overflow = "hidden";
           window.__dashboardOpen = true;
+          try {
+            window.api?.setDashboardOpen?.(true);
+          } catch {}
           setBackgroundInert(true);
           await buildDashboard();
           enableDashboardHoverSync();
@@ -4426,6 +6011,9 @@
           dashboard.classList.remove("open");
           document.body.style.overflow = "";
           window.__dashboardOpen = false;
+          try {
+            window.api?.setDashboardOpen?.(false);
+          } catch {}
           clearDashboardSearch();
           stopDashboardPoll();
           setBackgroundInert(false);
@@ -4436,11 +6024,25 @@
         window.dashboardFocusCardAt = focusCardAt;
 
         // polling to refresh card progress in near-real-time
+        const DASH_POLL_DEFAULT_MS = 4000;
+        const DASH_POLL_SLOW_MS = 12000;
         let __dashboardPollId = null;
+        let __dashboardPollActive = false;
+        let __dashboardPollPaused = false;
+        let __dashboardPollInterval = DASH_POLL_DEFAULT_MS;
+        let __dashboardPollSkipped = false;
+        window.__notificationBusy = false;
         function startDashboardPoll() {
+          if (__dashboardPollPaused) return;
           if (__dashboardPollId) return;
           __dashboardPollId = setInterval(async () => {
+            if (__dashboardPollActive) return;
+            __dashboardPollActive = true;
             try {
+              if (!window.__dashboardOpen || window.__notificationBusy) {
+                __dashboardPollSkipped = true;
+                return;
+              }
               let anyChange = false;
               const cards = Array.from(gridEl.querySelectorAll(".dash-card"));
               for (const card of cards) {
@@ -4465,15 +6067,35 @@
                   window.applyDashboardSortAndFilter?.();
                 } catch (e) {}
               }
+              // after a slow cycle, return to default cadence
+              if (
+                __dashboardPollInterval !== DASH_POLL_DEFAULT_MS &&
+                !__dashboardPollPaused
+              ) {
+                stopDashboardPoll();
+                __dashboardPollInterval = DASH_POLL_DEFAULT_MS;
+                startDashboardPoll();
+              }
             } catch (e) {
               console.error("Dashboard poll error:", e);
+            } finally {
+              __dashboardPollActive = false;
             }
-          }, 2500);
+          }, __dashboardPollInterval);
         }
         function stopDashboardPoll() {
           if (!__dashboardPollId) return;
           clearInterval(__dashboardPollId);
           __dashboardPollId = null;
+          __dashboardPollActive = false;
+        }
+        function pauseDashboardPoll() {
+          __dashboardPollPaused = true;
+          stopDashboardPoll();
+        }
+        function resumeDashboardPoll() {
+          __dashboardPollPaused = false;
+          if (window.__dashboardOpen) startDashboardPoll();
         }
 
         document.addEventListener("visibilitychange", () => {
@@ -4552,12 +6174,20 @@
             prepareCards();
             const q = norm(input.value.trim());
             const all = getDashCards(false);
+            const hideBlacklisted = !blacklistState.showBlacklisted;
 
             if (!q) {
-              all.forEach((c) => (c.style.display = ""));
+              all.forEach((c) => {
+                const blocked =
+                  hideBlacklisted && c.dataset.blacklisted === "1";
+                c.style.display = blocked ? "none" : "";
+              });
             } else {
               all.forEach((c) => {
-                c.style.display = c.dataset._search.includes(q) ? "" : "none";
+                const matches = c.dataset._search.includes(q);
+                const blocked =
+                  hideBlacklisted && c.dataset.blacklisted === "1";
+                c.style.display = matches && !blocked ? "" : "none";
               });
             }
           };
@@ -4619,10 +6249,13 @@
             input.resetSearch();
           } else {
             input.value = "";
+            const hideBlacklisted = !blacklistState.showBlacklisted;
             document
               .querySelectorAll("#dashboardGrid .dash-card")
               .forEach((c) => {
-                c.style.display = "";
+                const blocked =
+                  hideBlacklisted && c.dataset.blacklisted === "1";
+                c.style.display = blocked ? "none" : "";
               });
           }
           input.blur();
@@ -4631,14 +6264,14 @@
 
         async function buildDashboard() {
           if (!gridEl || !window.api) return;
+          await syncBlacklistList();
 
           // load configs and enrich with basic metadata
-          let items = await window.api.loadConfigs();
-          items = (items || []).map((it) =>
-            typeof it === "string"
-              ? { name: it, displayName: it }
-              : { name: it.name, displayName: it.displayName || it.name }
-          );
+          let items = normalizeConfigList(await window.api.loadConfigs());
+          cacheConfigMeta(items);
+          if (!blacklistState.showBlacklisted) {
+            items = items.filter((cfg) => !isAppIdInBlacklist(cfg.appid));
+          }
 
           const quickCards = items.map((it) => {
             const key = DASH_PROGRESS_PREFIX + it.name;
@@ -4660,6 +6293,8 @@
             return {
               name: it.name,
               displayName: it.displayName || it.name,
+              appid: it.appid || null,
+              blacklisted: it.appid ? isAppIdInBlacklist(it.appid) : false,
               progress: normalized,
               img: cachedImg || fallbackIcon,
               hasCachedImg: Boolean(cachedImg),
@@ -4684,6 +6319,7 @@
             card.dataset.unlocked = String(cardData.progress.unlocked);
             card.dataset.total = String(cardData.progress.total);
             card.dataset.updated = String(cardData.progress.updated);
+            card.dataset.blacklisted = cardData.blacklisted ? "1" : "0";
 
             const pill = document.createElement("div");
             pill.className = "dash-progresspill";
@@ -4744,13 +6380,23 @@
               meta.element.dataset.appid = appid;
               meta.data.appid = appid;
             }
+            const platform = cfg?.platform || null;
+            const cardBlacklisted = appid && isAppIdInBlacklist(appid);
+            meta.element.dataset.blacklisted = cardBlacklisted ? "1" : "0";
+            meta.data.blacklisted = cardBlacklisted;
+            if (platform) {
+              meta.data.platform = platform;
+            }
             let imgSrc = null;
             if (appid) {
               if (dashboardImageCache.has(appid)) {
                 imgSrc = dashboardImageCache.get(appid);
               } else {
                 try {
-                  const p = await window.api.checkLocalGameImage(appid);
+                  const p = await window.api.checkLocalGameImage(
+                    appid,
+                    platform || null
+                  );
                   imgSrc = p ? fileUrl(p) : null;
                 } catch {
                   imgSrc = null;
@@ -4792,7 +6438,10 @@
 
               let imgSrc = null;
               try {
-                const localPath = await window.api.checkLocalGameImage(appid);
+                const localPath = await window.api.checkLocalGameImage(
+                  appid,
+                  platform || null
+                );
                 if (localPath) imgSrc = fileUrl(localPath);
               } catch {
                 /* ignore */
@@ -4940,6 +6589,67 @@
                 if (exe) window.api.launchExecutable(exe, args);
               });
 
+              const appidValue = cfg.appid ? String(cfg.appid) : null;
+              const cardBlacklisted =
+                appidValue && isAppIdInBlacklist(appidValue);
+              card.dataset.blacklisted = cardBlacklisted ? "1" : "0";
+
+              const blockBtn = document.createElement("button");
+              blockBtn.className = "dash-block";
+              const removing =
+                blacklistState.showBlacklisted && cardBlacklisted;
+              blockBtn.setAttribute(
+                "aria-label",
+                removing ? "Remove from blacklist" : "Ignore game"
+              );
+              blockBtn.title = removing
+                ? "Remove this game from blacklist"
+                : "Stop tracking this game";
+              blockBtn.innerHTML = removing
+                ? '<i class="fa-solid fa-check"></i>'
+                : '<i class="fa-solid fa-ban"></i>';
+              blockBtn.addEventListener("click", async (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                if (!appidValue) return;
+                const removeMode =
+                  blacklistState.showBlacklisted && cardBlacklisted;
+                const confirmed = await window.ui.confirm({
+                  title: removeMode ? "Remove from blacklist" : "Ignore game",
+                  message: removeMode
+                    ? `Remove ${cfgName} from blacklist?`
+                    : `Ignore ${cfgName} and stop tracking it?`,
+                });
+                if (!confirmed) return;
+
+                await window.ui.refocus();
+
+                const response = await window.api.blacklistConfig({
+                  configName: cfgName,
+                  appid: appidValue,
+                  remove: removeMode,
+                });
+                if (!response?.success) {
+                  alert(response?.error || "Failed to update blacklist");
+                  return;
+                }
+
+                localStorage.removeItem(`${DASH_PROGRESS_PREFIX}${cfgName}`);
+                localStorage.removeItem(`${IMG_CACHE_PREFIX}${cfgName}`);
+                dashboardImageCache?.delete?.(appidValue);
+                if (Array.isArray(response.blacklist)) {
+                  blacklistState.appids = new Set(response.blacklist);
+                } else {
+                  await syncBlacklistList();
+                }
+
+                if (typeof reloadConfigsDropdown === "function") {
+                  await reloadConfigsDropdown(true);
+                }
+                await buildDashboard();
+              });
+
+              card.appendChild(blockBtn);
               card.appendChild(btn);
             });
           })();
@@ -4950,16 +6660,37 @@
           window.buildDashboard = buildDashboard;
         } catch {}
 
+        const dashboardSchemaCache = new Map();
+        const dashboardSavedCache = new Map();
+
+        async function getSchemaCached(cfgName) {
+          if (dashboardSchemaCache.has(cfgName)) {
+            return dashboardSchemaCache.get(cfgName);
+          }
+          const achData = await window.api.loadAchievementData(cfgName);
+          const list = Array.isArray(achData?.achievements)
+            ? achData.achievements
+            : [];
+          dashboardSchemaCache.set(cfgName, list);
+          return list;
+        }
+
+        async function getSavedCached(cfgName) {
+          if (dashboardSavedCache.has(cfgName)) {
+            return dashboardSavedCache.get(cfgName);
+          }
+          const saved = await window.api.loadSavedAchievements(cfgName);
+          const savedMap = saved?.achievements || {};
+          dashboardSavedCache.set(cfgName, savedMap);
+          return savedMap;
+        }
+
         async function computeCardProgress(cfgName) {
           try {
-            const [achData, saved] = await Promise.all([
-              window.api.loadAchievementData(cfgName),
-              window.api.loadSavedAchievements(cfgName),
+            const [list, savedMap] = await Promise.all([
+              getSchemaCached(cfgName),
+              getSavedCached(cfgName),
             ]);
-            const list = Array.isArray(achData?.achievements)
-              ? achData.achievements
-              : [];
-            const savedMap = saved?.achievements || {};
             if (!list.length)
               return { pct: 0, unlocked: 0, total: 0, updated: 0 };
 
@@ -5275,6 +7006,35 @@
           setActiveCard(safeName)
         );
         window.api?.on?.("refresh-achievements-table", () => {});
+        window.api?.on?.("dashboard:poll-pause", (state) => {
+          if (state) {
+            pauseDashboardPoll();
+          } else {
+            __dashboardPollInterval = DASH_POLL_SLOW_MS;
+            resumeDashboardPoll();
+          }
+        });
+        window.api?.on?.("show-notification", (_data) => {
+          window.__notificationBusy = true;
+          setTimeout(() => {
+            window.__notificationBusy = false;
+            if (__dashboardPollSkipped && window.__dashboardOpen) {
+              __dashboardPollSkipped = false;
+              stopDashboardPoll();
+              startDashboardPoll();
+            }
+          }, 1200);
+        });
+        window.api?.on?.("achievements:file-updated", (_evt, payload) => {
+          const cfg = payload?.configName;
+          if (cfg) {
+            dashboardSavedCache.delete(cfg);
+          }
+        });
+        window.api?.on?.("configs:changed", () => {
+          dashboardSchemaCache.clear();
+          dashboardSavedCache.clear();
+        });
       })();
 
       let __zoomFactor = 1;
@@ -5438,9 +7198,12 @@
         async () => {
           try {
             const cfgs = await window.api.loadConfigs();
-            if (typeof renderConfigs === "function") renderConfigs(cfgs);
+            const normalizedCfgs = normalizeConfigList(cfgs);
+            rememberCoverNamesFromList(normalizedCfgs);
+            if (typeof renderConfigs === "function")
+              renderConfigs(normalizedCfgs);
             if (typeof reloadConfigsDropdown === "function")
-              await reloadConfigsDropdown();
+              await reloadConfigsDropdown(true);
             if (window.__dashboardOpen) {
               await buildDashboard();
             }
@@ -5524,7 +7287,8 @@
 
         window.addEventListener("DOMContentLoaded", async () => {
           try {
-            const prefs = await window.api.loadPreferences();
+            await loadPreferencesCached();
+            const prefs = getCachedPreferences();
             __zoomFactor = Number(prefs?.windowZoomFactor || 1) || 1;
           } catch {}
           applyDashSize();
@@ -5650,7 +7414,8 @@
           const prevNames = JSON.parse(localStorage.getItem(namesKey) || "[]");
           if (unlocked > prev) {
             const shouldNotify = !sameAsActive || autoSelectMatch;
-            const prefs = (await window.api.loadPreferences()) || {};
+            await loadPreferencesCached();
+            const prefs = getCachedPreferences() || {};
             const preset =
               prefs.preset ||
               document.getElementById("presetDropdown")?.value ||
@@ -5689,19 +7454,20 @@
                 "";
               const iconGray =
                 achievement.icon_gray || achievement.icongray || "";
-              if (shouldNotify) {
-                window.api.queueAchievementNotification({
-                  displayName,
-                  description,
-                  icon,
-                  icon_gray: iconGray,
-                  config_path: achData.config_path,
-                  preset,
-                  position,
-                  sound,
-                  scale,
-                });
-              }
+              // notification sent by watcher (main process)
+              // if (shouldNotify) {
+              //   window.api.queueAchievementNotification({
+              //     displayName,
+              //     description,
+              //     icon,
+              //     icon_gray: iconGray,
+              //     config_path: achData.config_path,
+              //     preset,
+              //     position,
+              //     sound,
+              //     scale,
+              //   });
+              // }
               if (shouldNotify && !prefs?.disableProgress) {
                 const state = savedMap[achievement.name];
                 if (
@@ -6914,6 +8680,16 @@
           const recording = byId("overlay-shortcut-btn")?.classList?.contains(
             "listening"
           );
+          const windowActive =
+            typeof document.hasFocus === "function"
+              ? document.hasFocus()
+              : document.visibilityState !== "hidden";
+          const isVisible = document.visibilityState !== "hidden";
+
+          if (!windowActive || !isVisible) {
+            requestAnimationFrame(gpLoop);
+            return;
+          }
 
           if (pad && !recording) {
             const Abtn = !!pad.buttons?.[0]?.pressed; // A / Cross

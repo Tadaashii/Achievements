@@ -1,4 +1,4 @@
-﻿const {
+const {
   app,
   BrowserWindow,
   ipcMain,
@@ -10,7 +10,7 @@
 } = require("electron");
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
 app.commandLine.appendSwitch("disable-hid-blocklist");
-const { spawn, fork } = require("child_process");
+const { spawn, fork, execFile, execFileSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
@@ -31,6 +31,257 @@ const {
 } = require("./utils/paths");
 const { startPlaytimeLogWatcher } = require("./utils/playtime-log-watcher");
 const getConfigInflight = new Map();
+const { createLogger } = require("./utils/logger");
+
+const appLogger = createLogger("app");
+const notificationLogger = createLogger("notifications");
+const windowLogger = createLogger("windows");
+const ipcLogger = createLogger("ipc");
+const coverUiLogger = createLogger("covers");
+const prefsLogger = createLogger("preferences");
+const persistenceLogger = createLogger("persistence");
+const execLogger = createLogger("execution");
+const schemaLogger = createLogger("achschema");
+
+function deepEqual(a, b) {
+  if (a === b) return true;
+  if (typeof a !== typeof b) return false;
+  if (a && b && typeof a === "object") {
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) return false;
+    for (const key of keysA) {
+      if (!deepEqual(a[key], b[key])) return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+function getDefaultScreenshotFolder() {
+  try {
+    return path.join(app.getPath("pictures"), "Achievements Screenshots");
+  } catch {
+    return path.join(process.cwd(), "Achievements Screenshots");
+  }
+}
+
+const DEFAULT_PREFERENCES = {
+  startInTray: false,
+  screenshotFolder: getDefaultScreenshotFolder(),
+  overlayShortcut: "",
+  sound: "mute",
+  preset: "default",
+  notificationScale: 1,
+  position: "center-bottom",
+  language: "english",
+  disableProgress: false,
+  windowZoomFactor: 1,
+  disableAchievementScreenshot: false,
+  showDashboardOnStart: false,
+  startMaximized: false,
+  disablePlaytime: false,
+  platinumSound: "mute",
+  platinumPreset: "default",
+  platinumPosition: "center-bottom",
+  showBlacklistedGames: false,
+  disablePlatinum: false,
+  showHiddenDescription: false,
+  blockedWatchedFolders: [],
+  blacklistedAppIds: [],
+  watchedFolders: [],
+  steamApiKey: "",
+};
+
+function mergeWithDefaultPreferences(prefs = {}) {
+  return { ...DEFAULT_PREFERENCES, ...(prefs || {}) };
+}
+
+function ensurePreferencesFile() {
+  try {
+    const current = readPrefsSafe();
+    const merged = mergeWithDefaultPreferences(current);
+    const exists = fs.existsSync(preferencesPath);
+    if (!exists || !deepEqual(current, merged)) {
+      fs.mkdirSync(path.dirname(preferencesPath), { recursive: true });
+      fs.writeFileSync(preferencesPath, JSON.stringify(merged, null, 2));
+    }
+    return merged;
+  } catch (err) {
+    prefsLogger.warn("preferences:ensure-failed", { error: err.message });
+    return readPrefsSafe();
+  }
+}
+
+const BLACKLIST_PREF_KEY = "blacklistedAppIds";
+let watchedFoldersApi = null;
+let cachedPreferences = {};
+let mainWindow;
+let selectedConfigPath = null;
+let selectedConfig = null;
+let selectedSound = "mute";
+let selectedPreset = "default";
+let selectedPosition = "center-bottom";
+let selectedNotificationScale = 1;
+let bootSeeding = true;
+global.bootDone = false;
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+  app.exit(0);
+  process.exit(0);
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    } else {
+      createMainWindow();
+    }
+  });
+}
+
+function normalizeAppIdValue(value) {
+  const trimmed = String(value || "").trim();
+  return /^[0-9a-fA-F]+$/.test(trimmed) ? trimmed : "";
+}
+
+function readBlacklistFromPrefs() {
+  const prefs = readPrefsSafe();
+  const arr = Array.isArray(prefs[BLACKLIST_PREF_KEY])
+    ? prefs[BLACKLIST_PREF_KEY]
+    : [];
+  return arr.map(normalizeAppIdValue).filter(Boolean);
+}
+
+function persistBlacklist(appIds) {
+  const nextList = Array.from(new Set(appIds))
+    .map(normalizeAppIdValue)
+    .filter(Boolean);
+  try {
+    const prefs = updatePreferences({ [BLACKLIST_PREF_KEY]: nextList });
+    return prefs[BLACKLIST_PREF_KEY] || [];
+  } catch (err) {
+    prefsLogger.error("blacklist:write-failed", { error: err.message });
+  }
+  return readBlacklistFromPrefs();
+}
+
+function addAppIdToBlacklist(appid) {
+  const normalized = normalizeAppIdValue(appid);
+  if (!normalized) return readBlacklistFromPrefs();
+  const next = new Set(readBlacklistFromPrefs());
+  next.add(normalized);
+  return persistBlacklist(Array.from(next));
+}
+
+function removeAppIdFromBlacklist(appid) {
+  const normalized = normalizeAppIdValue(appid);
+  if (!normalized) return readBlacklistFromPrefs();
+  const next = new Set(readBlacklistFromPrefs());
+  next.delete(normalized);
+  return persistBlacklist(Array.from(next));
+}
+
+function resetBlacklist() {
+  return persistBlacklist([]);
+}
+
+function isAppIdBlacklisted(appid) {
+  const normalized = normalizeAppIdValue(appid);
+  if (!normalized) return false;
+  const current = readBlacklistFromPrefs();
+  return current.includes(normalized);
+}
+
+function refreshBlacklistEffects() {
+  if (watchedFoldersApi?.refreshConfigState) {
+    watchedFoldersApi.refreshConfigState();
+  }
+  if (watchedFoldersApi?.rebuildKnownAppIds) {
+    watchedFoldersApi.rebuildKnownAppIds();
+  }
+  try {
+    notifyConfigsChanged();
+  } catch {}
+}
+
+const MY_LOGIN_FILENAME = "my_login.txt";
+
+function getMyLoginUserDataPath() {
+  try {
+    return path.join(app.getPath("userData"), MY_LOGIN_FILENAME);
+  } catch {
+    return path.join(process.cwd(), MY_LOGIN_FILENAME);
+  }
+}
+
+function getMyLoginAppPath() {
+  return path.join(__dirname, MY_LOGIN_FILENAME);
+}
+
+function parseSteamApiKeyFromText(text) {
+  const lines = String(text || "").split(/\r?\n/);
+  for (const line of lines) {
+    if (/^\s*(key|apikey|steam_api_key)\s*=/i.test(line)) {
+      return line.split("=").slice(1).join("=").trim();
+    }
+  }
+  return "";
+}
+
+function readSteamApiKeyFromFile() {
+  const candidates = [getMyLoginUserDataPath(), getMyLoginAppPath()];
+  for (const fp of candidates) {
+    try {
+      if (!fs.existsSync(fp)) continue;
+      const raw = fs.readFileSync(fp, "utf8");
+      const key = parseSteamApiKeyFromText(raw);
+      if (key) return key;
+    } catch {}
+  }
+  return "";
+}
+
+function maskSteamApiKey(value) {
+  const key = String(value || "");
+  if (!key) return "";
+  if (key.length <= 4) {
+    return "•".repeat(key.length);
+  }
+  return `${"•".repeat(key.length - 4)}${key.slice(-4)}`;
+}
+
+function writeSteamApiKeyFile(key) {
+  const trimmed = String(key || "").trim();
+  if (!trimmed) return;
+  const target = getMyLoginUserDataPath();
+  try {
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, `key=${trimmed}\n`, "utf8");
+  } catch (err) {
+    prefsLogger.error("steam-api-key:write-failed", { error: err.message });
+  }
+}
+
+function removeSteamApiKeyFiles() {
+  const targets = [getMyLoginUserDataPath()];
+  const legacy = getMyLoginAppPath();
+  if (legacy && !targets.includes(legacy)) targets.push(legacy);
+  for (const fp of targets) {
+    try {
+      if (fs.existsSync(fp)) fs.unlinkSync(fp);
+    } catch {}
+  }
+}
+
+function ensureSteamApiKeyFileFromPrefs() {
+  const key = String(cachedPreferences?.steamApiKey || "").trim();
+  if (!key) return;
+  writeSteamApiKeyFile(key);
+}
 
 function looksLikeSchemaArray(json) {
   if (!Array.isArray(json)) return false;
@@ -75,16 +326,41 @@ function readJsonSafe(fp) {
   }
 }
 
-function findConfigDirFromSelection(selDir) {
-  // 1) <sel>/steam_settings/achievements.json
-  const cSteam = path.join(selDir, "steam_settings", "achievements.json");
-  if (fs.existsSync(cSteam) && looksLikeSchemaArray(readJsonSafe(cSteam))) {
-    return path.join(selDir, "steam_settings");
+function findConfigDirFromSelection(selDir, appid = "", platform = "") {
+  if (!isNonEmptyString(selDir)) return null;
+  const normalizedAppId = String(appid || "").trim();
+  const normalizedPlatform = String(platform || "")
+    .trim()
+    .toLowerCase();
+  const candidates = [];
+
+  const pushCandidate = (dir) => {
+    if (!dir || candidates.includes(dir)) return;
+    candidates.push(dir);
+  };
+
+  pushCandidate(path.join(selDir, "steam_settings"));
+  pushCandidate(selDir);
+  if (normalizedAppId) {
+    pushCandidate(path.join(selDir, normalizedAppId));
+    if (normalizedPlatform) {
+      pushCandidate(path.join(selDir, normalizedPlatform, normalizedAppId));
+    }
+    ["uplay", "steam", "epic", "gog"].forEach((plat) =>
+      pushCandidate(path.join(selDir, plat, normalizedAppId))
+    );
   }
-  // 2) <sel>/achievements.json
-  const cTop = path.join(selDir, "achievements.json");
-  if (fs.existsSync(cTop) && looksLikeSchemaArray(readJsonSafe(cTop))) {
-    return selDir;
+
+  for (const dir of candidates) {
+    if (!dir) continue;
+    const file = path.join(dir, "achievements.json");
+    try {
+      if (fs.existsSync(file) && looksLikeSchemaArray(readJsonSafe(file))) {
+        return dir;
+      }
+    } catch {
+      /* ignore */
+    }
   }
   return null;
 }
@@ -135,22 +411,52 @@ function resolveSaveSidecarPaths(saveBase, appid) {
   ];
   for (const d of dirs) {
     const iniPath = path.join(d, "achievements.ini");
+    const tenokeIniNested = path.join(d, "SteamData", "user_stats.ini");
+    const tenokeIniDirect = path.join(d, "user_stats.ini");
+    const tenokeIni = fs.existsSync(tenokeIniDirect)
+      ? tenokeIniDirect
+      : tenokeIniNested;
     const ofx = path.join(d, "Stats", "achievements.ini");
     const bin = path.join(d, "stats.bin");
+    if (fs.existsSync(tenokeIni))
+      return {
+        dir: d,
+        ini: null,
+        tenokeIni,
+        ofx: null,
+        bin: fs.existsSync(bin) ? bin : null,
+      };
     if (fs.existsSync(ofx))
-      return { dir: d, ini: null, ofx, bin: fs.existsSync(bin) ? bin : null };
+      return {
+        dir: d,
+        ini: null,
+        tenokeIni: null,
+        ofx,
+        bin: fs.existsSync(bin) ? bin : null,
+      };
+
     if (fs.existsSync(iniPath))
       return {
         dir: d,
         ini: iniPath,
+        tenokeIni: null,
         ofx: null,
         bin: fs.existsSync(bin) ? bin : null,
       };
-    if (fs.existsSync(bin)) return { dir: d, ini: null, ofx: null, bin };
+
+    if (fs.existsSync(bin))
+      return {
+        dir: d,
+        ini: null,
+        tenokeIni: null,
+        ofx: null,
+        bin,
+      };
   }
   return {
     dir: path.join(saveBase, String(appid)),
     ini: null,
+    tenokeIni: null,
     ofx: null,
     bin: null,
   };
@@ -210,6 +516,7 @@ function emitSchemaReady(data, senderWC = null) {
 
 function notifyWarn(message) {
   originalConsole.warn(message);
+  appLogger.warn(message);
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("notify", { message, color: "#FFC107" });
   }
@@ -241,6 +548,7 @@ function warnOnceLog(key, message) {
 
 function notifyError(message) {
   originalConsole.error(message);
+  appLogger.error(message);
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("notify", { message, color: "#f44336" });
   }
@@ -248,6 +556,7 @@ function notifyError(message) {
 
 function notifyInfo(message) {
   originalConsole.info(message);
+  appLogger.info(message);
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("notify", { message, color: "#2196f3" });
   }
@@ -260,7 +569,13 @@ function isNonEmptyString(s) {
 //Achievements Image
 function resolveIconAbsolutePath(configPath, rel) {
   try {
-    if (!rel || !isNonEmptyString(configPath)) return null;
+    if (!rel) return ICON_PNG_PATH;
+    if (path.isAbsolute(rel)) {
+      try {
+        if (fs.existsSync(rel)) return rel;
+      } catch {}
+    }
+    if (!isNonEmptyString(configPath)) return ICON_PNG_PATH;
     const base = path.basename(String(rel));
     const candidates = [];
 
@@ -273,6 +588,8 @@ function resolveIconAbsolutePath(configPath, rel) {
     candidates.push(path.join(configPath, "steam_settings", "img", base));
     candidates.push(path.join(configPath, "images", base));
     candidates.push(path.join(configPath, "steam_settings", "images", base));
+    candidates.push(ICON_PNG_PATH);
+    candidates.push(ICON_PATH);
 
     for (const p of candidates) {
       try {
@@ -280,7 +597,7 @@ function resolveIconAbsolutePath(configPath, rel) {
       } catch {}
     }
   } catch {}
-  return null;
+  return ICON_PNG_PATH;
 }
 
 //Config Name Sanitize
@@ -294,6 +611,19 @@ function sanitizeConfigName(raw) {
   return /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(base)
     ? `_${base}`
     : base;
+}
+
+function waitForFileExists(fp, tries = 50, delay = 80) {
+  return new Promise((resolve) => {
+    const tick = (n) => {
+      try {
+        if (fs.existsSync(fp)) return resolve(true);
+      } catch {}
+      if (n <= 0) return resolve(false);
+      setTimeout(() => tick(n - 1), delay);
+    };
+    tick(tries);
+  });
 }
 
 function registerOverlayShortcut(newShortcut) {
@@ -397,10 +727,36 @@ configsWatcher
 
 let selectedLanguage = "english";
 let manualLaunchInProgress = false;
-let cachedPreferences = readPrefsSafe();
+cachedPreferences = ensurePreferencesFile();
+if (!cachedPreferences || typeof cachedPreferences !== "object") {
+  cachedPreferences = {};
+}
+const fileSteamApiKey = readSteamApiKeyFromFile();
+if (fileSteamApiKey && !cachedPreferences.steamApiKey) {
+  cachedPreferences.steamApiKey = fileSteamApiKey;
+}
+if (typeof cachedPreferences.steamApiKey === "string") {
+  cachedPreferences.steamApiKey = cachedPreferences.steamApiKey.trim();
+  if (!cachedPreferences.steamApiKey) {
+    delete cachedPreferences.steamApiKey;
+  }
+}
 if (cachedPreferences && typeof cachedPreferences === "object") {
   if (typeof cachedPreferences.language === "string") {
     selectedLanguage = cachedPreferences.language;
+  }
+  if (cachedPreferences.preset) {
+    selectedPreset = cachedPreferences.preset;
+  }
+  if (cachedPreferences.position) {
+    selectedPosition = cachedPreferences.position;
+  }
+  if (cachedPreferences.sound) {
+    selectedSound = cachedPreferences.sound;
+  }
+  if (cachedPreferences.notificationScale != null) {
+    const n = Number(cachedPreferences.notificationScale);
+    if (!Number.isNaN(n) && n > 0) selectedNotificationScale = n;
   }
   if ("disableProgress" in cachedPreferences) {
     global.disableProgress = cachedPreferences.disableProgress === true;
@@ -414,52 +770,144 @@ if (cachedPreferences && typeof cachedPreferences === "object") {
   if ("startInTray" in cachedPreferences) {
     global.startInTray = !!cachedPreferences.startInTray;
   }
-} else {
-  cachedPreferences = {};
 }
-ipcMain.handle("save-preferences", async (event, newPrefs) => {
-  const freshPrefs = readPrefsSafe();
-  const mergedPrefs = { ...freshPrefs, ...newPrefs };
+ensureSteamApiKeyFileFromPrefs();
 
-  if (mergedPrefs.language) {
-    selectedLanguage = mergedPrefs.language;
+function applyPreferenceSideEffects(
+  patch = {},
+  prefsSnapshot = {},
+  options = {}
+) {
+  if ("language" in patch && typeof prefsSnapshot.language === "string") {
+    selectedLanguage = prefsSnapshot.language;
   }
-  if ("disableProgress" in newPrefs) {
-    global.disableProgress = newPrefs.disableProgress;
+  if ("disableProgress" in patch) {
+    global.disableProgress = prefsSnapshot.disableProgress === true;
+  }
+  if ("disablePlaytime" in patch) {
+    global.disablePlaytime = prefsSnapshot.disablePlaytime === true;
+  }
+  if ("startMaximized" in patch) {
+    global.startMaximized = !!prefsSnapshot.startMaximized;
+  }
+  if ("startInTray" in patch) {
+    global.startInTray = !!prefsSnapshot.startInTray;
+  }
+  if ("preset" in patch) {
+    selectedPreset = prefsSnapshot.preset || "default";
+  }
+  if ("position" in patch) {
+    selectedPosition = prefsSnapshot.position || "center-bottom";
+  }
+  if ("sound" in patch) {
+    selectedSound = prefsSnapshot.sound || "mute";
+  }
+  if ("notificationScale" in patch) {
+    const n = Number(prefsSnapshot.notificationScale);
+    if (!Number.isNaN(n) && n > 0) selectedNotificationScale = n;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "overlayShortcut")) {
+    global.overlayShortcut = patch.overlayShortcut;
+    if (typeof patch.overlayShortcut === "string" && patch.overlayShortcut) {
+      registerOverlayShortcut(patch.overlayShortcut);
+    }
+  }
+  if (options.removeSteamKey === true) {
+    removeSteamApiKeyFiles();
+  } else if (Object.prototype.hasOwnProperty.call(patch, "steamApiKey")) {
+    const trimmed = String(prefsSnapshot.steamApiKey || "").trim();
+    if (trimmed) writeSteamApiKeyFile(trimmed);
+  }
+}
+
+function updatePreferences(patch = {}) {
+  const incoming = { ...(patch || {}) };
+  let removeSteamKey = false;
+
+  if ("steamApiKeyMasked" in incoming) delete incoming.steamApiKeyMasked;
+
+  if (Object.prototype.hasOwnProperty.call(incoming, "steamApiKey")) {
+    const raw = incoming.steamApiKey;
+    const trimmed =
+      typeof raw === "string" ? raw.trim() : raw ? String(raw).trim() : "";
+    if (trimmed) {
+      incoming.steamApiKey = trimmed;
+    } else {
+      removeSteamKey = true;
+      delete incoming.steamApiKey;
+    }
   }
 
-  if ("disablePlaytime" in newPrefs) {
-    global.disablePlaytime = newPrefs.disablePlaytime;
-  }
-  if ("startMaximized" in newPrefs) {
-    global.startMaximized = !!newPrefs.startMaximized;
-  }
-  if ("startInTray" in newPrefs) {
-    global.startInTray = !!newPrefs.startInTray;
-  }
   try {
-    fs.writeFileSync(preferencesPath, JSON.stringify(mergedPrefs, null, 2));
+    const current = readPrefsSafe();
+    const merged = mergeWithDefaultPreferences({
+      ...current,
+      ...incoming,
+    });
+    if (removeSteamKey) delete merged.steamApiKey;
+
+    const keysSet = new Set([
+      ...Object.keys(current || {}),
+      ...Object.keys(merged || {}),
+    ]);
+    const changedKeys = [];
+    for (const key of keysSet) {
+      if (!deepEqual(current?.[key], merged?.[key])) {
+        changedKeys.push(key);
+      }
+    }
+
+    if (changedKeys.length === 0) {
+      prefsLogger.info("preferences:update:no-change", {
+        keys: Object.keys(incoming || {}),
+      });
+      return current;
+    }
+
+    fs.writeFileSync(preferencesPath, JSON.stringify(merged, null, 2));
+    cachedPreferences = { ...merged };
+    const effectivePatch = {};
+    for (const key of changedKeys) {
+      if (Object.prototype.hasOwnProperty.call(incoming, key)) {
+        effectivePatch[key] = merged[key];
+      }
+    }
+    if (removeSteamKey && !effectivePatch.steamApiKey) {
+      effectivePatch.steamApiKey = undefined;
+    }
+    prefsLogger.info("preferences:update:written", {
+      path: preferencesPath,
+      keys: changedKeys,
+    });
+    applyPreferenceSideEffects(effectivePatch, cachedPreferences, {
+      removeSteamKey,
+    });
+    return cachedPreferences;
   } catch (err) {
     notifyError("Error writing merged preferences: " + err.message);
+    prefsLogger.error("preferences:update:error", { error: err.message });
+    throw err;
   }
-  if ("overlayShortcut" in newPrefs) {
-    global.overlayShortcut = newPrefs.overlayShortcut;
-    registerOverlayShortcut(newPrefs.overlayShortcut);
-  }
+}
 
-  cachedPreferences = { ...mergedPrefs };
+ipcMain.handle("preferences:update", async (_event, newPrefs) => {
+  prefsLogger.info("preferences:update:requested", {
+    keys: newPrefs ? Object.keys(newPrefs) : [],
+  });
+  return updatePreferences(newPrefs || {});
 });
+
+// Backwards compatibility
+ipcMain.handle("save-preferences", async (_event, newPrefs) =>
+  updatePreferences(newPrefs || {})
+);
 
 ipcMain.on("set-zoom", (_event, zoomFactor) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.setZoomFactor(zoomFactor);
 
     try {
-      const updatedPrefs = {
-        ...cachedPreferences,
-        windowZoomFactor: zoomFactor,
-      };
-      fs.writeFileSync(preferencesPath, JSON.stringify(updatedPrefs, null, 2));
+      const updatedPrefs = updatePreferences({ windowZoomFactor: zoomFactor });
       cachedPreferences = updatedPrefs;
     } catch (err) {
       notifyError("❌ Failed to save zoom preference: " + err.message);
@@ -503,22 +951,46 @@ function sanitizeFilename(name) {
 }
 
 // --- Achievements schema generator (manual configs) ---
-async function runAchievementsGenerator(appid, schemaBaseDir, userDataDir) {
+async function runAchievementsGenerator(
+  appid,
+  schemaBaseDir,
+  userDataDir,
+  opts = {}
+) {
+  if (isAppIdBlacklisted(appid)) {
+    schemaLogger.warn("schema:skip-blacklisted", { appid });
+    throw new Error(`AppID ${appid} is blacklisted. Remove it to continue.`);
+  }
   return new Promise((resolve, reject) => {
+    ensureSteamApiKeyFileFromPrefs();
     const script = path.join(
       __dirname,
       "utils",
       "generate_achievements_schema.js"
     );
+    const logDir = path.join(app.getPath("userData"), "logs");
+    try {
+      if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+    } catch {}
+    const platform =
+      typeof opts.platform === "string" && opts.platform.length
+        ? opts.platform.toLowerCase()
+        : null;
     const args = [
       String(appid),
       "--apps-concurrency=1",
       `--out=${schemaBaseDir}`,
       `--user-data-dir=${userDataDir}`,
     ];
+    if (platform) args.push(`--platform=${platform}`);
     const cp = fork(script, args, {
       stdio: ["pipe", "pipe", "pipe", "ipc"],
-      env: { ...process.env, PLAYWRIGHT_BROWSERS_PATH: "0" },
+      env: {
+        ...process.env,
+        PLAYWRIGHT_BROWSERS_PATH: "0",
+        LOGGER_DIR: logDir,
+        LOGGER_SUPPRESS_CLEAR: "1",
+      },
       windowsHide: true,
     });
 
@@ -547,12 +1019,19 @@ async function runAchievementsGenerator(appid, schemaBaseDir, userDataDir) {
   });
 }
 
-async function ensureSchemaForApp(appid) {
-  if (!/^\d+$/.test(String(appid || ""))) return null;
+async function ensureSchemaForApp(appid, platform = "steam") {
+  const appidStr = String(appid || "");
+  if (!platform && /[a-f]/i.test(appidStr)) {
+    platform = "epic";
+  }
+  if (!/^[0-9a-fA-F]+$/.test(String(appid || ""))) return null;
 
-  const schemaBase = path.join(configsDir, "schema"); // %APPDATA%\Achievements\configs\schema
-  const destDir = path.join(schemaBase, String(appid));
+  const schemaBase = SCHEMA_ROOT_PATH; // %APPDATA%\Achievements\configs\schema
+  const normalizedPlatform = normalizeStoragePlatform(platform);
+  const destDir = resolveSchemaDirForPlatform(appid, normalizedPlatform);
   const achJson = path.join(destDir, "achievements.json");
+  const legacyDir = path.join(schemaBase, String(appid));
+  const legacyJson = path.join(legacyDir, "achievements.json");
 
   try {
     if (!fs.existsSync(schemaBase))
@@ -560,21 +1039,86 @@ async function ensureSchemaForApp(appid) {
   } catch {}
   // if achievements schema exist
   if (fs.existsSync(achJson)) {
+    ipcLogger.info("schema:ensure-exists", {
+      appid,
+      platform: normalizedPlatform,
+      dir: destDir,
+    });
     return { dir: destDir, existed: true };
   }
+  if (fs.existsSync(legacyJson)) {
+    try {
+      fs.mkdirSync(path.dirname(destDir), { recursive: true });
+      fs.renameSync(legacyDir, destDir);
+      if (fs.existsSync(achJson)) {
+        ipcLogger.info("schema:ensure-migrated-legacy", {
+          appid,
+          from: legacyDir,
+          to: destDir,
+        });
+        return { dir: destDir, existed: true };
+      }
+    } catch (err) {
+      ipcLogger.warn("schema:legacy-move-failed", {
+        appid,
+        error: err?.message || String(err),
+      });
+      return { dir: legacyDir, existed: true };
+    }
+  }
+
+  for (const altPlatform of SCHEMA_PLATFORM_DIRS) {
+    if (altPlatform === normalizedPlatform) continue;
+    const altDir = resolveSchemaDirForPlatform(appid, altPlatform);
+    if (
+      path.normalize(altDir).toLowerCase() ===
+      path.normalize(destDir).toLowerCase()
+    ) {
+      continue;
+    }
+    const altJson = path.join(altDir, "achievements.json");
+    if (!fs.existsSync(altJson)) continue;
+    try {
+      fs.mkdirSync(path.dirname(destDir), { recursive: true });
+      fs.renameSync(altDir, destDir);
+      if (fs.existsSync(achJson)) {
+        ipcLogger.info("schema:ensure-migrated-platform", {
+          appid,
+          from: altDir,
+          to: destDir,
+        });
+        return { dir: destDir, existed: true };
+      }
+    } catch (err) {
+      ipcLogger.warn("schema:platform-move-failed", {
+        appid,
+        from: altPlatform,
+        to: normalizedPlatform,
+        error: err?.message || String(err),
+      });
+    }
+    break;
+  }
+
   try {
-    await runAchievementsGenerator(appid, schemaBase, app.getPath("userData"));
+    await runAchievementsGenerator(appid, schemaBase, app.getPath("userData"), {
+      platform: normalizedPlatform,
+    });
     if (fs.existsSync(achJson)) {
+      ipcLogger.info("schema:ensure-generated", {
+        appid,
+        platform: normalizedPlatform,
+        dir: destDir,
+      });
       return { dir: destDir, existed: false };
     }
-    warnOnce(`${appid}:nojson`, `Schema was not generated!`);
   } catch (e) {
     warnOnce(`${appid}:fail`, `Generate schema failed: ${e.message}`);
   }
   return null;
 }
 
-/* <root>/<gameName>/<displayName>.png  (timestamp if exists) */
+/* <root>/<gameName>/<displayName>.png (timestamp if exists) */
 async function saveFullScreenShot(gameName, achDisplayName) {
   if (!screenshot) throw new Error("screenshot-desktop is not installed");
   const root = getScreenshotRootFolder();
@@ -599,8 +1143,61 @@ async function saveFullScreenShot(gameName, achDisplayName) {
 }
 
 ipcMain.handle("load-preferences", () => {
+  prefsLogger.info("load-preferences:requested");
   cachedPreferences = readPrefsSafe();
-  return { ...cachedPreferences };
+  const fileKey = readSteamApiKeyFromFile();
+  if (fileKey && !cachedPreferences.steamApiKey) {
+    cachedPreferences.steamApiKey = fileKey;
+  }
+  if (
+    typeof cachedPreferences.steamApiKey === "string" &&
+    !cachedPreferences.steamApiKey.trim()
+  ) {
+    delete cachedPreferences.steamApiKey;
+  }
+  prefsLogger.info("load-preferences:loaded", {
+    keys: cachedPreferences ? Object.keys(cachedPreferences) : [],
+  });
+  const safePrefs = { ...cachedPreferences };
+  if (safePrefs.steamApiKey) {
+    safePrefs.steamApiKeyMasked = maskSteamApiKey(safePrefs.steamApiKey);
+    delete safePrefs.steamApiKey;
+  } else {
+    safePrefs.steamApiKeyMasked = "";
+  }
+  return safePrefs;
+});
+
+ipcMain.handle("blacklist:check", async (_event, appid) => {
+  const normalized = normalizeAppIdValue(appid);
+  const blacklisted = normalized ? isAppIdBlacklisted(normalized) : false;
+  return { appid: normalized, blacklisted };
+});
+
+ipcMain.handle("config:get-by-appid", async (_event, appid) => {
+  const normalized = normalizeAppIdValue(appid);
+  if (!normalized) return null;
+  try {
+    const files = fs.readdirSync(configsDir);
+    for (const f of files) {
+      if (!f.toLowerCase().endsWith(".json")) continue;
+      const cfgPath = path.join(configsDir, f);
+      try {
+        const data = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+        const cfgAppId = normalizeAppIdValue(
+          data?.appid || data?.appId || data?.steamAppId
+        );
+        if (cfgAppId === normalized) {
+          return {
+            name: data?.name || path.basename(f, ".json"),
+            displayName: data?.displayName || null,
+            appid: cfgAppId,
+          };
+        }
+      } catch {}
+    }
+  } catch {}
+  return null;
 });
 
 ipcMain.handle("get-sound-files", () => {
@@ -649,6 +1246,40 @@ ipcMain.handle("ui:refocus", (e) => {
   } catch {}
 });
 
+// dashboard visibility & refresh
+let dashboardOpen = false;
+let pendingDashboardRefresh = false;
+let dashboardRefreshTimer = null;
+
+// Platinum tracking for pending delivery and dedupe
+const pendingPlatinumByConfig = new Map();
+
+function requestDashboardRefresh() {
+  if (!dashboardOpen) {
+    pendingDashboardRefresh = true;
+    return;
+  }
+  pendingDashboardRefresh = false;
+  clearTimeout(dashboardRefreshTimer);
+  dashboardRefreshTimer = setTimeout(() => {
+    try {
+      broadcastToAll("dashboard:refresh");
+    } catch {}
+  }, 350);
+}
+
+ipcMain.handle("dashboard:set-open", (_e, state) => {
+  dashboardOpen = !!state;
+  if (dashboardOpen && pendingDashboardRefresh) {
+    requestDashboardRefresh();
+  }
+  return dashboardOpen;
+});
+
+ipcMain.handle("dashboard:is-open", () => {
+  return dashboardOpen;
+});
+
 // List existing configs
 function listConfigs() {
   const files = fs.readdirSync(configsDir);
@@ -659,13 +1290,28 @@ function listConfigs() {
 
 // Handler for config saving
 ipcMain.handle("saveConfig", async (event, config) => {
+  ipcLogger.info("saveConfig:request", {
+    name: config?.name || null,
+    appid: config?.appid || null,
+  });
   try {
     const safeName = sanitizeConfigName(config.name);
     if (!fs.existsSync(configsDir))
       fs.mkdirSync(configsDir, { recursive: true });
     const filePath = path.join(configsDir, `${safeName}.json`);
+    let prevConfig = null;
+    if (fs.existsSync(filePath)) {
+      try {
+        prevConfig = JSON.parse(fs.readFileSync(filePath, "utf8"));
+      } catch {}
+    }
+
+    const exePath = isNonEmptyString(config.executable)
+      ? config.executable
+      : null;
 
     const payload = {
+      ...prevConfig, // preserve custom fields like platinum
       ...config,
       name: safeName,
       displayName: config.displayName || config.name,
@@ -673,47 +1319,117 @@ ipcMain.handle("saveConfig", async (event, config) => {
         ? config.config_path
         : null,
       save_path: isNonEmptyString(config.save_path) ? config.save_path : null,
-      executable: isNonEmptyString(config.executable)
-        ? config.executable
-        : null,
+      executable: exePath,
       arguments: isNonEmptyString(config.arguments) ? config.arguments : "",
       process_name: isNonEmptyString(config.process_name)
         ? config.process_name
+        : exePath
+        ? path.basename(exePath)
         : "",
     };
 
-    const hasAppId = /^\d+$/.test(String(payload.appid || ""));
-    if (!hasAppId) {
+    const sanitizedAppId = sanitizeAppId(payload.appid);
+    if (!sanitizedAppId) {
       return { success: false, message: "AppID is required." };
     }
+    if (isAppIdBlacklisted(sanitizedAppId)) {
+      const message = `AppID ${sanitizedAppId} is blacklisted. Remove it to continue.`;
+      ipcLogger.info("saveConfig:blocked-blacklist", {
+        appid: sanitizedAppId,
+        name: payload?.name || null,
+      });
+      return { success: false, message, blacklisted: true };
+    }
+    payload.appid = sanitizedAppId;
+    applyConfigPlatformDefaults(payload);
+    const prevPlatform = normalizePlatform(prevConfig?.platform) || null;
+    let nextPlatform = normalizePlatform(payload.platform) || null;
+    if (!nextPlatform && /[a-f]/i.test(String(payload.appid || ""))) {
+      nextPlatform = "epic";
+    }
+    nextPlatform = nextPlatform || "steam";
 
     const wc = event.sender;
 
     // 1) Manually selected config_path
     let finalSchemaDir = null;
     if (isNonEmptyString(payload.config_path)) {
-      const bySel = findConfigDirFromSelection(payload.config_path);
-      if (bySel) {
-        finalSchemaDir = bySel;
+      if (isManagedSchemaPath(payload.config_path)) {
+        const bySel = findConfigDirFromSelection(
+          payload.config_path,
+          payload.appid,
+          payload.platform
+        );
+        if (bySel) {
+          finalSchemaDir = bySel;
+        }
+      } else {
+        finalSchemaDir = payload.config_path;
       }
     }
 
     // 2) Search schema locally
     let needBackground = false;
     if (!finalSchemaDir) {
-      const schemaBase = path.join(configsDir, "schema");
-      const candidateDir = path.join(schemaBase, String(payload.appid));
-      const achPath = path.join(candidateDir, "achievements.json");
+      const preferredDir = resolveSchemaDirForPlatform(
+        payload.appid,
+        payload.platform
+      );
+      const achPath = path.join(preferredDir, "achievements.json");
       if (
         fs.existsSync(achPath) &&
         looksLikeSchemaArray(readJsonSafe(achPath))
       ) {
-        finalSchemaDir = candidateDir;
+        finalSchemaDir = preferredDir;
       } else {
-        needBackground = true;
+        const legacyDir = path.join(SCHEMA_ROOT_PATH, String(payload.appid));
+        const legacyJson = path.join(legacyDir, "achievements.json");
+        if (
+          fs.existsSync(legacyJson) &&
+          looksLikeSchemaArray(readJsonSafe(legacyJson))
+        ) {
+          try {
+            if (legacyDir !== preferredDir) {
+              fs.mkdirSync(preferredDir, { recursive: true });
+              fs.renameSync(legacyDir, preferredDir);
+              finalSchemaDir = preferredDir;
+            } else {
+              finalSchemaDir = legacyDir;
+            }
+          } catch {
+            finalSchemaDir = legacyDir;
+          }
+        } else {
+          needBackground = true;
+        }
       }
     }
-    if (finalSchemaDir) payload.config_path = finalSchemaDir;
+
+    const managesSchemaPath =
+      isManagedSchemaPath(payload.config_path) ||
+      (!isNonEmptyString(payload.config_path) &&
+        isManagedSchemaPath(prevConfig?.config_path));
+    if (prevPlatform && prevPlatform !== nextPlatform && managesSchemaPath) {
+      ipcLogger.info("config:platform-change", {
+        name: payload.name,
+        appid: payload.appid,
+        from: prevPlatform,
+        to: nextPlatform,
+      });
+      finalSchemaDir = null;
+      payload.config_path = null;
+      needBackground = true;
+    } else if (
+      finalSchemaDir &&
+      managesSchemaPath &&
+      !schemaPathMatchesPlatform(payload.appid, nextPlatform, finalSchemaDir)
+    ) {
+      finalSchemaDir = null;
+      payload.config_path = null;
+      needBackground = true;
+    }
+
+    if (finalSchemaDir && !needBackground) payload.config_path = finalSchemaDir;
 
     try {
       const selForSave = isNonEmptyString(config.save_path)
@@ -734,8 +1450,17 @@ ipcMain.handle("saveConfig", async (event, config) => {
         }
       }
     } catch {}
+
     // 3) Create config
     fs.writeFileSync(filePath, JSON.stringify(payload, null, 2));
+    ipcLogger.info("saveConfig:written", {
+      name: payload.name,
+      appid: payload.appid,
+      filePath,
+      savePath: payload.save_path || null,
+      schemaDir: finalSchemaDir || null,
+      needBackground,
+    });
     notifyConfigsChanged();
 
     // 4) Schema exists
@@ -762,6 +1487,13 @@ ipcMain.handle("saveConfig", async (event, config) => {
         );
       }, 15);
 
+      ipcLogger.info("saveConfig:success", {
+        name: payload.name,
+        appid: payload.appid,
+        schemaReady: true,
+        config_path: finalSchemaDir,
+        save_path: payload.save_path || null,
+      });
       return reply;
     }
 
@@ -779,7 +1511,7 @@ ipcMain.handle("saveConfig", async (event, config) => {
 
       (async () => {
         try {
-          const res = await ensureSchemaForApp(payload.appid);
+          const res = await ensureSchemaForApp(payload.appid, payload.platform);
           if (res?.dir) {
             try {
               const curr = JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -810,40 +1542,93 @@ ipcMain.handle("saveConfig", async (event, config) => {
             `Generate schema failed for ${payload.appid}: ${e.message}`
           );
           notifyError(`Generate schema failed: ${e.message}`);
+          ipcLogger.error("saveConfig:schema-generation-failed", {
+            appid: payload.appid,
+            error: e.message,
+          });
         }
       })();
       setTimeout(() => {
         console.log(`${startTxt}`);
       }, 15);
+      ipcLogger.info("saveConfig:success", {
+        name: payload.name,
+        appid: payload.appid,
+        schemaReady: false,
+        config_path: null,
+        save_path: payload.save_path || null,
+      });
       return reply;
     }
   } catch (error) {
+    ipcLogger.error("saveConfig:error", {
+      error: error?.message || String(error),
+      name: config?.name || null,
+      appid: config?.appid || null,
+    });
     return { success: false, message: "Error saving configuration!" };
   }
 });
 
 // Handler for config load
 ipcMain.handle("loadConfigs", () => {
+  ipcLogger.info("loadConfigs:request");
+  const blacklist = new Set(readBlacklistFromPrefs());
+  const lang = cachedPreferences?.language || "english";
   const configFiles = fs
     .readdirSync(configsDir)
     .filter((file) => file.endsWith(".json"));
-  const configs = configFiles.map((file) => path.basename(file, ".json"));
+  const configs = configFiles.map((file) => {
+    const baseName = path.basename(file, ".json");
+    const meta = {
+      name: baseName,
+      displayName: baseName,
+      appid: null,
+      blacklisted: false,
+    };
+    const fullPath = path.join(configsDir, file);
+    try {
+      const raw = JSON.parse(fs.readFileSync(fullPath, "utf8"));
+      if (raw?.displayName) {
+        meta.displayName =
+          getSafeLocalizedText(raw.displayName, lang) || raw.name || baseName;
+      } else if (raw?.name) {
+        meta.displayName = raw.name;
+      }
+      if (raw?.appid) {
+        meta.appid = String(raw.appid);
+        meta.blacklisted = blacklist.has(meta.appid);
+      }
+    } catch (err) {
+      ipcLogger.warn("loadConfigs:parse-failed", {
+        file: fullPath,
+        error: err?.message || String(err),
+      });
+    }
+    return meta;
+  });
+  ipcLogger.info("loadConfigs:success", { count: configs.length });
   return configs;
 });
 
 // Handler for folder load
 ipcMain.handle("selectFolder", async () => {
+  ipcLogger.info("selectFolder:request");
   const result = await dialog.showOpenDialog({
     properties: ["openDirectory"],
   });
   if (!result.canceled) {
-    return result.filePaths[0];
+    const folder = result.filePaths[0];
+    ipcLogger.info("selectFolder:success", { folder });
+    return folder;
   }
+  ipcLogger.info("selectFolder:cancelled");
   return null;
 });
 
 // Handler for json load
 ipcMain.handle("load-achievements", async (event, configName) => {
+  ipcLogger.info("load-achievements:request", { configName });
   try {
     //const configPath = path.join(process.env.APPDATA, 'Achievements', 'configs', `${configName}.json`);
     const safeName = sanitizeConfigName(configName);
@@ -855,6 +1640,10 @@ ipcMain.handle("load-achievements", async (event, configName) => {
       : "";
     if (!cfgDir) {
       event.sender.send("achievements-missing", {
+        configName,
+        reason: !cfgDir ? "no-config-path" : "no-file",
+      });
+      ipcLogger.warn("load-achievements:missing", {
         configName,
         reason: !cfgDir ? "no-config-path" : "no-file",
       });
@@ -881,29 +1670,64 @@ ipcMain.handle("load-achievements", async (event, configName) => {
         configName,
         reason: "no-file",
       });
+      ipcLogger.warn("load-achievements:missing", {
+        configName,
+        reason: "no-file",
+        config_path: cfgDir,
+      });
       return { achievements: null, config_path: cfgDir };
     }
 
     const achievements = JSON.parse(fs.readFileSync(foundPath, "utf-8"));
+    ipcLogger.info("load-achievements:success", {
+      configName,
+      source: foundPath,
+      count: Array.isArray(achievements)
+        ? achievements.length
+        : achievements && typeof achievements === "object"
+        ? Object.keys(achievements).length
+        : 0,
+    });
     return { achievements, config_path: path.dirname(foundPath) };
   } catch (error) {
     if (error?.code !== "ENOENT") {
       notifyError("Error reading achievements.json file: " + error.message);
+      ipcLogger.error("load-achievements:error", {
+        configName,
+        error: error.message,
+      });
     }
     return { achievements: null, config_path: "" };
   }
 });
 
 ipcMain.handle("load-saved-achievements", async (_event, configName) => {
+  ipcLogger.info("load-saved-achievements:request", { configName });
   try {
+    const rawName = String(configName || "").trim();
+    if (!rawName) {
+      ipcLogger.warn("load-saved-achievements:missing-name", { configName });
+      return { achievements: {}, save_path: "", error: "configName required" };
+    }
     const safeName = sanitizeConfigName(configName);
     const configPath = path.join(configsDir, `${safeName}.json`);
+    if (!fs.existsSync(configPath)) {
+      const ready = await waitForFileExists(configPath, 50, 100);
+      if (!ready || !fs.existsSync(configPath)) {
+        ipcLogger.warn("load-saved-achievements:not-found", {
+          configName: safeName,
+          configPath,
+        });
+        return { achievements: {}, save_path: "", error: "config not ready" };
+      }
+    }
     const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
 
     const saveBase = config.save_path;
     const appid = String(config.appid || "");
     const saveJsonPath = resolveSaveFilePath(saveBase, appid);
     const {
+      tenokeIni: tenokeIniPath,
       ini: achievementsIniPath,
       ofx: achievementsIniOnlineFixPath,
       bin: achievementsBinPath,
@@ -912,6 +1736,8 @@ ipcMain.handle("load-saved-achievements", async (_event, configName) => {
     let effectiveSavePath = "";
     if (fs.existsSync(saveJsonPath))
       effectiveSavePath = path.dirname(saveJsonPath);
+    else if (fs.existsSync(tenokeIniPath))
+      effectiveSavePath = path.dirname(tenokeIniPath);
     else if (fs.existsSync(achievementsIniPath))
       effectiveSavePath = path.dirname(achievementsIniPath);
     else if (fs.existsSync(achievementsIniOnlineFixPath))
@@ -934,24 +1760,112 @@ ipcMain.handle("load-saved-achievements", async (_event, configName) => {
       save_path: effectiveSavePath || saveBase || "",
     };
   } catch (error) {
+    ipcLogger.error("load-saved-achievements:error", {
+      configName,
+      error: error.message,
+    });
     return { achievements: {}, save_path: "", error: error.message };
   }
 });
 
 // Handler for config deletion
 ipcMain.handle("delete-config", async (_event, configName) => {
+  ipcLogger.info("delete-config:request", { configName });
   try {
     const safeName = sanitizeConfigName(configName);
     const configPath = path.join(configsDir, `${safeName}.json`);
     //const configPath = path.join(process.env.APPDATA, 'Achievements', 'configs', `${safe}.json`);
     if (fs.existsSync(configPath)) {
       fs.unlinkSync(configPath);
+      watchedFoldersApi?.refreshConfigState?.();
+      ipcLogger.info("delete-config:success", { configName, configPath });
       return { success: true };
     }
+    ipcLogger.warn("delete-config:not-found", { configName, configPath });
     return { success: false, error: "File not found." };
   } catch (error) {
+    ipcLogger.error("delete-config:error", {
+      configName,
+      error: error.message,
+    });
     return { success: false, error: error.message };
   }
+});
+
+ipcMain.handle("config:blacklist", async (_event, payload = {}) => {
+  const rawName = payload.configName || "";
+  const safeName = rawName ? sanitizeConfigName(rawName) : null;
+  let resolvedAppId = payload.appid ? String(payload.appid) : null;
+  const configPath = safeName
+    ? path.join(configsDir, `${safeName}.json`)
+    : null;
+  const removeFlag = payload?.remove === true || payload?.action === "remove";
+
+  ipcLogger.info("config:blacklist:request", {
+    configName: safeName || null,
+    appid: resolvedAppId || null,
+    remove: removeFlag,
+  });
+
+  try {
+    if (!resolvedAppId && configPath && fs.existsSync(configPath)) {
+      const parsed = JSON.parse(fs.readFileSync(configPath, "utf8"));
+      if (parsed?.appid) resolvedAppId = String(parsed.appid);
+    }
+    if (!resolvedAppId) throw new Error("AppID missing");
+
+    const updatedList = removeFlag
+      ? removeAppIdFromBlacklist(resolvedAppId)
+      : addAppIdToBlacklist(resolvedAppId);
+
+    if (removeFlag) {
+      try {
+        ipcMain.emit("blacklist:removed-appid", null, resolvedAppId);
+      } catch {}
+    }
+
+    refreshBlacklistEffects();
+    try {
+      broadcastToAll("blacklist:updated", { appids: updatedList });
+    } catch {}
+
+    ipcLogger.info("config:blacklist:success", {
+      configName: safeName || null,
+      appid: resolvedAppId,
+      remove: removeFlag,
+    });
+    return {
+      success: true,
+      appid: resolvedAppId,
+      blacklisted: !removeFlag,
+      blacklist: updatedList,
+    };
+  } catch (err) {
+    ipcLogger.error("config:blacklist:error", {
+      configName: safeName || null,
+      error: err?.message || String(err),
+    });
+    return { success: false, error: err?.message || "Blacklist failed" };
+  }
+});
+
+ipcMain.handle("blacklist:list", async () => {
+  return { appids: readBlacklistFromPrefs() };
+});
+
+ipcMain.handle("blacklist:reset", async () => {
+  const before = readBlacklistFromPrefs();
+  resetBlacklist();
+  if (Array.isArray(before) && before.length) {
+    try {
+      ipcMain.emit("blacklist:removed-appid", null, before);
+    } catch {}
+  }
+  refreshBlacklistEffects();
+  try {
+    broadcastToAll("blacklist:updated", { appids: readBlacklistFromPrefs() });
+  } catch {}
+  return { success: true, appids: [] };
 });
 
 ipcMain.on("set-animation-duration", (_event, duration) => {
@@ -989,12 +1903,13 @@ function getUserPreferredSound() {
   }
 }
 
-let mainWindow;
 let tray = null;
 const ICON_PATH = app.isPackaged
   ? path.join(process.resourcesPath, "icon.ico") // in installer: resources\icon.ico
   : path.join(__dirname, "icon.ico");
-
+const ICON_PNG_PATH = app.isPackaged
+  ? path.join(app.getAppPath(), "assets", "icon.png") // in installer: resources\app.asar\assets\icon.png
+  : path.join(__dirname, "assets", "icon.png");
 function showMainWindowRespectingPrefs() {
   if (!mainWindow) return;
   const prefs = readPrefsSafe();
@@ -1033,6 +1948,9 @@ let currentConfigPath;
 let previousAchievements = {};
 
 function createMainWindow() {
+  windowLogger.info("create-main-window:start", {
+    existing: Boolean(mainWindow && !mainWindow.isDestroyed?.()),
+  });
   let initialZoom = 1;
   try {
     const prefs = fs.existsSync(preferencesPath)
@@ -1055,11 +1973,18 @@ function createMainWindow() {
       zoomFactor: initialZoom,
     },
   });
+  windowLogger.info("create-main-window:browserwindow-created", {
+    width: 1000,
+    height: 1000,
+    zoom: initialZoom,
+  });
 
-  const ICON_URL = pathToFileURL(ICON_PATH).toString();
+  const ICON_URL = pathToFileURL(ICON_PNG_PATH).toString();
   mainWindow.loadFile("index.html", { query: { icon: ICON_URL } });
+  windowLogger.info("create-main-window:load-file", { icon: ICON_URL });
 
   mainWindow.webContents.on("did-finish-load", () => {
+    windowLogger.info("create-main-window:did-finish-load");
     try {
       const prefs = fs.existsSync(preferencesPath)
         ? JSON.parse(fs.readFileSync(preferencesPath, "utf-8"))
@@ -1079,6 +2004,9 @@ function createMainWindow() {
       mainWindow.webContents.setZoomFactor(1);
       mainWindow.show();
     }
+    windowLogger.info("create-main-window:visible", {
+      maximized: mainWindow.isMaximized(),
+    });
     mainWindow.webContents.send(
       "window-state-change",
       mainWindow.isMaximized()
@@ -1088,12 +2016,14 @@ function createMainWindow() {
 
   // Track window state changes
   mainWindow.on("maximize", () => {
+    windowLogger.info("create-main-window:maximize");
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("window-state-change", true);
     }
   });
 
   mainWindow.on("unmaximize", () => {
+    windowLogger.info("create-main-window:unmaximize");
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("window-state-change", false);
     }
@@ -1141,6 +2071,11 @@ function createNotificationWindow(message) {
   const presetHtml = path.join(presetFolder, "index.html");
   const position = message.position || "center-bottom";
   const scale = parseFloat(message.scale || 1);
+  windowLogger.info("create-notification-window:start", {
+    preset,
+    position,
+    scale,
+  });
 
   const { width: windowWidth, height: windowHeight } =
     getPresetDimensions(presetFolder);
@@ -1202,6 +2137,7 @@ function createNotificationWindow(message) {
     y,
     transparent: true,
     frame: false,
+    show: false,
     alwaysOnTop: true,
     focusable: false,
     resizable: false,
@@ -1221,8 +2157,12 @@ function createNotificationWindow(message) {
   notificationWindow.setVisibleOnAllWorkspaces(true);
   notificationWindow.setFullScreenable(false);
   notificationWindow.setFocusable(false);
-
+  notificationWindow.setIgnoreMouseEvents(true, { forward: true });
   notificationWindow.loadFile(presetHtml);
+  notificationWindow.showInactive();
+  windowLogger.info("create-notification-window:load-file", {
+    presetHtml,
+  });
 
   notificationWindow.webContents.on("did-finish-load", () => {
     const iconPathToSend =
@@ -1240,6 +2180,34 @@ function createNotificationWindow(message) {
 }
 
 ipcMain.on("show-notification", (_event, achievement) => {
+  const configName =
+    achievement?.configName ||
+    achievement?.config_name ||
+    selectedConfig ||
+    null;
+  const achKey =
+    achievement?.name ||
+    (typeof achievement?.displayName === "string"
+      ? achievement.displayName
+      : null);
+  if (configName && achKey) {
+    const prev = loadPreviousAchievements(configName) || {};
+    const prevEntry = prev[achKey];
+    const incomingProg = Number(achievement.progress);
+    const prevProg = Number(prevEntry?.progress);
+    const prevMax = Number(prevEntry?.max_progress);
+    const maxProg = Number(achievement.max_progress);
+    if (prevEntry?.earned === true) return;
+    if (
+      Number.isFinite(incomingProg) &&
+      Number.isFinite(prevProg) &&
+      incomingProg <= prevProg &&
+      (Number.isNaN(maxProg) || maxProg === prevMax)
+    ) {
+      return;
+    }
+  }
+
   const displayName = getSafeLocalizedText(
     achievement.displayName,
     selectedLanguage
@@ -1291,28 +2259,54 @@ ipcMain.on("show-notification", (_event, achievement) => {
 
 // New Image Windows
 // Return path to image if exists locally
-ipcMain.handle("checkLocalGameImage", async (_event, appid) => {
-  const imagePath = path.join(
-    app.getPath("userData"),
-    "images",
+ipcMain.handle("checkLocalGameImage", async (_event, appid, platformArg) => {
+  const platform = normalizePlatform(platformArg) || getPlatformForAppId(appid);
+  ipcLogger.info("checkLocalGameImage:request", { appid, platform });
+  const baseDir = path.join(app.getPath("userData"), "images");
+  const newPath = path.join(
+    baseDir,
+    platform || "steam",
+    `${appid}`,
     `${appid}.jpg`
   );
+  const legacyPath = path.join(baseDir, `${appid}.jpg`);
   try {
-    await fs.promises.access(imagePath, fs.constants.F_OK);
-    return imagePath;
-  } catch {
-    return null;
-  }
+    await fs.promises.access(newPath, fs.constants.F_OK);
+    ipcLogger.info("checkLocalGameImage:hit", {
+      appid,
+      platform,
+      imagePath: newPath,
+    });
+    return newPath;
+  } catch {}
+  try {
+    await fs.promises.access(legacyPath, fs.constants.F_OK);
+    ipcLogger.info("checkLocalGameImage:legacy-hit", {
+      appid,
+      platform,
+      imagePath: legacyPath,
+    });
+    return legacyPath;
+  } catch {}
+  ipcLogger.info("checkLocalGameImage:miss", { appid, platform });
+  return null;
 });
 
 // Save image locally from renderer
-ipcMain.handle("saveGameImage", async (_event, appid, buffer) => {
+ipcMain.handle("saveGameImage", async (_event, appid, buffer, platformArg) => {
+  const platform = normalizePlatform(platformArg) || getPlatformForAppId(appid);
+  ipcLogger.info("saveGameImage:request", { appid, platform });
   try {
-    const imageDir = path.join(app.getPath("userData"), "images");
+    const imageDir = path.join(
+      app.getPath("userData"),
+      "images",
+      platform || "steam",
+      String(appid)
+    );
     if (!fs.existsSync(imageDir)) fs.mkdirSync(imageDir, { recursive: true });
     const fullPath = path.join(imageDir, `${appid}.jpg`);
     fs.writeFileSync(fullPath, Buffer.from(buffer));
-    broadcastToAll("update-image", { appid: String(appid) });
+    broadcastToAll("update-image", { appid: String(appid), platform });
     return { success: true, path: fullPath };
   } catch (err) {
     notifyError("❌ Error saving image: " + err.message);
@@ -1328,8 +2322,8 @@ ipcMain.on("show-test-notification", (event, options) => {
   const notificationData = {
     displayName: "This is a testing achievement notification",
     description: "This is a testing achievement notification for this app",
-    icon: "icon.ico", // Use app icon
-    icon_gray: "icon.ico", // Use app icon
+    icon: ICON_PNG_PATH, // Use app icon
+    icon_gray: ICON_PNG_PATH, // Use app icon
     config_path: baseDir, // Use app's directory
     preset: options.preset || "default",
     position: options.position || "center-bottom",
@@ -1347,6 +2341,81 @@ ipcMain.on("show-test-notification", (event, options) => {
 
   queueAchievementNotification(notificationData);
 });
+
+// Add new IPC handler for Platinum Achievement
+const platinumDedup = new Set();
+
+function markConfigPlatinumFlag(configName) {
+  const safe = configName ? sanitizeConfigName(configName) : "";
+  if (!safe) return false;
+  const cfgPath = path.join(configsDir, `${safe}.json`);
+  if (!fs.existsSync(cfgPath)) return false;
+  try {
+    const data = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+    if (data.platinum === true) return false; // already flagged
+    data.platinum = true;
+    fs.writeFileSync(cfgPath, JSON.stringify(data, null, 2));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function handlePlatinumComplete({
+  configName,
+  appid,
+  savePath,
+  configPath,
+  isActive = false,
+}) {
+  const dedupKey =
+    (configName ? sanitizeConfigName(configName) : "") ||
+    (appid ? String(appid) : "") ||
+    (configPath ? path.basename(configPath) : "");
+  if (dedupKey) {
+    if (platinumDedup.has(dedupKey)) return;
+    platinumDedup.add(dedupKey);
+  }
+
+  const prefs = cachedPreferences || {};
+  if (prefs.disablePlatinum) return;
+
+  const preset = prefs.platinumPreset || "default";
+  const position = prefs.platinumPosition || "center-bottom";
+  const sound = prefs.platinumSound || "mute";
+  const scale = Number(prefs.notificationScale) || 1;
+  const safeName = configName ? sanitizeConfigName(configName) : "";
+
+  const message = {
+    displayName: "100% Completed",
+    description: "You've unlocked all achievements!",
+    preset,
+    position,
+    sound,
+    scale,
+    config_path: configPath || null,
+    save_path: savePath || null,
+    configName: configName || null,
+    appid: appid ? String(appid) : null,
+    __isPlatinum: true,
+  };
+
+  if (isActive) {
+    // Mark flag but defer popup until queue is idle
+    markConfigPlatinumFlag(configName);
+    const key =
+      safeName ||
+      (appid ? String(appid) : "") ||
+      (configPath ? path.basename(configPath) : "");
+    if (key) {
+      pendingPlatinumByConfig.set(key, message);
+    }
+    flushPendingPlatinum();
+    return;
+  }
+
+  queuePlatinumAfterCurrent(message);
+}
 
 ipcMain.handle("load-presets", async () => {
   if (!fs.existsSync(userPresetsFolder)) return [];
@@ -1398,9 +2467,11 @@ ipcMain.handle("load-presets", async () => {
 
 const earnedNotificationQueue = [];
 let isNotificationShowing = false;
-let selectedNotificationScale = 1;
 const progressNotificationQueue = [];
 let isProgressShowing = false;
+let pendingPlatinumNotification = null;
+let platinumAwaitingNormal = false;
+let platinumFallbackTimer = null;
 
 function queueAchievementNotification(achievement) {
   const prefs = cachedPreferences || {};
@@ -1416,20 +2487,45 @@ function queueAchievementNotification(achievement) {
   const displayName = getSafeLocalizedText(achievement.displayName, lang);
   const description = getSafeLocalizedText(achievement.description, lang);
 
+  const resolvedPreset =
+    achievement.preset || selectedPreset || prefs.preset || "default";
+  const resolvedPosition =
+    achievement.position ||
+    selectedPosition ||
+    prefs.position ||
+    "center-bottom";
+  const resolvedSound =
+    achievement.sound || selectedSound || prefs.sound || "mute";
+  const resolvedSkipScreenshot =
+    achievement.skipScreenshot === true
+      ? true
+      : prefs.disableAchievementScreenshot === true;
+
   const notificationData = {
     displayName: displayName || "",
     description: description || "",
     icon: achievement.icon,
     icon_gray: achievement.icon_gray || achievement.icongray,
     config_path: achievement.config_path,
-    preset: achievement.preset,
-    position: achievement.position,
-    sound: achievement.sound,
+    preset: resolvedPreset,
+    position: resolvedPosition,
+    sound: resolvedSound,
     scale: parseFloat(achievement.scale || 1),
-    skipScreenshot: !!achievement.skipScreenshot,
+    skipScreenshot: resolvedSkipScreenshot,
     isTest: !!achievement.isTest,
   };
 
+  notificationLogger.info("queue-achievement", {
+    displayName: notificationData.displayName,
+    preset: notificationData.preset || "default",
+    position: notificationData.position || "center-bottom",
+    config: notificationData.config_path || null,
+    test: notificationData.isTest || false,
+  });
+  const isPlatinum = achievement.__isPlatinum === true;
+  if (!isPlatinum && pendingPlatinumNotification) {
+    platinumAwaitingNormal = false;
+  }
   earnedNotificationQueue.push(notificationData);
   processNextNotification();
 }
@@ -1466,6 +2562,13 @@ function processNextNotification() {
     iconPathFinal = ICON_PATH;
   }
   notificationData.iconPath = iconPathFinal;
+  notificationLogger.info("show-notification", {
+    displayName: notificationData.displayName,
+    preset: notificationData.preset || "default",
+    position: notificationData.position || "center-bottom",
+    config: notificationData.config_path || null,
+    iconResolved: iconPathFinal,
+  });
 
   const preset = achievement.preset || "default";
   // Check in both scalable and non-scalable folders
@@ -1532,8 +2635,13 @@ function processNextNotification() {
   }
 
   notificationWindow.on("closed", () => {
+    windowLogger.info("create-notification-window:closed", {
+      preset: notificationData.preset || "default",
+      position: notificationData.position || "center-bottom",
+    });
     isNotificationShowing = false;
     processNextNotification();
+    flushPendingPlatinum();
   });
 
   setTimeout(() => {
@@ -1543,7 +2651,51 @@ function processNextNotification() {
   }, duration);
 }
 
+function flushPendingPlatinum() {
+  if (
+    pendingPlatinumNotification &&
+    !platinumAwaitingNormal &&
+    !isNotificationShowing &&
+    earnedNotificationQueue.length === 0
+  ) {
+    queueAchievementNotification(pendingPlatinumNotification);
+    pendingPlatinumNotification = null;
+    if (platinumFallbackTimer) {
+      clearTimeout(platinumFallbackTimer);
+      platinumFallbackTimer = null;
+    }
+  } else if (
+    !pendingPlatinumNotification &&
+    !isNotificationShowing &&
+    earnedNotificationQueue.length === 0 &&
+    pendingPlatinumByConfig.size > 0
+  ) {
+    const [key, payload] = pendingPlatinumByConfig.entries().next().value || [];
+    if (key) pendingPlatinumByConfig.delete(key);
+    if (payload) {
+      queuePlatinumAfterCurrent(payload);
+    }
+  }
+}
+
+function queuePlatinumAfterCurrent(notificationData) {
+  pendingPlatinumNotification = notificationData;
+  platinumAwaitingNormal = true;
+  if (platinumFallbackTimer) clearTimeout(platinumFallbackTimer);
+  platinumFallbackTimer = setTimeout(() => {
+    platinumAwaitingNormal = false;
+    flushPendingPlatinum();
+  }, 300);
+  flushPendingPlatinum();
+}
+
 function queueProgressNotification(data) {
+  notificationLogger.info("queue-progress", {
+    displayName: data?.displayName || "",
+    progress: data?.progress ?? null,
+    max: data?.max_progress ?? null,
+    config: data?.config_path || null,
+  });
   progressNotificationQueue.push(data);
   processNextProgressNotification();
 }
@@ -1582,11 +2734,25 @@ function loadPreviousAchievements(configName) {
   const cachePath = getCachePath(configName);
   if (fs.existsSync(cachePath)) {
     try {
-      return JSON.parse(fs.readFileSync(cachePath, "utf8"));
+      const data = JSON.parse(fs.readFileSync(cachePath, "utf8"));
+      persistenceLogger.info("load-achievement-cache:hit", {
+        config: configName,
+        path: cachePath,
+        count: data ? Object.keys(data).length : 0,
+      });
+      return data;
     } catch (e) {
       notifyError("Error reading achievement cache: " + e.message);
+      persistenceLogger.error("load-achievement-cache:error", {
+        config: configName,
+        error: e.message,
+      });
     }
   }
+  persistenceLogger.info("load-achievement-cache:miss", {
+    config: configName,
+    path: cachePath,
+  });
   return {};
 }
 
@@ -1594,8 +2760,17 @@ function savePreviousAchievements(configName, data) {
   const cachePath = getCachePath(configName);
   try {
     fs.writeFileSync(cachePath, JSON.stringify(data, null, 2));
+    persistenceLogger.info("save-achievement-cache", {
+      config: configName,
+      path: cachePath,
+      count: data ? Object.keys(data).length : 0,
+    });
   } catch (e) {
     notifyError("Error reading achievement cache: " + e.message);
+    persistenceLogger.error("save-achievement-cache:error", {
+      config: configName,
+      error: e.message,
+    });
   }
 }
 
@@ -1626,6 +2801,39 @@ function readJsonWithRetries(filePath, maxTries = 12, baseDelayMs = 45) {
     }
   }
   throw lastErr;
+}
+
+function findAchievementFileDeep(baseDir, maxDepth = 2) {
+  if (!isNonEmptyString(baseDir)) return null;
+  const targets = [
+    "achievements.json",
+    "achievements.ini",
+    "stats.bin",
+    "user_stats.ini",
+  ];
+  const targetLc = targets.map((t) => t.toLowerCase());
+  const stack = [{ dir: baseDir, depth: 0 }];
+  while (stack.length) {
+    const { dir, depth } = stack.pop();
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const ent of entries) {
+        if (ent.isFile() && targetLc.includes(ent.name.toLowerCase())) {
+          return path.join(dir, ent.name);
+        }
+      }
+      if (depth < maxDepth) {
+        for (const ent of entries) {
+          if (ent.isDirectory()) {
+            stack.push({ dir: path.join(dir, ent.name), depth: depth + 1 });
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return null;
 }
 
 function monitorAchievementsFile(filePath) {
@@ -1711,6 +2919,15 @@ function monitorAchievementsFile(filePath) {
 
     const isFirstTime = Object.keys(previousAchievements).length === 0;
     if (isFirstLoad && isFirstTime) {
+      const bootNotDoneYet = bootSeeding && global.bootDone !== true;
+      if (bootNotDoneYet) {
+        previousAchievements = { ...currentAchievements };
+        savePreviousAchievements(configName, previousAchievements);
+        isFirstLoad = false;
+        bootSeeding = false;
+        return;
+      }
+      bootSeeding = false;
       const earnedKeys = Object.keys(currentAchievements).filter(
         (key) =>
           currentAchievements[key].earned === true ||
@@ -1925,9 +3142,15 @@ function monitorAchievementsFile(filePath) {
       fs.watchFile(filePath, { interval: 1000 }, achievementsWatcher);
     } else {
       const baseDir = path.dirname(filePath);
+      const tenokePath = path.join(baseDir, "SteamData", "user_stats.ini");
       const iniPath = path.join(baseDir, "achievements.ini");
       const onlineFixIniPath = path.join(baseDir, "Stats", "achievements.ini");
       const binPath = path.join(baseDir, "stats.bin");
+
+      if (fs.existsSync(tenokePath)) {
+        monitorAchievementsFile(tenokePath);
+        return;
+      }
 
       if (fs.existsSync(iniPath)) {
         monitorAchievementsFile(iniPath);
@@ -1944,6 +3167,7 @@ function monitorAchievementsFile(filePath) {
         return;
       }
 
+      // Retry discovery later in case the save file appears after config load
       setTimeout(checkFileLoop, 1000);
     }
   };
@@ -1952,12 +3176,6 @@ function monitorAchievementsFile(filePath) {
 }
 
 let fullAchievementsConfigPath;
-let selectedConfigPath = null;
-let selectedConfig = null;
-let selectedSound = "mute";
-let selectedPreset = "default";
-let selectedPosition = "center-bottom";
-
 ipcMain.on("update-config", (event, { configName, preset, position }) => {
   const safeName = configName ? sanitizeConfigName(configName) : null;
 
@@ -1982,6 +3200,16 @@ ipcMain.on("update-config", (event, { configName, preset, position }) => {
     config = JSON.parse(fs.readFileSync(cfgFile, "utf-8"));
   } catch (err) {
     notifyError("Error reading configPath: " + err.message);
+    return;
+  }
+
+  const appIdString = config?.appid != null ? String(config.appid).trim() : "";
+
+  if (appIdString && isAppIdBlacklisted(appIdString)) {
+    ipcLogger.info("update-config:ignored-blacklisted", {
+      configName: configName || null,
+      appid: appIdString,
+    });
     return;
   }
 
@@ -2033,16 +3261,40 @@ ipcMain.on("update-config", (event, { configName, preset, position }) => {
 
   const saveJsonPath = resolveSaveFilePath(saveBase, appid);
   const {
+    tenokeIni: tenokeIniPath,
     ini: iniPath,
     ofx: onlineFixIniPath,
     bin: binPath,
   } = resolveSaveSidecarPaths(saveBase, appid);
 
   if (fs.existsSync(saveJsonPath)) achievementsFilePath = saveJsonPath;
+  else if (tenokeIniPath) achievementsFilePath = tenokeIniPath;
   else if (onlineFixIniPath) achievementsFilePath = onlineFixIniPath;
   else if (iniPath) achievementsFilePath = iniPath;
   else if (binPath) achievementsFilePath = binPath;
   else achievementsFilePath = saveJsonPath; // fallback
+
+  if (
+    (!achievementsFilePath || !fs.existsSync(achievementsFilePath)) &&
+    isNonEmptyString(saveBase)
+  ) {
+    const deep = findAchievementFileDeep(saveBase, 2);
+    if (deep) {
+      achievementsFilePath = deep;
+      try {
+        const cfgFile = path.join(configsDir, `${safeName}.json`);
+        if (fs.existsSync(cfgFile)) {
+          const raw = fs.readFileSync(cfgFile, "utf8");
+          const data = JSON.parse(raw);
+          data.save_path = path.dirname(deep);
+          fs.writeFileSync(cfgFile, JSON.stringify(data, null, 2));
+          selectedConfigPath = isNonEmptyString(data.config_path)
+            ? data.config_path
+            : null;
+        }
+      } catch {}
+    }
+  }
 
   monitorAchievementsFile(achievementsFilePath);
 
@@ -2107,7 +3359,10 @@ ipcMain.handle("get-config-by-name", async (_event, name) => {
           ].filter(Boolean);
 
           const ok = nameCandidates.some((val) => {
-            if (/^\d+$/.test(target) && /^\d+$/.test(String(val || ""))) {
+            if (
+              /^[0-9a-fA-F]+$/.test(target) &&
+              /^[0-9a-fA-F]+$/.test(String(val || ""))
+            ) {
               return String(val) === target;
             }
             return matchName(val);
@@ -2135,7 +3390,7 @@ ipcMain.handle("get-config-by-name", async (_event, name) => {
     }
 
     const appid = String(data?.appid || data?.appId || data?.steamAppId || "");
-    const hasAppId = /^\d+$/.test(appid);
+    const hasAppId = /^[0-9a-fA-F]+$/.test(appid);
     const hasConfigPath = isNonEmptyString(data?.config_path);
 
     const probe = [];
@@ -2157,24 +3412,43 @@ ipcMain.handle("get-config-by-name", async (_event, name) => {
     }
 
     if (!foundSchemaPath && hasAppId) {
-      const candidateDir = path.join(configsDir, "schema", appid);
-      const candidateJson = path.join(candidateDir, "achievements.json");
-      if (!fs.existsSync(candidateJson))
-        await waitForPathExists(candidateJson, 80, 60);
-      if (
-        fs.existsSync(candidateJson) &&
-        looksLikeSchemaArray(readJsonSafe(candidateJson))
-      ) {
-        data.config_path = candidateDir;
-        try {
-          const now = readJsonWithRetries(configPath, 3, 40);
-          if (now.config_path !== candidateDir) {
-            now.config_path = candidateDir;
-            fs.writeFileSync(configPath, JSON.stringify(now, null, 2));
-            data = now;
-          }
-        } catch {}
-        foundSchemaPath = candidateJson;
+      const schemaBase = path.join(configsDir, "schema");
+      const platformDir = resolveSchemaDirForPlatform(appid, data?.platform);
+      const platformJson = path.join(platformDir, "achievements.json");
+      const legacyDir = path.join(schemaBase, appid);
+      const legacyJson = path.join(legacyDir, "achievements.json");
+      const candidates = [
+        { dir: platformDir, file: platformJson },
+        { dir: legacyDir, file: legacyJson, legacy: true },
+      ];
+      for (const candidate of candidates) {
+        if (candidate.legacy && candidate.dir !== platformDir) {
+          try {
+            fs.mkdirSync(platformDir, { recursive: true });
+            fs.renameSync(candidate.dir, platformDir);
+            candidate.dir = platformDir;
+            candidate.file = path.join(platformDir, "achievements.json");
+          } catch {}
+        }
+        if (!fs.existsSync(candidate.file)) {
+          await waitForPathExists(candidate.file, 40, 60);
+        }
+        if (
+          fs.existsSync(candidate.file) &&
+          looksLikeSchemaArray(readJsonSafe(candidate.file))
+        ) {
+          data.config_path = candidate.dir;
+          try {
+            const now = readJsonWithRetries(configPath, 3, 40);
+            if (now.config_path !== candidate.dir) {
+              now.config_path = candidate.dir;
+              fs.writeFileSync(configPath, JSON.stringify(now, null, 2));
+              data = now;
+            }
+          } catch {}
+          foundSchemaPath = candidate.file;
+          break;
+        }
       }
     }
 
@@ -2233,12 +3507,23 @@ ipcMain.handle("renameAndSaveConfig", async (event, oldName, newConfig) => {
     const newConfigPath = path.join(configsDir, `${safeNew}.json`);
     const oldCachePath = getCachePath(safeOld);
     const newCachePath = getCachePath(safeNew);
+    let prevConfig = null;
+    if (fs.existsSync(oldConfigPath)) {
+      try {
+        prevConfig = JSON.parse(fs.readFileSync(oldConfigPath, "utf8"));
+      } catch {}
+    }
 
     if (safeOld !== safeNew && fs.existsSync(oldConfigPath)) {
       fs.renameSync(oldConfigPath, newConfigPath);
     }
 
+    const exePath = isNonEmptyString(newConfig.executable)
+      ? newConfig.executable
+      : null;
+
     const payload = {
+      ...prevConfig, // preserve custom fields like platinum
       ...newConfig,
       name: safeNew,
       displayName: newConfig.displayName || newConfig.name,
@@ -2248,23 +3533,50 @@ ipcMain.handle("renameAndSaveConfig", async (event, oldName, newConfig) => {
       save_path: isNonEmptyString(newConfig.save_path)
         ? newConfig.save_path
         : null,
-      executable: isNonEmptyString(newConfig.executable)
-        ? newConfig.executable
-        : null,
+      executable: exePath,
       arguments: isNonEmptyString(newConfig.arguments)
         ? newConfig.arguments
         : "",
       process_name: isNonEmptyString(newConfig.process_name)
         ? newConfig.process_name
+        : exePath
+        ? path.basename(exePath)
         : "",
     };
 
+    const sanitizedAppId = sanitizeAppId(payload.appid);
+    if (!sanitizedAppId) {
+      return { success: false, message: "AppID is required." };
+    }
+    if (isAppIdBlacklisted(sanitizedAppId)) {
+      const message = `AppID ${sanitizedAppId} is blacklisted. Remove it to continue.`;
+      ipcLogger.info("renameConfig:blocked-blacklist", {
+        appid: sanitizedAppId,
+        oldName: safeOld,
+        newName: safeNew,
+      });
+      return { success: false, message, blacklisted: true };
+    }
+    payload.appid = sanitizedAppId;
+
+    applyConfigPlatformDefaults(payload);
+    const prevPlatform = normalizePlatform(prevConfig?.platform) || null;
+    let nextPlatform = normalizePlatform(payload.platform) || null;
+    if (!nextPlatform && /[a-f]/i.test(String(payload.appid || ""))) {
+      nextPlatform = "epic";
+    }
+    nextPlatform = nextPlatform || "steam";
+    payload.platform = nextPlatform;
+
     // missing config_path, generate and set path
-    if (!payload.config_path && /^\d+$/.test(String(payload.appid || ""))) {
+    if (
+      !payload.config_path &&
+      /^[0-9a-fA-F]+$/.test(String(payload.appid || ""))
+    ) {
       try {
         global.mainWindow = BrowserWindow.fromWebContents(event.sender);
       } catch {}
-      const res = await ensureSchemaForApp(payload.appid);
+      const res = await ensureSchemaForApp(payload.appid, payload.platform);
       if (res && res.dir) payload.config_path = res.dir;
     }
     try {
@@ -2277,7 +3589,7 @@ ipcMain.handle("renameAndSaveConfig", async (event, oldName, newConfig) => {
       if (
         isNonEmptyString(selForSave) &&
         fs.existsSync(selForSave) &&
-        /^\d+$/.test(String(payload.appid || ""))
+        /^[0-9a-fA-F]+$/.test(String(payload.appid || ""))
       ) {
         const detectedBase = findSaveBaseFromSelection(
           selForSave,
@@ -2291,6 +3603,37 @@ ipcMain.handle("renameAndSaveConfig", async (event, oldName, newConfig) => {
     if (fs.existsSync(oldCachePath)) {
       fs.renameSync(oldCachePath, newCachePath);
     }
+
+    const managesSchemaPath = isManagedSchemaPath(prevConfig?.config_path);
+    if (
+      prevPlatform &&
+      prevPlatform !== nextPlatform &&
+      managesSchemaPath &&
+      /^[0-9a-fA-F]+$/.test(String(payload.appid || ""))
+    ) {
+      ipcLogger.info("config:platform-change", {
+        name: safeNew,
+        appid: payload.appid,
+        from: prevPlatform,
+        to: nextPlatform,
+      });
+      try {
+        const res = await ensureSchemaForApp(payload.appid, nextPlatform);
+        if (res?.dir) {
+          const current = JSON.parse(fs.readFileSync(newConfigPath, "utf8"));
+          if (current.config_path !== res.dir) {
+            current.config_path = res.dir;
+            fs.writeFileSync(newConfigPath, JSON.stringify(current, null, 2));
+          }
+        }
+      } catch (err) {
+        ipcLogger.warn("renameConfig:schema-sync-failed", {
+          appid: payload.appid,
+          error: err?.message || String(err),
+        });
+      }
+    }
+
     notifyConfigsChanged();
     return {
       success: true,
@@ -2314,6 +3657,9 @@ ipcMain.on("close-notification-window", (event) => {
 let overlayWindow = null;
 
 function createOverlayWindow(selectedConfig) {
+  windowLogger.info("create-overlay:start", {
+    selectedConfig: selectedConfig || null,
+  });
   const { width, height } =
     require("electron").screen.getPrimaryDisplay().workAreaSize;
 
@@ -2337,64 +3683,34 @@ function createOverlayWindow(selectedConfig) {
       backgroundThrottling: false,
     },
   });
+  windowLogger.info("create-overlay:browserwindow-created", {
+    width: 450,
+    height: 950,
+    position: { x: width - 470, y: 20 },
+  });
 
   overlayWindow.setAlwaysOnTop(true, "screen-saver");
   overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   overlayWindow.setFullScreenable(false);
   overlayWindow.setFocusable(false);
   overlayWindow.blur();
-  const ICON_URL = pathToFileURL(ICON_PATH).toString();
-  overlayWindow.loadFile("overlay.html", { query: { icon: ICON_URL } });
+  const iconUrl = pathToFileURL(ICON_PNG_PATH).toString();
+  overlayWindow.loadFile("overlay.html", { query: { icon: iconUrl } });
+  windowLogger.info("create-overlay:load-file", { icon: iconUrl });
 
   overlayWindow.webContents.on("did-finish-load", () => {
+    windowLogger.info("create-overlay:did-finish-load", {
+      selectedConfig: selectedConfig || null,
+    });
     overlayWindow.webContents.send("load-overlay-data", selectedConfig);
     overlayWindow.webContents.send("set-language", selectedLanguage);
   });
 
   overlayWindow.on("closed", () => {
+    windowLogger.info("create-overlay:closed");
     overlayWindow = null;
   });
 }
-
-app.whenReady().then(async () => {
-  try {
-    const prefs = fs.existsSync(preferencesPath)
-      ? JSON.parse(fs.readFileSync(preferencesPath, "utf-8"))
-      : {};
-
-    if (prefs.language) {
-      selectedLanguage = prefs.language;
-    }
-  } catch (err) {
-    notifyError("❌ Failed to load language preference: " + err.message);
-  }
-
-  let overlayShortcut = null;
-
-  try {
-    const prefs = fs.existsSync(preferencesPath)
-      ? JSON.parse(fs.readFileSync(preferencesPath, "utf-8"))
-      : {};
-
-    overlayShortcut = prefs.overlayShortcut || null;
-
-    selectedLanguage = prefs.language || "english";
-
-    if (overlayShortcut) {
-      registerOverlayShortcut(overlayShortcut);
-    }
-  } catch (err) {
-    notifyError("❌ Failed to load preferences: " + err.message);
-  }
-
-  let registeredShortcut = null;
-
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createMainWindow();
-    }
-  });
-});
 
 ipcMain.handle("selectExecutable", async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
@@ -2405,7 +3721,12 @@ ipcMain.handle("selectExecutable", async () => {
 
 ipcMain.handle("launchExecutable", async (_event, exePath, argsString) => {
   try {
-    const args = argsString.trim().match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+    if (!exePath) {
+      notifyError("? No executable path provided.");
+      return;
+    }
+    const argStr = String(argsString || "").trim();
+    const args = argStr ? argStr.match(/(?:[^\s"]+|"[^"]*")+/g) || [] : [];
 
     const child = spawn(exePath, args, {
       cwd: path.dirname(exePath),
@@ -2519,8 +3840,11 @@ app.whenReady().then(async () => {
       ? JSON.parse(fs.readFileSync(preferencesPath, "utf-8"))
       : {};
 
-    if (prefs.language) {
-      selectedLanguage = prefs.language;
+    selectedLanguage = prefs.language || selectedLanguage;
+    const overlayShortcut = prefs.overlayShortcut || null;
+    global.overlayShortcut = overlayShortcut;
+    if (overlayShortcut) {
+      registerOverlayShortcut(overlayShortcut);
     }
     global.disableProgress = prefs.disableProgress === true;
     global.disablePlaytime = prefs.disablePlaytime === true;
@@ -2546,6 +3870,10 @@ app.whenReady().then(async () => {
 });
 
 function showProgressNotification(data) {
+  windowLogger.info("create-progress-window:start", {
+    displayName: data?.displayName || "",
+    config: data?.config_path || null,
+  });
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   const progressWindow = new BrowserWindow({
     width: 350,
@@ -2574,8 +3902,19 @@ function showProgressNotification(data) {
   progressWindow.setFullScreenable(false);
   progressWindow.setFocusable(false);
   progressWindow.loadFile("progress.html");
+  windowLogger.info("create-progress-window:browserwindow-created", {
+    size: { width: 350, height: 150 },
+    position: { x: 20, y: height - 140 },
+  });
 
   progressWindow.once("ready-to-show", () => {
+    notificationLogger.info("show-progress", {
+      displayName: data?.displayName || "",
+      progress: data?.progress ?? null,
+      max: data?.max_progress ?? null,
+      config: data?.config_path || null,
+    });
+    windowLogger.info("create-progress-window:ready-to-show");
     progressWindow.show();
     progressWindow.webContents.send("show-progress", data);
   });
@@ -2601,12 +3940,7 @@ ipcMain.on("disable-playtime-check", (event) => {
 ipcMain.on("set-disable-playtime", (_event, value) => {
   global.disablePlaytime = !!value;
   try {
-    global.disablePlaytime = !!value;
-    const cur = fs.existsSync(preferencesPath)
-      ? JSON.parse(fs.readFileSync(preferencesPath, "utf8"))
-      : {};
-    cur.disablePlaytime = !!value;
-    fs.writeFileSync(preferencesPath, JSON.stringify(cur, null, 2));
+    updatePreferences({ disablePlaytime: !!value });
   } catch (err) {
     notifyError("❌ Failed to persist disablePlaytime: " + err.message);
   }
@@ -2661,6 +3995,10 @@ ipcMain.on("show-playtime", (_event, playData) => {
 });
 
 function createPlaytimeWindow(playData = {}) {
+  windowLogger.info("create-playtime-window:start", {
+    displayName: playData?.displayName || playData?.name || null,
+    phase: playData?.phase || "start",
+  });
   const phase = playData.phase || "start";
 
   try {
@@ -2674,6 +4012,9 @@ function createPlaytimeWindow(playData = {}) {
 
   if (playtimeWindow && !playtimeWindow.isDestroyed()) {
     if (!playtimeAlreadyClosing) {
+      windowLogger.info("create-playtime-window:reuse", {
+        reason: "closing-existing",
+      });
       playtimeAlreadyClosing = true;
       pendingPlayData = normalizePlayPayload(playData);
       try {
@@ -2722,6 +4063,10 @@ function createPlaytimeWindow(playData = {}) {
       backgroundThrottling: false,
     },
   });
+  windowLogger.info("create-playtime-window:browserwindow-created", {
+    size: { width: winWidth, height: winHeight },
+    position: { x, y },
+  });
   playtimeWindow.setIgnoreMouseEvents(true, { forward: true });
   playtimeWindow.setAlwaysOnTop(true, "screen-saver");
   playtimeWindow.setVisibleOnAllWorkspaces(true);
@@ -2741,6 +4086,11 @@ function createPlaytimeWindow(playData = {}) {
       pendingPlayData = null;
       playtimeAlreadyClosing = false;
       playtimeWindow.show();
+      windowLogger.info("create-playtime-window:dom-ready", {
+        displayName: payload.displayName,
+        phase: payload.phase,
+        scale,
+      });
       playtimeWindow.webContents.send("show-playtime", payload);
     } catch (err) {
       console.error("[playtime] send failed:", err.message);
@@ -2760,6 +4110,7 @@ function createPlaytimeWindow(playData = {}) {
   });
 
   playtimeWindow.on("closed", () => {
+    windowLogger.info("create-playtime-window:closed");
     playtimeWindow = null;
     playtimeAlreadyClosing = false;
     pendingPlayData = null;
@@ -2768,6 +4119,29 @@ function createPlaytimeWindow(playData = {}) {
 
 ipcMain.on("queue-achievement-notification", (_event, payload) => {
   try {
+    const configName =
+      payload?.configName || payload?.config_name || selectedConfig || null;
+    const achKey =
+      payload?.name ||
+      (typeof payload?.displayName === "string" ? payload.displayName : null);
+    if (configName && achKey) {
+      const prev = loadPreviousAchievements(configName) || {};
+      const prevEntry = prev[achKey];
+      const incomingProg = Number(payload.progress);
+      const prevProg = Number(prevEntry?.progress);
+      const prevMax = Number(prevEntry?.max_progress);
+      const maxProg = Number(payload.max_progress);
+      if (prevEntry?.earned === true) return;
+      if (
+        Number.isFinite(incomingProg) &&
+        Number.isFinite(prevProg) &&
+        incomingProg <= prevProg &&
+        (Number.isNaN(maxProg) || maxProg === prevMax)
+      ) {
+        return;
+      }
+    }
+
     queueAchievementNotification(payload);
   } catch (err) {
     notifyError(`queue-achievement-notification failed: ${err.message}`);
@@ -2776,6 +4150,29 @@ ipcMain.on("queue-achievement-notification", (_event, payload) => {
 
 ipcMain.on("queue-progress-notification", (_event, payload) => {
   try {
+    const configName =
+      payload?.configName || payload?.config_name || selectedConfig || null;
+    const achKey =
+      payload?.name ||
+      (typeof payload?.displayName === "string" ? payload.displayName : null);
+    if (configName && achKey) {
+      const prev = loadPreviousAchievements(configName) || {};
+      const prevEntry = prev[achKey];
+      const incomingProg = Number(payload.progress);
+      const prevProg = Number(prevEntry?.progress);
+      const prevMax = Number(prevEntry?.max_progress);
+      const maxProg = Number(payload.max_progress);
+      if (prevEntry?.earned === true) return;
+      if (
+        Number.isFinite(incomingProg) &&
+        Number.isFinite(prevProg) &&
+        incomingProg <= prevProg &&
+        (Number.isNaN(maxProg) || maxProg === prevMax)
+      ) {
+        return;
+      }
+    }
+
     queueProgressNotification(payload);
   } catch (err) {
     notifyError(`queue-progress-notification failed: ${err.message}`);
@@ -2953,6 +4350,13 @@ const {
   buildCrcNameMap,
   resolveConfigSchemaPath,
 } = require("./utils/achievement-data");
+const {
+  migrateConfigPlatforms,
+  normalizePlatform,
+  sanitizeAppId,
+  inferPlatformAndSteamId,
+  migrateSchemaStorage,
+} = require("./utils/config-platform-migrator");
 ipcMain.handle("parse-stats-bin", async (_event, filePath) => {
   try {
     const parseStatsBin = require("./utils/parseStatsBin");
@@ -2962,6 +4366,297 @@ ipcMain.handle("parse-stats-bin", async (_event, filePath) => {
     throw err;
   }
 });
+
+const defaultUplaySteamMapPath = path.join(
+  __dirname,
+  "assets",
+  "uplay-steam.json"
+);
+const runtimeUplaySteamMapPath = path.join(
+  app.getPath("userData"),
+  "uplay-steam.json"
+);
+function ensureRuntimeUplayMap() {
+  try {
+    if (fs.existsSync(runtimeUplaySteamMapPath)) return;
+    fs.mkdirSync(path.dirname(runtimeUplaySteamMapPath), { recursive: true });
+    if (fs.existsSync(defaultUplaySteamMapPath)) {
+      fs.copyFileSync(defaultUplaySteamMapPath, runtimeUplaySteamMapPath);
+    } else {
+      fs.writeFileSync(runtimeUplaySteamMapPath, "[]", "utf8");
+    }
+  } catch (err) {
+    ipcLogger.warn("uplay-mapping:init-failed", {
+      error: err?.message || String(err),
+    });
+  }
+}
+function loadRuntimeUplayMap() {
+  try {
+    const raw = fs.readFileSync(runtimeUplaySteamMapPath, "utf8");
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    ipcLogger.warn("uplay-mapping:load-failed", {
+      error: err?.message || String(err),
+    });
+    return [];
+  }
+}
+function refreshRuntimeUplayMapping() {
+  try {
+    const script = path.join(__dirname, "utils", "match-uplay-steam.js");
+    execFileSync(
+      process.execPath,
+      ["--run-as-node", script, `--output=${runtimeUplaySteamMapPath}`],
+      {
+        windowsHide: true,
+        stdio: "ignore",
+      }
+    );
+    ipcLogger.info("uplay-mapping:refresh-success");
+  } catch (err) {
+    ipcLogger.warn("uplay-mapping:refresh-failed", {
+      error: err?.message || String(err),
+    });
+  }
+}
+function hydrateRuntimeMapping(rows) {
+  uplaySteamMap = Array.isArray(rows) ? rows : [];
+  uplayToSteam.clear();
+  for (const row of uplaySteamMap) {
+    if (row && row.uplay_id) {
+      uplayToSteam.set(String(row.uplay_id), row);
+    }
+  }
+}
+
+function refreshRuntimeUplayMappingAsync() {
+  if (refreshRuntimeUplayMappingAsync.inflight) return;
+  const script = path.join(__dirname, "utils", "match-uplay-steam.js");
+  refreshRuntimeUplayMappingAsync.inflight = true;
+  execFile(
+    process.execPath,
+    ["--run-as-node", script, `--output=${runtimeUplaySteamMapPath}`],
+    { windowsHide: true },
+    (err) => {
+      if (err) {
+        ipcLogger.warn("uplay-mapping:refresh-failed", {
+          error: err?.message || String(err),
+        });
+      } else {
+        try {
+          const rows = loadRuntimeUplayMap();
+          hydrateRuntimeMapping(rows);
+          ipcLogger.info("uplay-mapping:refresh-success", {
+            entries: uplaySteamMap.length,
+          });
+        } catch (reloadErr) {
+          ipcLogger.warn("uplay-mapping:refresh-reload-failed", {
+            error: reloadErr?.message || String(reloadErr),
+          });
+        }
+      }
+      refreshRuntimeUplayMappingAsync.inflight = false;
+    }
+  );
+}
+refreshRuntimeUplayMappingAsync.inflight = false;
+
+ensureRuntimeUplayMap();
+let uplaySteamMap = loadRuntimeUplayMap();
+const uplayToSteam = new Map();
+hydrateRuntimeMapping(uplaySteamMap);
+refreshRuntimeUplayMappingAsync();
+
+function applyConfigPlatformDefaults(payload = {}) {
+  if (!payload || typeof payload !== "object") return payload;
+  const sanitizedAppId =
+    sanitizeAppId(payload.appid) ||
+    sanitizeAppId(payload.appId) ||
+    sanitizeAppId(payload.steamAppId);
+  if (sanitizedAppId) {
+    payload.appid = sanitizedAppId;
+  }
+  const mapping = sanitizedAppId ? uplayToSteam.get(sanitizedAppId) : null;
+  const { platform, steamAppId } = inferPlatformAndSteamId({
+    config: payload,
+    mapping,
+  });
+  if (platform) payload.platform = platform;
+  else delete payload.platform;
+  if (steamAppId) payload.steamAppId = steamAppId;
+  else delete payload.steamAppId;
+  return payload;
+}
+
+const SCHEMA_ROOT_PATH = path.join(configsDir, "schema");
+const SCHEMA_PLATFORM_DIRS = ["steam", "uplay", "gog", "epic"];
+
+function normalizeStoragePlatform(platform) {
+  const normalized = normalizePlatform(platform);
+  if (normalized === "uplay") return "uplay";
+  if (normalized === "gog") return "gog";
+  if (normalized === "epic") return "epic";
+  return "steam";
+}
+
+function resolveSchemaDirForPlatform(appid, platform) {
+  const storagePlatform = normalizeStoragePlatform(platform);
+  return path.join(SCHEMA_ROOT_PATH, storagePlatform, String(appid));
+}
+
+function isManagedSchemaPath(p) {
+  if (!isNonEmptyString(p)) return true;
+  const normalized = path.normalize(p).toLowerCase();
+  return normalized.startsWith(path.normalize(SCHEMA_ROOT_PATH).toLowerCase());
+}
+
+function schemaPathMatchesPlatform(appid, platform, schemaPath) {
+  if (!isManagedSchemaPath(schemaPath)) return false;
+  const expected = resolveSchemaDirForPlatform(appid, platform);
+  return (
+    path.normalize(schemaPath || "").toLowerCase() ===
+    path.normalize(expected).toLowerCase()
+  );
+}
+const { updated: platformMetaUpdated, platformIndex: configPlatformIndex } =
+  migrateConfigPlatforms({
+    configsDir,
+    mappingByUplayId: uplayToSteam,
+    logger: persistenceLogger,
+  });
+if (platformMetaUpdated) {
+  persistenceLogger.info("platform-migrate:configs-updated", {
+    updated: platformMetaUpdated,
+  });
+}
+global.configPlatformIndex = configPlatformIndex;
+const { moved: schemaDirsMoved, updatedConfigs: schemaConfigsUpdated } =
+  migrateSchemaStorage({
+    configsDir,
+    platformIndex: configPlatformIndex,
+    logger: persistenceLogger,
+  });
+if (schemaDirsMoved || schemaConfigsUpdated) {
+  persistenceLogger.info("platform-migrate:schema-updated", {
+    moved: schemaDirsMoved,
+    configsUpdated: schemaConfigsUpdated,
+  });
+}
+
+function getPlatformForAppId(appid) {
+  const key = String(appid || "").trim();
+  if (!key) return "steam";
+  try {
+    const idx = global.configPlatformIndex;
+    const set = idx && typeof idx.get === "function" ? idx.get(key) : null;
+    if (!set || set.size === 0) return "steam";
+    const order = ["steam", "uplay", "gog", "epic"];
+    for (const p of order) {
+      if (set.has(p)) return p;
+    }
+    const first = set.values().next();
+    return first && typeof first.value === "string" ? first.value : "steam";
+  } catch {
+    return "steam";
+  }
+}
+
+function pickFresherPath(src, dest) {
+  try {
+    if (!fs.existsSync(dest)) return src;
+    const sStat = fs.statSync(src);
+    const dStat = fs.statSync(dest);
+    return sStat.mtimeMs >= dStat.mtimeMs ? src : dest;
+  } catch {
+    return src;
+  }
+}
+
+function migrateImagesToPlatformStorage() {
+  let imagesRoot;
+  try {
+    imagesRoot = path.join(app.getPath("userData"), "images");
+  } catch {
+    return;
+  }
+  if (!imagesRoot || !fs.existsSync(imagesRoot)) return;
+
+  const isNumeric = (name) => /^[0-9a-fA-F]+$/.test(String(name || ""));
+  const entries = fs.readdirSync(imagesRoot, { withFileTypes: true });
+
+  // Covers: images/<appid>.jpg -> images/<platform>/<appid>/<appid>.jpg
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    const m = entry.name.match(/^(\d+)\.jpg$/i);
+    if (!m) continue;
+    const appid = m[1];
+    const platform = getPlatformForAppId(appid);
+    const src = path.join(imagesRoot, entry.name);
+    const destDir = path.join(imagesRoot, platform, appid);
+    const dest = path.join(destDir, `${appid}.jpg`);
+    try {
+      fs.mkdirSync(destDir, { recursive: true });
+      const preferred = pickFresherPath(src, dest);
+      if (preferred === src) {
+        fs.renameSync(src, dest);
+      } else {
+        fs.unlinkSync(src);
+      }
+    } catch (err) {
+      ipcLogger?.warn?.("images:migrate-cover-failed", {
+        appid,
+        platform,
+        error: err?.message || String(err),
+      });
+    }
+  }
+
+  // Headers/other per-app folders: images/<appid>/header.jpg -> images/<platform>/<appid>/header.jpg
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const appid = entry.name;
+    if (!isNumeric(appid)) continue;
+    const srcDir = path.join(imagesRoot, appid);
+    const platform = getPlatformForAppId(appid);
+    const destDir = path.join(imagesRoot, platform, appid);
+    try {
+      const files = fs.readdirSync(srcDir);
+      fs.mkdirSync(destDir, { recursive: true });
+      for (const file of files || []) {
+        const src = path.join(srcDir, file);
+        const dest = path.join(destDir, file);
+        try {
+          const preferred = pickFresherPath(src, dest);
+          if (preferred === src) {
+            fs.renameSync(src, dest);
+          } else {
+            fs.unlinkSync(src);
+          }
+        } catch (moveErr) {
+          ipcLogger?.warn?.("images:migrate-header-failed", {
+            appid,
+            file,
+            platform,
+            error: moveErr?.message || String(moveErr),
+          });
+        }
+      }
+      try {
+        fs.rmdirSync(srcDir);
+      } catch {}
+    } catch (err) {
+      ipcLogger?.warn?.("images:migrate-dir-failed", {
+        appid,
+        platform,
+        error: err?.message || String(err),
+      });
+    }
+  }
+}
+
+migrateImagesToPlatformStorage();
 
 ipcMain.handle("select-file", async () => {
   const result = await dialog.showOpenDialog({ properties: ["openFile"] });
@@ -2984,6 +4679,7 @@ ipcMain.handle("generate-auto-configs", async (event, folderPath) => {
   const outputDir = configsDir;
   global.mainWindow = BrowserWindow.fromWebContents(event.sender);
   try {
+    ensureSteamApiKeyFileFromPrefs();
     const result = await generateGameConfigs(folderPath, outputDir, {
       onSeedCache: ({ appid, configName, snapshot }) => {
         try {
@@ -3042,16 +4738,41 @@ ipcMain.handle("startup:set-start-with-windows", async (_e, enabled) => {
   return true;
 });
 
-const { fetchSteamDbLibraryCover } = require("./utils/steamdb-cover");
+const {
+  fetchSteamDbLibraryCover,
+  fetchSteamGridDbImage,
+} = require("./utils/game-cover");
 
 ipcMain.handle("covers:steamdb", async (_evt, appid) => {
   try {
-    const url = await fetchSteamDbLibraryCover(String(appid));
+    const mapping = uplayToSteam.get(String(appid));
+    const steamAppId = mapping?.steam_appid
+      ? String(mapping.steam_appid)
+      : String(appid);
+    const url = await fetchSteamDbLibraryCover(String(steamAppId));
     return { ok: true, url };
   } catch (err) {
     const notFound = err && err.tag === Symbol.for("steamdb-miss");
     return { ok: false, notFound, message: String(err?.message || err) };
   }
+});
+
+ipcMain.handle("covers:steamgriddb", async (_evt, payload = {}) => {
+  try {
+    const term = String(payload?.term || "").trim();
+    if (!term) throw new Error("term-required");
+    const size = payload?.size || "600x900";
+    const url = await fetchSteamGridDbImage(term, { size });
+    return { ok: true, url };
+  } catch (err) {
+    const notFound = err && err.tag === Symbol.for("steamgriddb-miss");
+    return { ok: false, notFound, message: String(err?.message || err) };
+  }
+});
+
+ipcMain.handle("uplay:steam-appid", async (_evt, appid) => {
+  const mapping = uplayToSteam.get(String(appid));
+  return mapping?.steam_appid ? String(mapping.steam_appid) : null;
 });
 
 const {
@@ -3073,17 +4794,37 @@ ipcMain.handle("playtime:get-total", async (_event, configName) => {
   return { totalMs: getPlaytimeTotal(safe) };
 });
 
+ipcMain.handle("covers:ui-log", async (_event, payload = {}) => {
+  const level = ["info", "warn", "error"].includes(
+    String(payload.level || "").toLowerCase()
+  )
+    ? String(payload.level || "").toLowerCase()
+    : "info";
+  const message = String(payload.message || "").trim();
+  const meta =
+    payload.meta && typeof payload.meta === "object" ? payload.meta : {};
+  try {
+    coverUiLogger[level](
+      message || "covers:ui-log",
+      Object.keys(meta).length ? meta : undefined
+    );
+  } catch {}
+  return true;
+});
+
 const makeWatchedFolders = require("./utils/watched-folders");
 
-makeWatchedFolders({
+watchedFoldersApi = makeWatchedFolders({
   app,
   ipcMain,
   BrowserWindow,
   preferencesPath,
+  updatePreferences,
   configsDir,
   generateGameConfigs,
   generateConfigForAppId,
   notifyWarn: (m) => console.warn(m),
+  requestDashboardRefresh,
   onSeedCache: ({ appid, configName, snapshot }) => {
     try {
       savePreviousAchievements(configName, snapshot);
@@ -3110,6 +4851,7 @@ makeWatchedFolders({
   },
   isConfigActive: (name) =>
     sanitizeConfigName(name) === sanitizeConfigName(selectedConfig),
+  onPlatinumComplete: handlePlatinumComplete,
 });
 
 // === screenshots support ===
@@ -3127,9 +4869,86 @@ function readPrefsSafe() {
     return fs.existsSync(preferencesPath)
       ? JSON.parse(fs.readFileSync(preferencesPath, "utf8"))
       : {};
-  } catch {
+  } catch (err) {
+    prefsLogger.error("read-preferences:error", { error: err.message });
     return {};
   }
+}
+ipcMain.handle("platinum:manual", async (_event, payload = {}) => {
+  const {
+    configName = "",
+    appid = null,
+    savePath = null,
+    configPath = null,
+    suppressNotify = false,
+  } = payload || {};
+  const flagged = markConfigPlatinumFlag(configName);
+  const alreadyFlagged = flagged === false;
+  if (
+    !suppressNotify &&
+    !cachedPreferences.disablePlatinum &&
+    !alreadyFlagged
+  ) {
+    handlePlatinumComplete({
+      configName,
+      appid,
+      savePath,
+      configPath,
+      isActive: false,
+    });
+  }
+  return { flagged: flagged || alreadyFlagged };
+});
+// Flag already-complete configs at boot to avoid retroactive platinum popups
+async function flagPlatinumFromCacheOnBoot() {
+  try {
+    const files = fs
+      .readdirSync(configsDir)
+      .filter((f) => f.toLowerCase().endsWith(".json"));
+    for (const file of files) {
+      const name = path.basename(file, ".json");
+      const configPath = path.join(configsDir, file);
+      let config = null;
+      try {
+        const raw = fs.readFileSync(configPath, "utf8");
+        config = JSON.parse(raw);
+      } catch {
+        continue;
+      }
+      const schemaPath = resolveConfigSchemaPath(config);
+      if (!schemaPath || !fs.existsSync(schemaPath)) continue;
+      let schema = null;
+      try {
+        schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+      } catch {
+        continue;
+      }
+      const schemaNames = Array.isArray(schema)
+        ? schema
+            .map((a) => (a && a.name ? String(a.name) : null))
+            .filter(Boolean)
+        : [];
+      if (!schemaNames.length) continue;
+
+      const snapshot = loadPreviousAchievements(name) || {};
+      const isEarnedByName = (achName) => {
+        const main = snapshot?.[achName];
+        if (main?.earned) return true;
+        if (/^ach_/i.test(achName)) {
+          const alt = achName.replace(/^ach_/i, "");
+          return !!snapshot?.[alt]?.earned;
+        }
+        const withPrefix = `ach_${achName}`;
+        return !!snapshot?.[withPrefix]?.earned;
+      };
+
+      const total = schemaNames.length;
+      const earned = schemaNames.filter(isEarnedByName).length;
+      if (total > 0 && earned === total) {
+        markConfigPlatinumFlag(name);
+      }
+    }
+  } catch {}
 }
 
 app.on("before-quit", () => {
@@ -3139,6 +4958,7 @@ app.on("before-quit", () => {
   }
 });
 
+flagPlatinumFromCacheOnBoot();
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();

@@ -712,6 +712,10 @@ body::-webkit-scrollbar {
     opacity: 1;
   }
 }
+#settings-steamApiKeyInput {
+  width: 100%;
+  max-width: 420px;
+}
 
 /* Settings notification tab */
 .settings-slider {
@@ -1303,7 +1307,16 @@ body.window-maximized .dashboard-grid {
 
 /* ——— Folders list  ——— */
 #foldersList {
-  max-height: 350px;
+  max-height: 450px;
+  overflow: auto !important;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 2px;
+}
+
+#blacklistList {
+  max-height: 250px;
   overflow: auto !important;
   display: flex;
   flex-direction: column;
@@ -1316,9 +1329,8 @@ body.window-maximized .dashboard-grid {
   align-items: center;
   justify-content: space-between;
   gap: 2px;
-
   padding: 4px 8px;
-  min-height: 10px;
+  min-height: 20px;
   border: 1px solid #262a36;
   border-radius: 8px;
 
@@ -1349,6 +1361,7 @@ body.window-maximized .dashboard-grid {
   align-items: center;
   justify-content: center;
   gap: 6px;
+  margin-top: 10px;
 }
 
 .icon-btn {
@@ -1837,4 +1850,48 @@ kbd {
 .btn.ps-square,
 .btn.ps-triangle {
   font-size: 13px;
+}
+
+#blacklistConfigBtn {
+  background-color: #f0b429;
+  color: #1c1e26;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.2s ease;
+}
+
+#blacklistConfigBtn:hover {
+  background-color: #ff9800;
+}
+
+.dash-block {
+  position: absolute;
+  top: 0px;
+  right: 5px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(34, 34, 46, 0.85);
+  color: #ff6b6b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  cursor: pointer;
+}
+
+.dash-card:hover .dash-block,
+.dash-card:focus-within .dash-block {
+  opacity: 1;
+}
+
+.dash-block:hover {
+  background: var(--dracula-cyan);
+  color: #ff0000;
 }
