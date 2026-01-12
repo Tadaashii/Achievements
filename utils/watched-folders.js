@@ -1060,11 +1060,20 @@ module.exports = function makeWatchedFolders({
     for (const [achKey, nowVal] of Object.entries(cur)) {
       const oldVal = prev[achKey];
       const becameEarned = nowVal.earned && (!oldVal || !oldVal.earned);
+      const nowProgress = Number(nowVal?.progress);
+      const nowMax = Number(nowVal?.max_progress);
+      const oldProgress = Number(oldVal?.progress);
+      const oldMax = Number(oldVal?.max_progress);
+      const hasProgressValues =
+        Number.isFinite(nowProgress) &&
+        Number.isFinite(nowMax) &&
+        nowMax > 0;
       const progressChanged =
         !nowVal.earned &&
+        hasProgressValues &&
         (!oldVal ||
-          nowVal.progress !== oldVal.progress ||
-          nowVal.max_progress !== oldVal.max_progress);
+          nowProgress !== oldProgress ||
+          nowMax !== oldMax);
       if (initial) {
         watcherLogger.info("initial-notify:entry-check", {
           appid: String(appid),
@@ -1131,6 +1140,7 @@ module.exports = function makeWatchedFolders({
           progress: nowVal.progress || 0,
           max_progress: nowVal.max_progress || 0,
           config_path: meta.config_path || null,
+          configName: meta?.name || null,
         });
       }
     }
@@ -2069,22 +2079,24 @@ module.exports = function makeWatchedFolders({
         () => null
       );
       if (gogInfoFound) {
-        const gogId = String(gogInfoFound.appid || "").trim();
-        if (gogId && !blacklist.has(gogId)) {
-          const normalizedPath = normalizeObservedPath(
-            gogInfoFound.baseDir || scanBase,
+          const gogId = String(gogInfoFound.appid || "").trim();
+          if (gogId && !blacklist.has(gogId)) {
+            const shippingDir = await findShippingExeDir(scanBase, 6);
+            const saveRoot = shippingDir || gogInfoFound.baseDir || scanBase;
+            const normalizedPath = normalizeObservedPath(
+            saveRoot,
             gogId
-          );
-          generationTasks.push({
-            appid: gogId,
-            forcePlatform: "gog",
-            appDir: gogInfoFound.baseDir || scanBase,
-            normalizedPath,
-            __savePathOverride: gogInfoFound.baseDir || scanBase,
-            __gogName: gogInfoFound.name || null,
-          });
-          if (normalizedPath) markPendingSavePath(gogId, normalizedPath);
-        }
+            );
+            generationTasks.push({
+              appid: gogId,
+              forcePlatform: "gog",
+              appDir: gogInfoFound.baseDir || scanBase,
+              normalizedPath,
+              __savePathOverride: saveRoot,
+              __gogName: gogInfoFound.name || null,
+            });
+            if (normalizedPath) markPendingSavePath(gogId, normalizedPath);
+          }
       }
 
       // If no GOG .info, fall back to generic numeric discovery
@@ -2159,52 +2171,58 @@ module.exports = function makeWatchedFolders({
         if (tenokeFound) {
           const tenokeId = String(tenokeFound.appid || "").trim();
           if (tenokeId && !blacklist.has(tenokeId)) {
+            const shippingDir = await findShippingExeDir(scanBase, 6);
+            const saveRoot = shippingDir || tenokeFound.baseDir || scanBase;
             tenokeIds.add(tenokeId);
-            const normalizedRoot = normalizeObservedPath(rootPath, tenokeId);
+            const normalizedRoot = normalizeObservedPath(saveRoot, tenokeId);
             generationTasks.push({
               appid: tenokeId,
               forcePlatform: null,
               appDir: tenokeFound.baseDir || scanBase,
               normalizedPath: normalizedRoot,
               __tenoke: true,
-              __savePathOverride: normalizedRoot,
+              __savePathOverride: saveRoot,
               __emu: "tenoke",
             });
             markPendingSavePath(
               tenokeId,
-              normalizeObservedPath(rootPath, tenokeId)
+              normalizeObservedPath(saveRoot, tenokeId)
             );
           }
         }
         if (gogInfoFound) {
           const gogId = String(gogInfoFound.appid || "").trim();
           if (gogId && !blacklist.has(gogId)) {
+            const shippingDir = await findShippingExeDir(scanBase, 6);
+            const saveRoot = shippingDir || gogInfoFound.baseDir || scanBase;
             generationTasks.push({
               appid: gogId,
               forcePlatform: "gog",
               appDir: gogInfoFound.baseDir || scanBase,
-              normalizedPath: normalizeObservedPath(rootPath, gogId),
-              __savePathOverride: gogInfoFound.baseDir || scanBase,
+              normalizedPath: normalizeObservedPath(saveRoot, gogId),
+              __savePathOverride: saveRoot,
               __gogName: gogInfoFound.name || null,
             });
             markPendingSavePath(
               gogId,
-              normalizeObservedPath(rootPath, gogId)
+              normalizeObservedPath(saveRoot, gogId)
             );
           }
         } else if (universeFound) {
           const uniId = String(universeFound.appid || "").trim();
           if (uniId && !blacklist.has(uniId)) {
+            const shippingDir = await findShippingExeDir(scanBase, 6);
+            const saveRoot = shippingDir || universeFound.baseDir || scanBase;
             generationTasks.push({
               appid: uniId,
               forcePlatform: "gog",
               appDir: universeFound.baseDir || scanBase,
-              normalizedPath: normalizeObservedPath(rootPath, uniId),
-              __savePathOverride: universeFound.baseDir || scanBase,
+              normalizedPath: normalizeObservedPath(saveRoot, uniId),
+              __savePathOverride: saveRoot,
             });
             markPendingSavePath(
               uniId,
-              normalizeObservedPath(rootPath, uniId)
+              normalizeObservedPath(saveRoot, uniId)
             );
           }
         }
@@ -2820,6 +2838,36 @@ module.exports = function makeWatchedFolders({
   function refreshConfigState() {
     indexExistingConfigsSync();
     rebuildSaveWatchers();
+  }
+
+  async function findShippingExeDir(root, maxDepth = 6) {
+    const matches = (name) => /shipping\.exe$/i.test(name || "");
+    async function walk(dir, depth = 0) {
+      if (depth > maxDepth) return null;
+      let entries;
+      try {
+        entries = await fsp.readdir(dir, { withFileTypes: true });
+      } catch {
+        return null;
+      }
+      for (const ent of entries) {
+        const full = path.join(dir, ent.name);
+        if (ent.isFile() && matches(ent.name)) {
+          return path.dirname(full);
+        }
+      }
+      if (depth < maxDepth) {
+        for (const ent of entries) {
+          if (ent.isDirectory()) {
+            const next = path.join(dir, ent.name);
+            const found = await walk(next, depth + 1);
+            if (found) return found;
+          }
+        }
+      }
+      return null;
+    }
+    return await walk(root, 0);
   }
 
   if (app && typeof app.on === "function") {

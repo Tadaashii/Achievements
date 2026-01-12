@@ -12,6 +12,7 @@
       --wave-color-1: #203e7a;
       --wave-color-2: #0c2a66;
 	  --wave-color-3: #ffffff;
+      --timeline-scale: 1;
     }
 	html {
 	  overflow: hidden;
@@ -50,10 +51,10 @@
       width: 80px;
       height: 80px;
       overflow: visible;
-      animation: popIn 0.5s ease-out forwards,
-                 expandCircle 0.6s ease-out 1.5s forwards,
-                 retractCircle 0.4s ease-in 5.5s forwards,
-                 popOut 0.5s ease-in 7s forwards;
+      animation: popIn calc(0.5s * var(--timeline-scale)) ease-out forwards,
+                 expandCircle calc(0.6s * var(--timeline-scale)) ease-out calc(1.5s * var(--timeline-scale)) forwards,
+                 retractCircle calc(0.4s * var(--timeline-scale)) ease-in calc(5.5s * var(--timeline-scale)) forwards,
+                 popOut calc(0.5s * var(--timeline-scale)) ease-in calc(7s * var(--timeline-scale)) forwards;
     }
 
     .loader-wrapper {
@@ -68,10 +69,10 @@
       z-index: 1;
       pointer-events: none;
       opacity: 0;
-      animation: showWave 0.5s ease-in 0.2s forwards,
-                 hideWave 0.2s ease-out 1.2s forwards,
-                 showWave 0.5s ease-in 6s forwards,
-                 hideWave 0.2s ease-out 7s forwards;
+      animation: showWave calc(0.5s * var(--timeline-scale)) ease-in calc(0.2s * var(--timeline-scale)) forwards,
+                 hideWave calc(0.2s * var(--timeline-scale)) ease-out calc(1.2s * var(--timeline-scale)) forwards,
+                 showWave calc(0.5s * var(--timeline-scale)) ease-in calc(6s * var(--timeline-scale)) forwards,
+                 hideWave calc(0.2s * var(--timeline-scale)) ease-out calc(7s * var(--timeline-scale)) forwards;
     }
 
     .achievement-loader {
@@ -79,7 +80,7 @@
       width: 100%;
       height: 100%;
       border-radius: 50%;
-      animation: waveEffect 1.5s infinite ease-out;
+      animation: waveEffect calc(1.5s * var(--timeline-scale)) infinite ease-out;
       opacity: 0.3;
     }
 
@@ -89,12 +90,12 @@
 
     .achievement-loader:nth-child(2) {
       background-color: var(--wave-color-2);
-      animation-delay: 0.3s;
+      animation-delay: calc(0.3s * var(--timeline-scale));
     }
 
     .achievement-loader:nth-child(3) {
       background-color: var(--wave-color-3);
-      animation-delay: 0.5s;
+      animation-delay: calc(0.5s * var(--timeline-scale));
     }
 
     @keyframes waveEffect {
@@ -121,10 +122,10 @@
       background: url("https://dummyimage.com/64x64/555/fff.png&text=ICON") center/cover no-repeat;
       border-radius: 50%;
       z-index: 2;
-      animation: iconPopIn 0.5s ease-out 0s forwards,
-                 iconPopOut 0.5s ease-in 1.5s forwards,
-                 iconPopIn 0.5s ease-out 5.5s forwards,
-                 iconPopOut 0.5s ease-in 7s forwards;
+      animation: iconPopIn calc(0.5s * var(--timeline-scale)) ease-out 0s forwards,
+                 iconPopOut calc(0.5s * var(--timeline-scale)) ease-in calc(1.5s * var(--timeline-scale)) forwards,
+                 iconPopIn calc(0.5s * var(--timeline-scale)) ease-out calc(5.5s * var(--timeline-scale)) forwards,
+                 iconPopOut calc(0.5s * var(--timeline-scale)) ease-in calc(7s * var(--timeline-scale)) forwards;
       opacity: 0;
     }
 	
@@ -169,8 +170,8 @@
       transform: translateY(0%) scale(0.8);
       opacity: 0;
       z-index: 1;
-      animation: showText 0.5s ease-out 2s forwards,
-                 hideText 0.5s ease-in 4.8s forwards;
+      animation: showText calc(0.5s * var(--timeline-scale)) ease-out calc(2s * var(--timeline-scale)) forwards,
+                 hideText calc(0.5s * var(--timeline-scale)) ease-in calc(4.8s * var(--timeline-scale)) forwards;
     }
 
     .title {
@@ -239,6 +240,8 @@
   </div>
 <script>
 window.addEventListener('DOMContentLoaded', () => {
+  const metaDur = document.querySelector('meta[name="duration"]');
+  const baseTotal = Math.max(1, Number(metaDur?.content || 10000));
   window.api?.onNotification?.((notificationData) => {
     if (notificationData &&
         notificationData.displayName &&
@@ -248,6 +251,13 @@ window.addEventListener('DOMContentLoaded', () => {
       document.querySelector(".title").textContent = notificationData.displayName;
       document.querySelector(".desc").textContent = notificationData.description;
       document.querySelector(".icon img").src = `file:///${notificationData.iconPath}`;
+
+      const total = Math.max(0, Number(metaDur?.content || 10000));
+      const timelineScale = Math.max(0.1, total / baseTotal);
+      document.documentElement.style.setProperty(
+        "--timeline-scale",
+        timelineScale.toFixed(4)
+      );
 
       const root = document.body;
       const scale = parseFloat(notificationData.scale || 1);

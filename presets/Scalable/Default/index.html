@@ -67,6 +67,8 @@
           }
         }
 
+        const baseTotal = Math.max(1, Number(metaDur?.content || 6000));
+
         function onPayload(displayName, description, iconPath, scale) {
           const ach = document.querySelector(".ach");
           const titleEl = document.querySelector(".title");
@@ -85,6 +87,14 @@
 
           const s = Math.max(0.01, parseFloat(scale || 1) || 1);
           ach.style.setProperty("--scale", String(s));
+          const total = Math.max(0, Number(metaDur?.content || baseTotal));
+          const timelineScale = Math.max(0.1, total / baseTotal);
+          const inMs = Math.max(120, Math.round(1400 * timelineScale));
+          const outMs = Math.max(120, Math.round(400 * timelineScale));
+          const holdMs = Math.max(0, total - inMs - outMs);
+          ach.style.setProperty("--ach-in", `${inMs}ms`);
+          ach.style.setProperty("--ach-hold", `${holdMs}ms`);
+          ach.style.setProperty("--ach-out", `${outMs}ms`);
 
           // Start expand
           ach.classList.add("active");
@@ -95,7 +105,6 @@
             setTimeout(() => startMarqueeIfOverflow(titleEl), 350);
           }, 900);
 
-          const total = Math.max(0, Number(metaDur?.content || 6000));
           setTimeout(() => {
             ach.classList.remove("active");
             window.api?.closeNotificationWindow?.();

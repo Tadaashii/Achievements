@@ -727,6 +727,22 @@ body::-webkit-scrollbar {
   margin-bottom: 8px;
 }
 
+.settings-slider .info-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 6px;
+  border-radius: 50%;
+  border: 1px solid #777;
+  color: #777;
+  font-size: 10px;
+  line-height: 1;
+  cursor: help;
+  user-select: none;
+}
+
 .settings-slider .slider-control {
   display: flex;
   align-items: center;
@@ -858,7 +874,7 @@ body::-webkit-scrollbar {
 .game-image-embed {
   position: relative;
   width: 100%;
-  min-height: 420px;
+  min-height: 510px;
   background: #000;
   border-radius: 10px;
   overflow: hidden;
@@ -882,7 +898,7 @@ body::-webkit-scrollbar {
 #embeddedGameImage {
   height: 320px;
   width: 100%;
-  max-width: 280px;
+  max-width: 340px;
   margin: 0 auto;
   flex: 0 0 auto;
 }

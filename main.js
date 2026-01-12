@@ -5,7 +5,6 @@ const {
   dialog,
   screen,
   globalShortcut,
-  Menu,
   Tray,
 } = require("electron");
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
@@ -17,9 +16,8 @@ const os = require("os");
 const ini = require("ini");
 const chokidar = require("chokidar");
 app.disableHardwareAcceleration();
-app.commandLine.appendSwitch("force-device-scale-factor", "1");
 const CRC32 = require("crc-32");
-const { copyFolderOnce } = require("./utils/fileCopy");
+const { copyFolderOnce, copyFolderOverwrite } = require("./utils/fileCopy");
 const {
   defaultSoundsFolder,
   defaultPresetsFolder,
@@ -42,6 +40,67 @@ const prefsLogger = createLogger("preferences");
 const persistenceLogger = createLogger("persistence");
 const execLogger = createLogger("execution");
 const schemaLogger = createLogger("achschema");
+
+const PRESETS_MIGRATION_VERSION = "2026-01-12-duration";
+
+function migrateDefaultPresetsIfNeeded() {
+  const versionFile = path.join(userPresetsFolder, ".presets-version");
+  let currentVersion = "";
+  try {
+    if (fs.existsSync(versionFile)) {
+      currentVersion = fs.readFileSync(versionFile, "utf8").trim();
+    }
+  } catch (err) {
+    appLogger.warn("presets:version-read-failed", { error: err.message });
+  }
+
+  if (currentVersion === PRESETS_MIGRATION_VERSION) return;
+
+  try {
+    fs.mkdirSync(userPresetsFolder, { recursive: true });
+  } catch (err) {
+    appLogger.warn("presets:user-dir-create-failed", { error: err.message });
+  }
+
+  try {
+    if (fs.existsSync(userPresetsFolder)) {
+      const entries = fs.readdirSync(userPresetsFolder);
+      if (entries.length > 0) {
+        const baseUserDir = path.dirname(userPresetsFolder);
+        const backupDir = path.join(
+          baseUserDir,
+          `presets_backup_${PRESETS_MIGRATION_VERSION}`
+        );
+        if (!fs.existsSync(backupDir)) {
+          copyFolderOnce(userPresetsFolder, backupDir);
+          appLogger.info("presets:backup-created", {
+            backupDir,
+            version: PRESETS_MIGRATION_VERSION,
+          });
+        }
+      }
+    }
+  } catch (err) {
+    appLogger.warn("presets:backup-failed", { error: err.message });
+  }
+
+  try {
+    copyFolderOverwrite(defaultPresetsFolder, userPresetsFolder);
+    appLogger.info("presets:migrated", {
+      version: PRESETS_MIGRATION_VERSION,
+      source: defaultPresetsFolder,
+      target: userPresetsFolder,
+    });
+  } catch (err) {
+    appLogger.warn("presets:migration-failed", { error: err.message });
+  }
+
+  try {
+    fs.writeFileSync(versionFile, PRESETS_MIGRATION_VERSION, "utf8");
+  } catch (err) {
+    appLogger.warn("presets:version-write-failed", { error: err.message });
+  }
+}
 
 function deepEqual(a, b) {
   if (a === b) return true;
@@ -72,11 +131,14 @@ const DEFAULT_PREFERENCES = {
   screenshotFolder: getDefaultScreenshotFolder(),
   overlayShortcut: "",
   sound: "mute",
+  soundVolume: 100,
   preset: "default",
   notificationScale: 1,
+  notificationDuration: 0,
   position: "center-bottom",
   language: "english",
   disableProgress: false,
+  progressMutedConfigs: [],
   windowZoomFactor: 1,
   disableAchievementScreenshot: false,
   showDashboardOnStart: false,
@@ -88,6 +150,7 @@ const DEFAULT_PREFERENCES = {
   showBlacklistedGames: false,
   disablePlatinum: false,
   showHiddenDescription: false,
+  closeToTray: false,
   blockedWatchedFolders: [],
   blacklistedAppIds: [],
   watchedFolders: [],
@@ -120,6 +183,11 @@ let cachedPreferences = {};
 let mainWindow;
 let selectedConfigPath = null;
 let selectedConfig = null;
+let mainWindowUserZoom = 1;
+let mainWindowZoomTimer = null;
+let displayMetricsListenerAdded = false;
+const ZOOM_LOG_EPS = 0.001;
+let lastZoomLog = null;
 let selectedSound = "mute";
 let selectedPreset = "default";
 let selectedPosition = "center-bottom";
@@ -133,19 +201,41 @@ if (!gotTheLock) {
   process.exit(0);
 } else {
   app.on("second-instance", () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.show();
-      mainWindow.focus();
-    } else {
-      createMainWindow();
-    }
+    // Ignore subsequent launches; keep the first instance state (tray/hidden).
+    return;
   });
 }
 
 function normalizeAppIdValue(value) {
   const trimmed = String(value || "").trim();
   return /^[0-9a-fA-F]+$/.test(trimmed) ? trimmed : "";
+}
+
+function normalizeProgressMutePath(value) {
+  if (!value) return "";
+  const normalized = path.normalize(String(value));
+  return process.platform === "win32" ? normalized.toLowerCase() : normalized;
+}
+
+function buildProgressMuteKey(configPath, configName) {
+  if (configPath) return `path:${normalizeProgressMutePath(configPath)}`;
+  if (configName) return `name:${String(configName)}`;
+  return "";
+}
+
+function isProgressMutedByPrefs(prefs, payload) {
+  const list = Array.isArray(prefs?.progressMutedConfigs)
+    ? prefs.progressMutedConfigs
+    : [];
+  if (!list.length) return false;
+  const key = buildProgressMuteKey(
+    payload?.config_path || payload?.configPath || "",
+    payload?.configName ||
+      payload?.config_name ||
+      payload?.config ||
+      selectedConfig
+  );
+  return key ? list.includes(key) : false;
 }
 
 function readBlacklistFromPrefs() {
@@ -411,6 +501,7 @@ function resolveSaveSidecarPaths(saveBase, appid) {
   ];
   for (const d of dirs) {
     const iniPath = path.join(d, "achievements.ini");
+    const universeIniPath = path.join(d, "UniverseLANData", "Achievements.ini");
     const tenokeIniNested = path.join(d, "SteamData", "user_stats.ini");
     const tenokeIniDirect = path.join(d, "user_stats.ini");
     const tenokeIni = fs.existsSync(tenokeIniDirect)
@@ -432,6 +523,15 @@ function resolveSaveSidecarPaths(saveBase, appid) {
         ini: null,
         tenokeIni: null,
         ofx,
+        bin: fs.existsSync(bin) ? bin : null,
+      };
+
+    if (fs.existsSync(universeIniPath))
+      return {
+        dir: d,
+        ini: universeIniPath,
+        tenokeIni: null,
+        ofx: null,
         bin: fs.existsSync(bin) ? bin : null,
       };
 
@@ -770,6 +870,9 @@ if (cachedPreferences && typeof cachedPreferences === "object") {
   if ("startInTray" in cachedPreferences) {
     global.startInTray = !!cachedPreferences.startInTray;
   }
+  if ("closeToTray" in cachedPreferences) {
+    global.closeToTray = !!cachedPreferences.closeToTray;
+  }
 }
 ensureSteamApiKeyFileFromPrefs();
 
@@ -792,6 +895,9 @@ function applyPreferenceSideEffects(
   }
   if ("startInTray" in patch) {
     global.startInTray = !!prefsSnapshot.startInTray;
+  }
+  if ("closeToTray" in patch) {
+    global.closeToTray = !!prefsSnapshot.closeToTray;
   }
   if ("preset" in patch) {
     selectedPreset = prefsSnapshot.preset || "default";
@@ -904,15 +1010,16 @@ ipcMain.handle("save-preferences", async (_event, newPrefs) =>
 
 ipcMain.on("set-zoom", (_event, zoomFactor) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.setZoomFactor(zoomFactor);
+    const safeZoom = Number(zoomFactor) || 1;
+    mainWindowUserZoom = safeZoom;
+    applyMainWindowZoomFactor(safeZoom);
 
     try {
-      const updatedPrefs = updatePreferences({ windowZoomFactor: zoomFactor });
+      const updatedPrefs = updatePreferences({ windowZoomFactor: safeZoom });
       cachedPreferences = updatedPrefs;
     } catch (err) {
       notifyError("❌ Failed to save zoom preference: " + err.message);
     }
-    mainWindow.webContents.send("zoom-factor-changed", zoomFactor);
   }
 });
 
@@ -1904,14 +2011,48 @@ function getUserPreferredSound() {
 }
 
 let tray = null;
+let trayMenuWindow = null;
+let isQuitting = false;
 const ICON_PATH = app.isPackaged
   ? path.join(process.resourcesPath, "icon.ico") // in installer: resources\icon.ico
   : path.join(__dirname, "icon.ico");
 const ICON_PNG_PATH = app.isPackaged
   ? path.join(app.getAppPath(), "assets", "icon.png") // in installer: resources\app.asar\assets\icon.png
   : path.join(__dirname, "assets", "icon.png");
+const TRAY_MENU_WIDTH = 180;
+const TRAY_MENU_HEIGHT = 170;
+
+function getTrayScaleFactor() {
+  try {
+    if (tray) {
+      const bounds = tray.getBounds();
+      return screen.getDisplayNearestPoint(bounds)?.scaleFactor || 1;
+    }
+  } catch {}
+  return screen.getPrimaryDisplay()?.scaleFactor || 1;
+}
+
+function applyTrayMenuScale() {
+  if (!trayMenuWindow || trayMenuWindow.isDestroyed()) return;
+  const scale = getTrayScaleFactor();
+  const width = Math.max(120, Math.round(TRAY_MENU_WIDTH));
+  const height = Math.max(120, Math.round(TRAY_MENU_HEIGHT));
+  trayMenuWindow.setBounds({ width, height }, false);
+  if (!trayMenuWindow.webContents.isDestroyed()) {
+    trayMenuWindow.webContents.setZoomFactor(1);
+  }
+  windowLogger.info("tray:scale", {
+    scale,
+    width,
+    height,
+    mode: "linear",
+  });
+}
 function showMainWindowRespectingPrefs() {
-  if (!mainWindow) return;
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createMainWindow({ forceShow: true });
+    return;
+  }
   const prefs = readPrefsSafe();
   if (prefs.startMaximized) {
     mainWindow.maximize();
@@ -1919,26 +2060,197 @@ function showMainWindowRespectingPrefs() {
   mainWindow.show();
 }
 
+// Zoom model:
+// - userZoom: preference from UI dropdown (1.0, 1.25, 1.5, etc).
+// - effectiveZoom: value applied to webContents (userZoom / display scale).
+// This keeps the main window visually at userZoom while tray/notifications use DPI.
+function getDisplayScaleForBounds(bounds) {
+  try {
+    if (bounds) {
+      return screen.getDisplayMatching(bounds)?.scaleFactor || 1;
+    }
+  } catch {}
+  return screen.getPrimaryDisplay()?.scaleFactor || 1;
+}
+
+function getMainWindowScaleFactor() {
+  if (!mainWindow || mainWindow.isDestroyed()) return 1;
+  return getDisplayScaleForBounds(mainWindow.getBounds());
+}
+
+function shouldLogZoomChange(prev, next) {
+  if (!prev) return true;
+  return (
+    Math.abs(prev.userZoom - next.userZoom) > ZOOM_LOG_EPS ||
+    Math.abs(prev.scaleFactor - next.scaleFactor) > ZOOM_LOG_EPS ||
+    Math.abs(prev.effectiveZoom - next.effectiveZoom) > ZOOM_LOG_EPS
+  );
+}
+
+function logMainZoomState(userZoom, scaleFactor, effectiveZoom) {
+  const next = { userZoom, scaleFactor, effectiveZoom };
+  if (!shouldLogZoomChange(lastZoomLog, next)) return;
+  lastZoomLog = next;
+  windowLogger.info("zoom:apply", next);
+}
+
+function applyMainWindowZoomFactor(userZoom = mainWindowUserZoom) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const scale = getMainWindowScaleFactor() || 1;
+  const safeZoom = Number(userZoom) || 1;
+  mainWindowUserZoom = safeZoom;
+  const effectiveZoom = safeZoom / scale;
+  mainWindow.webContents.setZoomFactor(effectiveZoom);
+  logMainZoomState(safeZoom, scale, effectiveZoom);
+  mainWindow.webContents.send("zoom-factor-changed", {
+    userZoom: safeZoom,
+    effectiveZoom,
+  });
+}
+
+function scheduleMainWindowZoomUpdate() {
+  if (mainWindowZoomTimer) clearTimeout(mainWindowZoomTimer);
+  mainWindowZoomTimer = setTimeout(() => {
+    mainWindowZoomTimer = null;
+    applyMainWindowZoomFactor();
+  }, 120);
+}
+
+function ensureDisplayMetricsListener() {
+  if (displayMetricsListenerAdded) return;
+  displayMetricsListenerAdded = true;
+  screen.on("display-metrics-changed", () => {
+    scheduleMainWindowZoomUpdate();
+    applyTrayMenuScale();
+  });
+  screen.on("display-added", () => {
+    scheduleMainWindowZoomUpdate();
+    applyTrayMenuScale();
+  });
+  screen.on("display-removed", () => {
+    scheduleMainWindowZoomUpdate();
+    applyTrayMenuScale();
+  });
+}
+
+function createTrayMenuWindow() {
+  if (trayMenuWindow && !trayMenuWindow.isDestroyed()) {
+    return trayMenuWindow;
+  }
+  trayMenuWindow = new BrowserWindow({
+    width: TRAY_MENU_WIDTH,
+    height: TRAY_MENU_HEIGHT,
+    show: false,
+    frame: false,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    focusable: true,
+    backgroundColor: "#282a36",
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      backgroundThrottling: false,
+      preload: path.join(__dirname, "preload.js"),
+    },
+  });
+
+  trayMenuWindow.setAlwaysOnTop(true, "pop-up-menu");
+  trayMenuWindow.setVisibleOnAllWorkspaces(true, {
+    visibleOnFullScreen: true,
+  });
+  trayMenuWindow.loadFile("tray-menu.html");
+  trayMenuWindow.webContents.once("did-finish-load", () => {
+    applyTrayMenuScale();
+  });
+  trayMenuWindow.on("blur", () => {
+    if (trayMenuWindow && !trayMenuWindow.isDestroyed()) {
+      trayMenuWindow.hide();
+    }
+  });
+  trayMenuWindow.on("close", (e) => {
+    if (!isQuitting) {
+      e.preventDefault();
+      trayMenuWindow.hide();
+    }
+  });
+  return trayMenuWindow;
+}
+
+function hideTrayMenu() {
+  if (trayMenuWindow && !trayMenuWindow.isDestroyed()) {
+    trayMenuWindow.hide();
+  }
+}
+
+function positionTrayMenu() {
+  if (!tray || !trayMenuWindow || trayMenuWindow.isDestroyed()) return;
+  applyTrayMenuScale();
+  const trayBounds = tray.getBounds();
+  const winBounds = trayMenuWindow.getBounds();
+  const display = screen.getDisplayNearestPoint({
+    x: trayBounds.x,
+    y: trayBounds.y,
+  });
+  const workArea = display.workArea;
+  const x = Math.round(
+    trayBounds.x + trayBounds.width / 2 - winBounds.width / 2
+  );
+  const shouldPlaceBelow = trayBounds.y < workArea.y + workArea.height / 2;
+  const y = shouldPlaceBelow
+    ? Math.round(trayBounds.y + trayBounds.height)
+    : Math.round(trayBounds.y - winBounds.height);
+  const clampedX = Math.min(
+    Math.max(x, workArea.x),
+    workArea.x + workArea.width - winBounds.width
+  );
+  const clampedY = Math.min(
+    Math.max(y, workArea.y),
+    workArea.y + workArea.height - winBounds.height
+  );
+  trayMenuWindow.setPosition(clampedX, clampedY, false);
+}
+
+function toggleTrayMenu() {
+  if (!tray) return;
+  const win = createTrayMenuWindow();
+  if (win.isVisible()) {
+    win.hide();
+    return;
+  }
+  positionTrayMenu();
+  win.show();
+  win.focus();
+}
+
+function openSettingsFromTray() {
+  showMainWindowRespectingPrefs();
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.webContents.isLoading()) {
+    mainWindow.webContents.once("did-finish-load", () => {
+      mainWindow.webContents.send("tray:open-settings");
+    });
+  } else {
+    mainWindow.webContents.send("tray:open-settings");
+  }
+}
+
 function createTray() {
   tray = new Tray(ICON_PATH);
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: "Show App",
-      click: () => {
-        showMainWindowRespectingPrefs();
-      },
-    },
-    {
-      label: "Quit",
-      click: () => {
-        app.quit();
-      },
-    },
-  ]);
   tray.setToolTip("Achievements App");
-  tray.setContextMenu(contextMenu);
+  createTrayMenuWindow();
 
+  tray.on("click", () => {
+    toggleTrayMenu();
+  });
+  tray.on("right-click", () => {
+    toggleTrayMenu();
+  });
   tray.on("double-click", () => {
+    hideTrayMenu();
     showMainWindowRespectingPrefs();
   });
 }
@@ -1947,10 +2259,11 @@ let achievementsFilePath; // achievements.json path
 let currentConfigPath;
 let previousAchievements = {};
 
-function createMainWindow() {
+function createMainWindow(options = {}) {
   windowLogger.info("create-main-window:start", {
     existing: Boolean(mainWindow && !mainWindow.isDestroyed?.()),
   });
+  const forceShowOnLoad = !!options.forceShow;
   let initialZoom = 1;
   try {
     const prefs = fs.existsSync(preferencesPath)
@@ -1958,6 +2271,9 @@ function createMainWindow() {
       : {};
     initialZoom = Number(prefs.windowZoomFactor) || 1;
   } catch {}
+  mainWindowUserZoom = initialZoom;
+  const initialScale = getDisplayScaleForBounds();
+  const initialZoomFactor = initialZoom / (initialScale || 1);
   mainWindow = new BrowserWindow({
     width: 1000,
     height: 1000,
@@ -1970,7 +2286,7 @@ function createMainWindow() {
       contextIsolation: true,
       backgroundThrottling: false,
       preload: path.join(__dirname, "preload.js"),
-      zoomFactor: initialZoom,
+      zoomFactor: initialZoomFactor,
     },
   });
   windowLogger.info("create-main-window:browserwindow-created", {
@@ -1992,16 +2308,15 @@ function createMainWindow() {
       const shouldStartInTray = !!prefs.startInTray;
       const shouldStartMaximized = !!prefs.startMaximized;
       const zoom = Number(prefs.windowZoomFactor) || 1;
-      mainWindow.webContents.setZoomFactor(zoom);
-      if (!shouldStartInTray) {
+      applyMainWindowZoomFactor(zoom);
+      if (forceShowOnLoad || !shouldStartInTray) {
         if (shouldStartMaximized) {
           mainWindow.maximize();
         }
         mainWindow.show();
       }
-      mainWindow.webContents.send("zoom-factor-changed", zoom);
     } catch (e) {
-      mainWindow.webContents.setZoomFactor(1);
+      applyMainWindowZoomFactor(1);
       mainWindow.show();
     }
     windowLogger.info("create-main-window:visible", {
@@ -2028,6 +2343,47 @@ function createMainWindow() {
       mainWindow.webContents.send("window-state-change", false);
     }
   });
+
+  mainWindow.on("enter-full-screen", () => {
+    windowLogger.info("create-main-window:enter-full-screen");
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("window-fullscreen-change", true);
+    }
+  });
+
+  mainWindow.on("leave-full-screen", () => {
+    windowLogger.info("create-main-window:leave-full-screen");
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("window-fullscreen-change", false);
+    }
+  });
+
+  mainWindow.on("move", () => scheduleMainWindowZoomUpdate());
+  mainWindow.on("resize", () => scheduleMainWindowZoomUpdate());
+  ensureDisplayMetricsListener();
+
+  mainWindow.on("close", (e) => {
+    if (isQuitting) return;
+    const shouldCloseToTray =
+      cachedPreferences?.closeToTray === true || global.closeToTray === true;
+    if (shouldCloseToTray) {
+      e.preventDefault();
+      mainWindow.hide();
+    }
+  });
+
+  mainWindow.on("closed", () => {
+    windowLogger.info("create-main-window:closed");
+    if (mainWindowZoomTimer) {
+      clearTimeout(mainWindowZoomTimer);
+      mainWindowZoomTimer = null;
+    }
+    if (trayMenuWindow && !trayMenuWindow.isDestroyed()) {
+      trayMenuWindow.destroy();
+    }
+    trayMenuWindow = null;
+    mainWindow = null;
+  });
 }
 
 function getPresetDimensions(presetFolder) {
@@ -2045,6 +2401,14 @@ function getPresetDimensions(presetFolder) {
   }
   // Default values if not defined
   return { width: 400, height: 200 };
+}
+
+function normalizeNotificationScale(rawScale) {
+  const scale = Number(rawScale);
+  const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+  const displayScale = screen.getPrimaryDisplay()?.scaleFactor || 1;
+  const effectiveScale = safeScale * displayScale;
+  return { scale: safeScale, displayScale, effectiveScale };
 }
 
 function createNotificationWindow(message) {
@@ -2070,7 +2434,8 @@ function createNotificationWindow(message) {
 
   const presetHtml = path.join(presetFolder, "index.html");
   const position = message.position || "center-bottom";
-  const scale = parseFloat(message.scale || 1);
+  const scaleInfo = normalizeNotificationScale(message.scale);
+  const scale = scaleInfo.scale;
   windowLogger.info("create-notification-window:start", {
     preset,
     position,
@@ -2164,10 +2529,28 @@ function createNotificationWindow(message) {
     presetHtml,
   });
 
-  notificationWindow.webContents.on("did-finish-load", () => {
+  notificationWindow.webContents.on("did-finish-load", async () => {
     const iconPathToSend =
       message.iconPath ||
       (message.icon ? path.join(message.config_path, message.icon) : "");
+    const durationMs = Number(message?.durationMs);
+    if (Number.isFinite(durationMs) && durationMs > 0) {
+      try {
+        await notificationWindow.webContents.executeJavaScript(
+          `(function(){const meta=document.querySelector('meta[name="duration"]');if(meta){meta.content='${Math.round(
+            durationMs
+          )}';}})();`,
+          true
+        );
+      } catch (err) {
+        windowLogger.warn(
+          "create-notification-window:duration-override-failed",
+          {
+            error: err?.message || String(err),
+          }
+        );
+      }
+    }
     notificationWindow.webContents.send("show-notification", {
       displayName: message.displayName,
       description: message.description,
@@ -2590,7 +2973,14 @@ function processNextNotification() {
     presetFolder = oldStyleFolder; // Fallback to the old structure
   }
 
-  const duration = getPresetAnimationDuration(presetFolder);
+  const overrideDurationSec = Number(cachedPreferences?.notificationDuration);
+  const overrideDurationMs =
+    Number.isFinite(overrideDurationSec) && overrideDurationSec > 0
+      ? Math.round(overrideDurationSec * 1000)
+      : 0;
+  const duration =
+    overrideDurationMs || getPresetAnimationDuration(presetFolder);
+  notificationData.durationMs = duration;
   const notificationWindow = createNotificationWindow(notificationData);
 
   if (
@@ -2690,6 +3080,14 @@ function queuePlatinumAfterCurrent(notificationData) {
 }
 
 function queueProgressNotification(data) {
+  if (global.disableProgress) return;
+  if (isProgressMutedByPrefs(cachedPreferences, data)) {
+    notificationLogger.info("queue-progress:muted", {
+      displayName: data?.displayName || "",
+      config: data?.config_path || null,
+    });
+    return;
+  }
   notificationLogger.info("queue-progress", {
     displayName: data?.displayName || "",
     progress: data?.progress ?? null,
@@ -2759,7 +3157,40 @@ function loadPreviousAchievements(configName) {
 function savePreviousAchievements(configName, data) {
   const cachePath = getCachePath(configName);
   try {
-    fs.writeFileSync(cachePath, JSON.stringify(data, null, 2));
+    const ordered = {};
+    const keys = Object.keys(data || {});
+    const known = new Set([
+      "earned",
+      "earned_time",
+      "max_progress",
+      "progress",
+    ]);
+    for (const key of keys) {
+      const entry = data?.[key];
+      if (!entry || typeof entry !== "object") {
+        ordered[key] = entry;
+        continue;
+      }
+      const normalized = {};
+      if (Object.prototype.hasOwnProperty.call(entry, "earned")) {
+        normalized.earned = entry.earned;
+      }
+      if (Object.prototype.hasOwnProperty.call(entry, "earned_time")) {
+        normalized.earned_time = entry.earned_time;
+      }
+      if (Object.prototype.hasOwnProperty.call(entry, "max_progress")) {
+        normalized.max_progress = entry.max_progress;
+      }
+      if (Object.prototype.hasOwnProperty.call(entry, "progress")) {
+        normalized.progress = entry.progress;
+      }
+      for (const [k, v] of Object.entries(entry)) {
+        if (known.has(k)) continue;
+        normalized[k] = v;
+      }
+      ordered[key] = normalized;
+    }
+    fs.writeFileSync(cachePath, JSON.stringify(ordered, null, 2));
     persistenceLogger.info("save-achievement-cache", {
       config: configName,
       path: cachePath,
@@ -2832,6 +3263,26 @@ function findAchievementFileDeep(baseDir, maxDepth = 2) {
     } catch {
       /* ignore */
     }
+  }
+  return null;
+}
+
+function findAchievementFileDeepForAppId(saveBase, appid, maxDepth = 2) {
+  if (!isNonEmptyString(saveBase) || !isNonEmptyString(appid)) return null;
+  const appidStr = String(appid);
+  const candidates = [];
+  if (path.basename(saveBase) === appidStr) {
+    candidates.push(saveBase);
+  }
+  candidates.push(
+    path.join(saveBase, "steam_settings", appidStr),
+    path.join(saveBase, appidStr),
+    path.join(saveBase, "remote", appidStr)
+  );
+  for (const root of candidates) {
+    if (!root || !fs.existsSync(root)) continue;
+    const found = findAchievementFileDeep(root, maxDepth);
+    if (found) return found;
   }
   return null;
 }
@@ -3011,6 +3462,7 @@ function monitorAchievementsFile(filePath) {
               progress: cur.progress,
               max_progress: cur.max_progress,
               config_path: selectedConfigPath,
+              configName,
             });
           }
         }
@@ -3104,6 +3556,7 @@ function monitorAchievementsFile(filePath) {
               progress: current.progress,
               max_progress: current.max_progress,
               config_path: selectedConfigPath,
+              configName,
             });
           }
 
@@ -3144,6 +3597,11 @@ function monitorAchievementsFile(filePath) {
       const baseDir = path.dirname(filePath);
       const tenokePath = path.join(baseDir, "SteamData", "user_stats.ini");
       const iniPath = path.join(baseDir, "achievements.ini");
+      const universeIniPath = path.join(
+        baseDir,
+        "UniverseLANData",
+        "Achievements.ini"
+      );
       const onlineFixIniPath = path.join(baseDir, "Stats", "achievements.ini");
       const binPath = path.join(baseDir, "stats.bin");
 
@@ -3154,6 +3612,11 @@ function monitorAchievementsFile(filePath) {
 
       if (fs.existsSync(iniPath)) {
         monitorAchievementsFile(iniPath);
+        return;
+      }
+
+      if (fs.existsSync(universeIniPath)) {
+        monitorAchievementsFile(universeIniPath);
         return;
       }
 
@@ -3278,7 +3741,7 @@ ipcMain.on("update-config", (event, { configName, preset, position }) => {
     (!achievementsFilePath || !fs.existsSync(achievementsFilePath)) &&
     isNonEmptyString(saveBase)
   ) {
-    const deep = findAchievementFileDeep(saveBase, 2);
+    const deep = findAchievementFileDeepForAppId(saveBase, appid, 2);
     if (deep) {
       achievementsFilePath = deep;
       try {
@@ -3821,17 +4284,42 @@ function maximizeWindow() {
 }
 
 function closeWindow() {
-  if (overlayWindow && !overlayWindow.isDestroyed()) {
-    overlayWindow.close();
-  }
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.close();
+    const shouldCloseToTray =
+      cachedPreferences?.closeToTray === true || global.closeToTray === true;
+    if (shouldCloseToTray && !isQuitting) {
+      mainWindow.hide();
+      return;
+    }
   }
+  isQuitting = true;
+  app.quit();
 }
 
 ipcMain.on("minimize-window", minimizeWindow);
 ipcMain.on("maximize-window", maximizeWindow);
 ipcMain.on("close-window", closeWindow);
+ipcMain.on("tray:action", (_event, action) => {
+  const cmd = String(action || "").toLowerCase();
+  if (cmd === "show") {
+    hideTrayMenu();
+    showMainWindowRespectingPrefs();
+    return;
+  }
+  if (cmd === "settings") {
+    hideTrayMenu();
+    openSettingsFromTray();
+    return;
+  }
+  if (cmd === "hide") {
+    hideTrayMenu();
+    return;
+  }
+  if (cmd === "quit") {
+    isQuitting = true;
+    app.quit();
+  }
+});
 
 app.whenReady().then(async () => {
   // Load preferences
@@ -3856,6 +4344,7 @@ app.whenReady().then(async () => {
   }
 
   copyFolderOnce(defaultSoundsFolder, userSoundsFolder);
+  migrateDefaultPresetsIfNeeded();
   copyFolderOnce(defaultPresetsFolder, userPresetsFolder);
 
   createMainWindow();
@@ -3972,7 +4461,7 @@ function normalizePlayPayload(raw) {
   const displayName = p.displayName || p.name || "Unknown Game";
   const description =
     p.description || (p.phase === "start" ? "Start Playtime!" : "");
-  return { ...p, displayName, description };
+  return { ...p, displayName, description, scale: 1 };
 }
 
 ipcMain.on("show-playtime", (_event, playData) => {
@@ -4035,12 +4524,15 @@ function createPlaytimeWindow(playData = {}) {
     return;
   }
 
-  const { width: sw } =
-    require("electron").screen.getPrimaryDisplay().workAreaSize;
-  const winWidth = 460,
-    winHeight = 340;
-  const x = Math.floor((sw - winWidth) / 2),
-    y = 40;
+  const {
+    x: ax,
+    y: ay,
+    width: aw,
+  } = require("electron").screen.getPrimaryDisplay().workArea;
+  const winWidth = 460;
+  const winHeight = 340;
+  const x = Math.floor(ax + (aw - winWidth) / 2),
+    y = Math.floor(ay + 40);
 
   playtimeWindow = new BrowserWindow({
     width: winWidth,
@@ -4079,7 +4571,7 @@ function createPlaytimeWindow(playData = {}) {
       const prefs = fs.existsSync(preferencesPath)
         ? JSON.parse(fs.readFileSync(preferencesPath, "utf8"))
         : {};
-      const scale = prefs.notificationScale || 1;
+      const scale = normalizeNotificationScale(prefs.notificationScale).scale;
       const source = pendingPlayData ?? playData;
       const payload = normalizePlayPayload({ ...source, phase, scale });
 
@@ -4952,9 +5444,13 @@ async function flagPlatinumFromCacheOnBoot() {
 }
 
 app.on("before-quit", () => {
+  isQuitting = true;
   manualLaunchInProgress = false;
   if (playtimeWindow && !playtimeWindow.isDestroyed()) {
     playtimeWindow.destroy();
+  }
+  if (trayMenuWindow && !trayMenuWindow.isDestroyed()) {
+    trayMenuWindow.destroy();
   }
 });
 

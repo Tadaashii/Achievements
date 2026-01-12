@@ -28,7 +28,6 @@
 }
 
 *{ box-sizing:border-box; }
-html,body{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
 
 .dock{
   position: relative;
@@ -36,14 +35,16 @@ html,body{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, A
   height: var(--icon);
   pointer-events: none;
   opacity: 1;
+  font-family: "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px;
 }
 .dock::before{
   content:"";
   position:absolute; inset:-18% -10%;
+  display: none;
   background:
     radial-gradient(60% 70% at 35% 50%, rgba(var(--glowRGB), .28), transparent 70%),
     radial-gradient(60% 70% at 70% 50%, rgba(var(--glowRGB), .16), transparent 72%);
-  filter: blur(18px);
   opacity: 0;
   pointer-events: none;
 }
@@ -115,20 +116,32 @@ html,body{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, A
 
 .title{
   color: var(--title);
-  font-weight: 800;
-  font-size: 16px;
+  font-weight: 600;
+  font-size: 1.1em;
   line-height: 1.2;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  letter-spacing:.2px;
+  letter-spacing: .1px;
   opacity: 0; transform: translateY(3px);
 }
 .desc{
   margin-top: 6px;
   color: var(--desc);
-  font-size: 13px;
+  font-size: .9em;
   line-height: 1.25;
+  font-weight: 400;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   opacity: 0; transform: translateY(3px);
+}
+
+.title-inner,
+.desc-inner{
+  display: inline-block;
+  will-change: transform;
+  padding-right: 24px;
+}
+.title.marquee,
+.desc.marquee{
+  text-overflow: clip;
 }
 
 .dock.active .clip{

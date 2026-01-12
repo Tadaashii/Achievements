@@ -1,3 +1,7 @@
+:root {
+  --timeline-scale: 1;
+}
+
 * {
   -webkit-box-sizing: border-box;
   -moz-box-sizing: border-box;
@@ -312,9 +316,9 @@
   }
 }
 .ach {
-  -webkit-animation: open-close-banner 5s 1;
-  -moz-animation: open-close-banner 5s 1;
-  animation: open-close-banner 5s 1;
+  -webkit-animation: open-close-banner var(--banner-duration, 5s) 1;
+  -moz-animation: open-close-banner var(--banner-duration, 5s) 1;
+  animation: open-close-banner var(--banner-duration, 5s) 1;
   -webkit-animation-fill-mode: forwards;
   -moz-animation-fill-mode: forwards;
   animation-fill-mode: forwards;
@@ -322,18 +326,18 @@
 
 .ach .icon {
   /* Make border-top pulse. */
-  -webkit-animation: border-top-pulse 1.25s 2;
-  -moz-animation: border-top-pulse 1.25s 2;
-  animation: border-top-pulse 1.25s 2;
+  -webkit-animation: border-top-pulse calc(1.25s * var(--timeline-scale)) 2;
+  -moz-animation: border-top-pulse calc(1.25s * var(--timeline-scale)) 2;
+  animation: border-top-pulse calc(1.25s * var(--timeline-scale)) 2;
   -webkit-animation-fill-mode: forwards;
   -moz-animation-fill-mode: forwards;
   animation-fill-mode: forwards;
 }
 /* fade-in-text */
 .ach .text_wrap {
-  -webkit-animation: fade-in-text 0.5s 1;
-  -moz-animation: fade-in-text 0.5s 1;
-  animation: fade-in-text 0.5s 1;
+  -webkit-animation: fade-in-text calc(0.5s * var(--timeline-scale)) 1;
+  -moz-animation: fade-in-text calc(0.5s * var(--timeline-scale)) 1;
+  animation: fade-in-text calc(0.5s * var(--timeline-scale)) 1;
   -webkit-animation-fill-mode: forwards;
   -moz-animation-fill-mode: forwards;
   animation-fill-mode: forwards;

@@ -61,6 +61,8 @@
 
   <script>
     window.addEventListener('DOMContentLoaded', () => {
+      const metaDur = document.querySelector('meta[name="duration"]');
+      const baseTotal = Math.max(1, Number(metaDur?.content || 5000));
       window.api.onNotification((notificationData) => {
         if (notificationData &&
             notificationData.displayName &&
@@ -84,6 +86,16 @@
           }
         }
 
+        const total = Math.max(0, Number(metaDur?.content || baseTotal));
+        const timelineScale = Math.max(0.1, total / baseTotal);
+        document.documentElement.style.setProperty(
+          "--animation-duration",
+          `${total}ms`
+        );
+        document.documentElement.style.setProperty(
+          "--timeline-scale",
+          String(timelineScale)
+        );
         const container = document.querySelector(".achievement");
         container.classList.add("active");
 
@@ -95,7 +107,7 @@
           container.classList.remove("active");
           glowElement.classList.remove("pulse");
           window.api.closeNotificationWindow();
-        }, 5000);
+        }, total);
       });
     });
   </script>

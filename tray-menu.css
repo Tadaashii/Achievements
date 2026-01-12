@@ -1,0 +1,54 @@
+.tray-menu-html,
+body.tray-menu-body {
+  padding: 10px !important;
+  margin: 0 !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  width: 100% !important;
+  overflow: hidden !important;
+  background-color: var(--dracula-background);
+  scrollbar-width: none;
+  box-sizing: border-box;
+}
+
+.tray-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  scrollbar-width: none;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.tray-menu__item {
+  width: 100%;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin: 0;
+}
+
+.tray-menu__item--danger {
+  color: var(--dracula-red);
+}
+
+.tray-menu__separator {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 2px 0;
+}
+
+body.tray-menu-body::-webkit-scrollbar,
+.tray-menu::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}

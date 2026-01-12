@@ -36,6 +36,8 @@
     </div>
     <script>
       window.addEventListener("DOMContentLoaded", () => {
+        const metaDur = document.querySelector('meta[name="duration"]');
+        const baseTotal = Math.max(1, Number(metaDur?.content || 6000));
         function applyAnchoringFromPosition(ach, posRaw) {
           const raw = String(posRaw || "").toLowerCase();
           const tokens = raw
@@ -123,9 +125,12 @@
 
           const total = Math.max(
             0,
-            Number(
-              document.querySelector('meta[name="duration"]')?.content || 6000
-            )
+            Number(metaDur?.content || baseTotal || 6000)
+          );
+          const timelineScale = Math.max(0.1, total / baseTotal);
+          document.documentElement.style.setProperty(
+            "--timeline-scale",
+            timelineScale.toFixed(4)
           );
           setTimeout(() => {
             ach.classList.remove("active");

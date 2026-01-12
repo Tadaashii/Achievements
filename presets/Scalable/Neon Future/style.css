@@ -8,6 +8,7 @@
   --shadow: 0 0 20px rgba(0, 255, 170, 0.5);
   --animation-duration: 5s;
   --neon-shadow: 0 0 10px var(--primary-color), 0 0 20px var(--primary-color), 0 0 30px var(--primary-color);
+  --timeline-scale: 1;
 }
 
 .achievement {
@@ -41,7 +42,7 @@
 }
 
 .neon-glow.pulse {
-  animation: neon-pulse 1.5s infinite alternate;
+  animation: neon-pulse calc(1.5s * var(--timeline-scale, 1)) infinite alternate;
 }
 
 .achievement.active {

@@ -18,6 +18,7 @@ html {
   --blue: #12cbc4;
   --dark-blue: #1289a7;
   --red: #ed4c67;
+  --timeline-scale: 1;
 }
 
 body {
@@ -48,7 +49,8 @@ body {
 
 .ach {
   opacity: 1;
-  animation: base-animation 3s ease alternate infinite;
+  animation: base-animation calc(3s * var(--timeline-scale)) ease alternate
+    infinite;
 }
 
 .ach .icon {
@@ -74,8 +76,9 @@ body {
 }
 
 .ach .icon {
-  animation-delay: 1s;
-  animation: combinedButtonIconAnimation 3s ease alternate infinite;
+  animation-delay: calc(1s * var(--timeline-scale));
+  animation: combinedButtonIconAnimation calc(3s * var(--timeline-scale)) ease
+    alternate infinite;
 }
 .ach .icon {
   z-index: 2;
@@ -84,16 +87,18 @@ body {
   height: 60px;
   width: 60px;
   border-radius: 10px;
-  animation-delay: 1s;
-  animation: icon-animation 3s ease alternate infinite;
+  animation-delay: calc(1s * var(--timeline-scale));
+  animation: icon-animation calc(3s * var(--timeline-scale)) ease alternate
+    infinite;
 }
 
 .ach .text_wrap {
   position: relative;
   z-index: 1;
   overflow: hidden;
-  animation-delay: 1s;
-  animation: text-animation 3s ease alternate infinite;
+  animation-delay: calc(1s * var(--timeline-scale));
+  animation: text-animation calc(3s * var(--timeline-scale)) ease alternate
+    infinite;
   overflow: hidden; /* clip marquee */
 }
 

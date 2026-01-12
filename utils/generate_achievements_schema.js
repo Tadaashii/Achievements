@@ -279,9 +279,22 @@ const DEFAULT_LANGS = [
   "schinese",
   "LATAM",
 ];
+const EXTENDED_STEAM_LANGS = [
+  ...DEFAULT_LANGS,
+  "thai",
+  "portuguese",
+  "danish",
+  "dutch",
+  "swedish",
+  "hungarian",
+  "turkish",
+  "ukrainian",
+  "vietnamese",
+];
 const LANGS = (langsArg ? langsArg.split(",") : DEFAULT_LANGS)
   .map((s) => s.trim())
   .filter(Boolean);
+const STEAM_LANGS = langsArg ? LANGS : EXTENDED_STEAM_LANGS;
 
 info("achschema:start", {
   uplayAppIds: resolvedAppIds.map((entry) => entry.uplayId),
@@ -347,6 +360,12 @@ function extFromUrl(u) {
   } catch {
     return ".jpg";
   }
+}
+function normalizeSteamIconUrl(appid, value) {
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith("//")) return "https:" + value;
+  return `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${appid}/${value}`;
 }
 
 async function download(url, dest, ms = 20000) {
@@ -658,7 +677,9 @@ const EPIC_LOCALE_MAP = {
 };
 
 function epicLocaleForLang(lang) {
-  const key = String(lang || "").trim().toLowerCase();
+  const key = String(lang || "")
+    .trim()
+    .toLowerCase();
   return EPIC_LOCALE_MAP[key] || EPIC_LOCALE_MAP.english;
 }
 
@@ -853,26 +874,147 @@ async function readApiKey() {
   //emit('warn', 'Steam API key not found. Running in SteamDB/SteamHunters mode. (English only)');
   return "";
 }
-async function fetchSchemaLang(appid, key, lang) {
-  const url = `https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${encodeURIComponent(
-    key
-  )}&appid=${encodeURIComponent(appid)}&l=${encodeURIComponent(lang)}`;
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`Steam API ${appid} ${lang} HTTP ${r.status}`);
-  const j = await r.json().catch(() => ({}));
-  const list = j?.game?.availableGameStats?.achievements || [];
-  const map = new Map();
-  for (const a of list) {
-    if (!a || !a.name) continue;
-    map.set(a.name, {
-      displayName: a.displayName || "",
-      description: a.description || "",
-      hidden: Number(a.hidden) ? 1 : 0,
-      icon: a.icon || "",
-      icongray: a.icongray || "",
-    });
+
+const STEAM_API_TIMEOUT_MS = 15000;
+const STEAM_API_GAP_MS = 250;
+
+async function fetchJsonWithTimeout(url, timeoutMs) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal });
+    return { response: r, json: await r.json().catch(() => ({})) };
+  } finally {
+    clearTimeout(t);
   }
-  return map;
+}
+async function fetchSchemaLang(appid, key, lang) {
+  const base = `https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${encodeURIComponent(
+    key
+  )}&appid=${encodeURIComponent(appid)}`;
+  const urls = [
+    `${base}&language=${encodeURIComponent(lang)}`,
+    `${base}&l=${encodeURIComponent(lang)}`,
+  ];
+  let lastErr = null;
+
+  for (let i = 0; i < urls.length; i++) {
+    const url = urls[i];
+    const mode = i === 0 ? "language" : "l";
+    try {
+      emit("info", "steam-schema:request", { appid, lang, mode });
+      const { response: r, json: j } = await fetchJsonWithTimeout(
+        url,
+        STEAM_API_TIMEOUT_MS
+      );
+      if (!r.ok) throw new Error(`Steam API ${appid} ${lang} HTTP ${r.status}`);
+      const list = j?.game?.availableGameStats?.achievements || [];
+      if (!list.length) {
+        emit("warn", "steam-schema:empty", { appid, lang, mode });
+        continue;
+      }
+      const map = new Map();
+      for (const a of list) {
+        if (!a || !a.name) continue;
+        map.set(a.name, {
+          displayName: a.displayName || "",
+          description: a.description || "",
+          hidden: Number(a.hidden) ? 1 : 0,
+          icon: a.icon || "",
+          icongray: a.icongray || "",
+        });
+      }
+      emit("info", "steam-schema:success", {
+        appid,
+        lang,
+        mode,
+        count: map.size,
+      });
+      return map;
+    } catch (err) {
+      lastErr = err;
+      emit("warn", "steam-schema:failed", {
+        appid,
+        lang,
+        mode,
+        error: err?.message || String(err),
+      });
+    }
+    if (i < urls.length - 1 && STEAM_API_GAP_MS > 0) {
+      await sleep(STEAM_API_GAP_MS);
+    }
+  }
+
+  if (lastErr) throw lastErr;
+  return new Map();
+}
+async function fetchAchievementsLang(appid, key, lang) {
+  const base = `https://api.steampowered.com/IPlayerService/GetGameAchievements/v1/?key=${encodeURIComponent(
+    key
+  )}&appid=${encodeURIComponent(appid)}`;
+  const urls = [
+    `${base}&language=${encodeURIComponent(lang)}`,
+    `${base}&l=${encodeURIComponent(lang)}`,
+  ];
+  let lastErr = null;
+
+  for (let i = 0; i < urls.length; i++) {
+    const url = urls[i];
+    const mode = i === 0 ? "language" : "l";
+    try {
+      emit("info", "steam-achievements:request", { appid, lang, mode });
+      const { response: r, json: j } = await fetchJsonWithTimeout(
+        url,
+        STEAM_API_TIMEOUT_MS
+      );
+      if (!r.ok)
+        throw new Error(
+          `Steam Achievements API ${appid} ${lang} HTTP ${r.status}`
+        );
+      const list = j?.response?.achievements || [];
+      if (!list.length) {
+        emit("warn", "steam-achievements:empty", { appid, lang, mode });
+        continue;
+      }
+
+      const map = new Map();
+      for (const a of list) {
+        const apiName = a?.internal_name || a?.name || "";
+        if (!apiName) continue;
+        map.set(apiName, {
+          displayName: a?.localized_name || "",
+          description: a?.localized_desc || "",
+          hidden: a?.hidden ? 1 : 0,
+          icon: normalizeSteamIconUrl(appid, a?.icon || ""),
+          icongray: normalizeSteamIconUrl(
+            appid,
+            a?.icon_gray || a?.icongray || ""
+          ),
+        });
+      }
+      emit("info", "steam-achievements:success", {
+        appid,
+        lang,
+        mode,
+        count: map.size,
+      });
+      return map;
+    } catch (err) {
+      lastErr = err;
+      emit("warn", "steam-achievements:failed", {
+        appid,
+        lang,
+        mode,
+        error: err?.message || String(err),
+      });
+    }
+    if (i < urls.length - 1 && STEAM_API_GAP_MS > 0) {
+      await sleep(STEAM_API_GAP_MS);
+    }
+  }
+
+  if (lastErr) throw lastErr;
+  return new Map();
 }
 
 /* ---------- Scraping SteamDB ---------- */
@@ -1143,6 +1285,70 @@ function uniqueLangsWithEnglish(langs) {
   s.add("english");
   return Array.from(s);
 }
+async function buildAchievementsFromScrape(appid, imgDir) {
+  let scraped = [];
+  try {
+    scraped = await scrapeSteamDB(appid);
+  } catch (e) {
+    warn(
+      `[${appid}] SteamDB failed: ${String(
+        e?.message || e
+      )} -> trying SteamHunters`
+    );
+    try {
+      scraped = await scrapeSteamHunters(appid);
+    } catch (e2) {
+      warn(
+        `[${appid}] SteamHunters failed: ${String(
+          e2?.message || e2
+        )} -> continue`
+      );
+      scraped = [];
+    }
+  }
+
+  const results = [];
+  for (const a of scraped) {
+    const enNorm = normalizeHidden(a.descEN || "");
+    const hidden = enNorm.hidden ? 1 : a.hidden ? 1 : 0;
+
+    let iconRel = "";
+    let iconGrayRel = "";
+    if (a.iconUrl) {
+      const baseName =
+        sanitize(
+          path.basename(new URL(a.iconUrl).pathname).replace(/\.[^.]+$/, "")
+        ) || sanitize(a.apiName + "_icon");
+      const file = `${baseName}${extFromUrl(a.iconUrl)}`;
+      await download(a.iconUrl, path.join(imgDir, file));
+      iconRel = `img/${file}`;
+    }
+    if (a.iconGrayUrl) {
+      const baseName =
+        sanitize(
+          path
+            .basename(new URL(a.iconGrayUrl).pathname)
+            .replace(/\.[^.]+$/, "")
+        ) || sanitize(a.apiName + "_gray");
+      const file = `${baseName}${extFromUrl(a.iconGrayUrl)}`;
+      await download(a.iconGrayUrl, path.join(imgDir, file));
+      iconGrayRel = `img/${file}`;
+    } else {
+      iconGrayRel = iconRel;
+    }
+
+    results.push({
+      hidden,
+      displayName: { english: a.nameEN || "" },
+      description: { english: enNorm.clean },
+      icon: iconRel,
+      icon_gray: iconGrayRel,
+      name: a.apiName,
+    });
+  }
+
+  return results;
+}
 
 /* ---------- Process ---------- */
 async function processOneApp(appMeta, apiKey, outBaseDir) {
@@ -1175,7 +1381,7 @@ async function processOneApp(appMeta, apiKey, outBaseDir) {
     return processGogApp(folderId, outBaseDir);
   }
   if (wantsEpic) {
-    const langsToFetch = uniqueLangsWithEnglish(LANGS);
+    const langsToFetch = uniqueLangsWithEnglish(STEAM_LANGS);
     const perLangByApi = {};
 
     await Promise.all(
@@ -1265,28 +1471,35 @@ async function processOneApp(appMeta, apiKey, outBaseDir) {
         name: apiName,
       });
     }
-  }
-  else if (apiKey) {
+  } else if (apiKey) {
     // ===== API-ONLY =====
     // 1) langs
-    const langsToFetch = uniqueLangsWithEnglish(LANGS);
+    const langsToFetch = uniqueLangsWithEnglish(STEAM_LANGS);
 
-    // 2) fetch schema
+    // 2) fetch achievements -> fallback schema
     const perLangByApi = {};
-    await Promise.all(
-      langsToFetch.map(async (lang) => {
+    for (const lang of langsToFetch) {
+      let map = null;
+      try {
+        map = await fetchAchievementsLang(appid, apiKey, lang);
+      } catch {
+        map = null;
+      }
+      if (map && map.size) {
+        perLangByApi[lang] = map;
+      } else {
+        emit("info", "steam-achievements:fallback-schema", { appid, lang });
         try {
-          perLangByApi[lang] = await fetchSchemaLang(appid, apiKey, lang);
-        } catch (e) {
-          emit("warn", `[${appid}] Steam API failed for ${lang}`, {
-            appid,
-            lang,
-            error: String(e?.message || e),
-          });
-          perLangByApi[lang] = new Map();
+          map = await fetchSchemaLang(appid, apiKey, lang);
+        } catch {
+          map = null;
         }
-      })
-    );
+        perLangByApi[lang] = map || new Map();
+      }
+      if (STEAM_API_GAP_MS > 0) {
+        await sleep(STEAM_API_GAP_MS);
+      }
+    }
 
     // 3) take EN
     let enMap = perLangByApi["english"];
@@ -1359,71 +1572,12 @@ async function processOneApp(appMeta, apiKey, outBaseDir) {
         name: apiName,
       });
     }
+    if (achievements.length === 0) {
+      achievements.push(...(await buildAchievementsFromScrape(appid, imgDir)));
+    }
   } else {
     // ===== STEAMDB-ONLY =====
-    // 1) scrape SteamDB => fallback SteamHunters
-    let scraped = [];
-    try {
-      scraped = await scrapeSteamDB(appid);
-    } catch (e) {
-      warn(
-        `[${appid}] SteamDB failed: ${String(
-          e?.message || e
-        )} -> trying SteamHunters`
-      );
-      try {
-        scraped = await scrapeSteamHunters(appid);
-      } catch (e2) {
-        warn(
-          `[${appid}] SteamHunters failed: ${String(
-            e2?.message || e2
-          )} -> continue`
-        );
-        scraped = [];
-      }
-    }
-
-    // 2) Only English
-    for (const a of scraped) {
-      const enNorm = normalizeHidden(a.descEN || "");
-      const hidden = enNorm.hidden ? 1 : a.hidden ? 1 : 0;
-
-      // take img from SteamDB/SteamHunters
-      let iconRel = "",
-        iconGrayRel = "";
-      if (a.iconUrl) {
-        const baseName =
-          sanitize(
-            path.basename(new URL(a.iconUrl).pathname).replace(/\.[^.]+$/, "")
-          ) || sanitize(a.apiName + "_icon");
-        const file = `${baseName}${extFromUrl(a.iconUrl)}`;
-        await download(a.iconUrl, path.join(imgDir, file));
-        iconRel = `img/${file}`;
-      }
-      if (a.iconGrayUrl) {
-        const baseName =
-          sanitize(
-            path
-              .basename(new URL(a.iconGrayUrl).pathname)
-              .replace(/\.[^.]+$/, "")
-          ) || sanitize(a.apiName + "_gray");
-        const file = `${baseName}${extFromUrl(a.iconGrayUrl)}`;
-        await download(a.iconGrayUrl, path.join(imgDir, file));
-        iconGrayRel = `img/${file}`;
-      } else {
-        // fallback: icon_gary is missing use icon
-        iconGrayRel = iconRel;
-      }
-
-      achievements.push({
-        hidden,
-        displayName: { english: a.nameEN || "" },
-        description: { english: enNorm.clean },
-        icon: iconRel,
-        icon_gray: iconGrayRel,
-        name: a.apiName,
-      });
-    }
+    achievements.push(...(await buildAchievementsFromScrape(appid, imgDir)));
   }
 
   const gogCredentialsReady =

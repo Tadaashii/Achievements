@@ -14,6 +14,7 @@ body {
   --scale: 1;
   --ach-width: 600px;
   --ach-collapsed-width: 100px;
+  --timeline-scale: 1;
 }
 
 .ach {
@@ -43,8 +44,8 @@ body {
 }
 
 .achievement-banner.animated {
-  animation: mainAnimationFrames linear 5s;
-  animation-delay: 1s;
+  animation: mainAnimationFrames linear calc(5s * var(--timeline-scale));
+  animation-delay: calc(1s * var(--timeline-scale));
   animation-iteration-count: 1;
   transform-origin: 50% 50%;
   animation-fill-mode: forwards;
@@ -66,7 +67,8 @@ body {
   border-radius: 50px;
   background-color: #12a314;
   z-index: 10;
-  animation: achievementLoaderAnimationFrames ease-out 7s;
+  animation: achievementLoaderAnimationFrames ease-out
+    calc(7s * var(--timeline-scale));
   animation-fill-mode: forwards;
   transform: scale(0);
   transform-origin: 50% 50%;
@@ -75,35 +77,35 @@ body {
 .achievement-loader:nth-of-type(1) {
   animation: achievementLoaderAnimationFrames;
   background-color: #139d13;
-  animation-duration: 7s;
+  animation-duration: calc(7s * var(--timeline-scale));
 }
 
 .achievement-loader:nth-of-type(2) {
   animation: achievementLoaderAnimationFrames;
   background-color: #107c10;
-  animation-delay: 0.1s;
-  animation-duration: 6.5s;
+  animation-delay: calc(0.1s * var(--timeline-scale));
+  animation-duration: calc(6.5s * var(--timeline-scale));
 }
 
 .achievement-loader:nth-of-type(3) {
   animation: achievementLoaderAnimationFrames;
   background-color: #139d13;
-  animation-delay: 0.25s;
-  animation-duration: 6s;
+  animation-delay: calc(0.25s * var(--timeline-scale));
+  animation-duration: calc(6s * var(--timeline-scale));
 }
 
 .achievement-loader:nth-of-type(4) {
   animation: achievementLoaderAnimationFrames;
   background-color: #107c10;
-  animation-delay: 0.5s;
-  animation-duration: 5.5s;
+  animation-delay: calc(0.5s * var(--timeline-scale));
+  animation-duration: calc(5.5s * var(--timeline-scale));
 }
 
 .achievement-loader:nth-of-type(5) {
   animation: achievementLoaderAnimationFrames;
   background-color: #139d13;
-  animation-delay: 0.75s;
-  animation-duration: 5s;
+  animation-delay: calc(0.75s * var(--timeline-scale));
+  animation-duration: calc(5s * var(--timeline-scale));
 }
 
 .icon img {
@@ -122,8 +124,8 @@ body {
   margin-left: 10px;
   z-index: 10;
   animation: achievementLoaderAnimationFrames;
-  animation-delay: 1s;
-  animation-duration: 4.5s;
+  animation-delay: calc(1s * var(--timeline-scale));
+  animation-duration: calc(4.5s * var(--timeline-scale));
 }
 
 @keyframes achievementLoaderAnimationFrames {
@@ -147,8 +149,8 @@ body {
 
 .achievement-trophy {
   background-color: transparent !important;
-  animation: xboxLogoAnimationFrames ease-out 4s;
-  animation-delay: 1s;
+  animation: xboxLogoAnimationFrames ease-out calc(4s * var(--timeline-scale));
+  animation-delay: calc(1s * var(--timeline-scale));
   color: #fff;
   position: relative;
 }
@@ -180,8 +182,9 @@ body {
   top: -60px;
   transform: translateX(-50%) translateX(40px);
   font-size: 27px;
-  animation: achievementNameAnimationFrames linear 2s;
-  animation-delay: 1.4s;
+  animation: achievementNameAnimationFrames linear
+    calc(2s * var(--timeline-scale));
+  animation-delay: calc(1.4s * var(--timeline-scale));
   opacity: 0;
   max-width: 70%;
   text-align: center;
@@ -197,8 +200,9 @@ body {
   top: -30px;
   transform: translateX(-50%) translateY(20px);
   font-size: 20px;
-  animation: achievementTextAnimationFrames linear 6s;
-  animation-delay: 2.4s;
+  animation: achievementTextAnimationFrames linear
+    calc(6s * var(--timeline-scale));
+  animation-delay: calc(2.4s * var(--timeline-scale));
   opacity: 0;
   max-width: 60%;
   text-align: center;

@@ -142,6 +142,7 @@ contextBridge.exposeInMainWorld("api", {
   getSteamDbCover: (appid) => ipcRenderer.invoke("covers:steamdb", appid),
   getSteamGridDbCover: (payload) =>
     ipcRenderer.invoke("covers:steamgriddb", payload),
+  trayAction: (action) => ipcRenderer.send("tray:action", action),
   setStartWithWindows: (enabled) =>
     ipcRenderer.invoke("startup:set-start-with-windows", enabled),
   getStartWithWindows: () =>
@@ -167,6 +168,7 @@ contextBridge.exposeInMainWorld("electron", {
     on: (channel, func) => {
       const validChannels = [
         "window-state-change",
+        "window-fullscreen-change",
         "notify",
         "achievements-missing",
         "show-progress",

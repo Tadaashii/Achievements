@@ -17,6 +17,9 @@
         background: transparent;
         font-family: "Segoe UI", system-ui, sans-serif;
         overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
 
       .playtime-container {
@@ -26,6 +29,7 @@
         background: rgba(20, 22, 28, 0.92);
         color: #fff;
         transform: scale(0) translateY(30px);
+        transform-origin: center center;
         opacity: 0;
         will-change: transform, opacity;
       }

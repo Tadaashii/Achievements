@@ -1,6 +1,6 @@
 {
   "name": "achievements",
-  "version": "1.0.9",
+  "version": "1.1.0",
   "description": "Achievements",
   "author": "JokerVerse",
   "main": "main.js",
@@ -35,6 +35,9 @@
       "playtime.html",
       "playtime-log-watcher.js",
       "style.css",
+      "tray-menu.html",
+      "tray-menu.js",
+      "tray-menu.css",
       "sounds/**/*",
       "presets/**/*",
       "utils/**/*",
@@ -61,6 +64,7 @@
     ],
     "win": {
       "requestedExecutionLevel": "requireAdministrator",
+      "signAndEditExecutable": false,
       "target": [
         {
           "target": "nsis",
@@ -78,7 +82,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Achievements"
-    }
+    },
+    "afterPack": "build/afterPack.js"
   },
   "dependencies": {
     "axios": "^1.12.0",
@@ -96,7 +101,8 @@
     "cross-env": "^10.0.0",
     "electron": "^27.3.11",
     "electron-builder": "^24.13.3",
-    "eslint": "^9.35.0"
+    "eslint": "^9.35.0",
+    "rcedit": "^5.0.2"
   },
   "overrides": {
     "glob": "^9.0.0"
