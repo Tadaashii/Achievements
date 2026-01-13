@@ -1972,6 +1972,13 @@
         ) {
           const term = buildSteamGridSearchTerm(rawTerm);
           if (!term) return false;
+          const logCover = (level, message, meta = {}) => {
+            try {
+              if (window.api?.logCoverEvent) {
+                window.api.logCoverEvent(level, message, meta);
+              }
+            } catch {}
+          };
           const cacheKey = `${size}::${term.toLowerCase()}`;
           if (steamGridUrlCache.has(cacheKey)) {
             const cached = steamGridUrlCache.get(cacheKey);
@@ -1993,7 +2000,20 @@
               await downloadAndSave(targetAppId, response.url);
               return true;
             }
-          } catch (err) {}
+            logCover("warn", "steamgrid:ipc-failed", {
+              appid: targetAppId,
+              term,
+              size,
+              message: response?.message || "no-url",
+            });
+          } catch (err) {
+            logCover("warn", "steamgrid:ipc-error", {
+              appid: targetAppId,
+              term,
+              size,
+              error: err?.message || String(err),
+            });
+          }
           steamGridUrlCache.set(cacheKey, null);
           return false;
         }

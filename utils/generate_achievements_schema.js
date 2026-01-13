@@ -1,12 +1,24 @@
 // generate_achievements_schema.js
-process.env.PLAYWRIGHT_BROWSERS_PATH = "0";
+const path = require("path");
+const fsSync = require("fs");
+
+function resolvePlaywrightBrowsersPath() {
+  const current = process.env.PLAYWRIGHT_BROWSERS_PATH || "";
+  if (current && current !== "0") return current;
+  const resourcesRoot = process.resourcesPath;
+  if (resourcesRoot) {
+    const candidate = path.join(resourcesRoot, "playwright-browsers");
+    if (fsSync.existsSync(candidate)) return candidate;
+  }
+  return current || "0";
+}
+
+process.env.PLAYWRIGHT_BROWSERS_PATH = resolvePlaywrightBrowsersPath();
 const { chromium } = require("playwright");
 const { execFileSync } = require("child_process");
 const fs = require("fs/promises");
-const path = require("path");
 const crypto = require("crypto");
 const { createLogger } = require("./logger");
-const fsSync = require("fs");
 const DEFAULT_UPLAY_MAP_PATH = path.join(
   __dirname,
   "..",

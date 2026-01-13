@@ -1180,7 +1180,6 @@ async function runAchievementsGenerator(
       stdio: ["pipe", "pipe", "pipe", "ipc"],
       env: {
         ...process.env,
-        PLAYWRIGHT_BROWSERS_PATH: "0",
         LOGGER_DIR: logDir,
         LOGGER_SUPPRESS_CLEAR: "1",
       },

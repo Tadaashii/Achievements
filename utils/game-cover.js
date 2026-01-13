@@ -1,5 +1,19 @@
 const path = require("path");
 const fs = require("fs/promises");
+const fsSync = require("fs");
+
+const resolvePlaywrightBrowsersPath = () => {
+  const current = process.env.PLAYWRIGHT_BROWSERS_PATH || "";
+  if (current && current !== "0") return current;
+  const resourcesRoot = process.resourcesPath;
+  if (resourcesRoot) {
+    const candidate = path.join(resourcesRoot, "playwright-browsers");
+    if (fsSync.existsSync(candidate)) return candidate;
+  }
+  return current || "0";
+};
+
+process.env.PLAYWRIGHT_BROWSERS_PATH = resolvePlaywrightBrowsersPath();
 const { chromium } = require("playwright-core");
 const { createLogger } = require("./logger");
 
@@ -38,6 +52,10 @@ async function launchChromiumSafe(opts = {}) {
       p.replace(/app\.asar(?!\.unpacked)/, "app.asar.unpacked");
 
     const roots = [];
+    const envRoot = process.env.PLAYWRIGHT_BROWSERS_PATH || "";
+    if (envRoot && envRoot !== "0") {
+      roots.push(envRoot);
+    }
 
     for (const pkg of ["playwright-core", "playwright"]) {
       try {
@@ -76,9 +94,27 @@ async function launchChromiumSafe(opts = {}) {
           exeCandidates.push(
             path.join(root, d, "chrome-win", "headless_shell.exe")
           );
+          exeCandidates.push(
+            path.join(
+              root,
+              d,
+              "chrome-headless-shell-win64",
+              "chrome-headless-shell.exe"
+            )
+          );
+          exeCandidates.push(
+            path.join(
+              root,
+              d,
+              "chrome-headless-shell-win32",
+              "chrome-headless-shell.exe"
+            )
+          );
         }
         if (/^chromium-/i.test(d)) {
           exeCandidates.push(path.join(root, d, "chrome-win", "chrome.exe"));
+          exeCandidates.push(path.join(root, d, "chrome-win64", "chrome.exe"));
+          exeCandidates.push(path.join(root, d, "chrome-win32", "chrome.exe"));
         }
       }
     }
@@ -218,14 +254,34 @@ async function fetchSteamGridDbImage(term, options = {}) {
   const size = options.size || "600x900";
   const url = buildSteamGridSearchUrl(term, size);
   coverLogger.info("steamgrid:fetch:start", { term, size });
-  const browser = await getBrowserForApp(options?.appid || term, {
-    headless: true,
-  });
-  const ctx = await browser.newContext({
-    userAgent:
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
-    viewport: { width: 1280, height: 900 },
-  });
+  let browser;
+  try {
+    browser = await getBrowserForApp(options?.appid || term, {
+      headless: true,
+    });
+  } catch (err) {
+    coverLogger.error("steamgrid:browser-failed", {
+      term,
+      size,
+      error: err?.message || String(err),
+    });
+    throw markSteamGridNotFound(err, "browser-launch-failed");
+  }
+  let ctx;
+  try {
+    ctx = await browser.newContext({
+      userAgent:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
+      viewport: { width: 1280, height: 900 },
+    });
+  } catch (err) {
+    coverLogger.error("steamgrid:context-failed", {
+      term,
+      size,
+      error: err?.message || String(err),
+    });
+    throw markSteamGridNotFound(err, "context-create-failed");
+  }
   try {
     const page = await ctx.newPage();
     page.setDefaultTimeout(20000);
@@ -279,7 +335,7 @@ async function fetchSteamGridDbImage(term, options = {}) {
     });
     throw markSteamGridNotFound(err);
   } finally {
-    await ctx.close().catch(() => {});
+    await ctx?.close().catch(() => {});
     try {
       const key = String(options?.appid || term);
       const b = browserByApp.get(key);
