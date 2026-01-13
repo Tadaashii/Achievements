@@ -117,6 +117,8 @@ contextBridge.exposeInMainWorld("api", {
     ),
   logCoverEvent: (level, message, meta) =>
     ipcRenderer.invoke("covers:ui-log", { level, message, meta }),
+  logUiEvent: (level, message, meta) =>
+    ipcRenderer.invoke("ui:log", { level, message, meta }),
   checkLocalGameImage: (appid, platform) =>
     ipcRenderer.invoke("checkLocalGameImage", appid, platform),
   saveGameImage: (appid, buffer, platform) =>

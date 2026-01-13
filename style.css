@@ -167,6 +167,31 @@ h1 {
   scrollbar-width: none;
 }
 
+#appConfirmModal {
+  z-index: 100000;
+}
+
+.confirm-modal {
+  width: 420px;
+  max-width: 90vw;
+  text-align: left;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.confirm-actions button {
+  min-width: 110px;
+}
+
+.modal-open {
+  overflow: hidden;
+}
+
 .modal.hidden {
   display: none;
 }
@@ -1482,7 +1507,7 @@ body.window-maximized #left-controls,
     :fullscreen body,
     body:-webkit-full-screen,
     :-webkit-full-screen body
-  )[data-zoom="200"]
+  )[data-effective-zoom="200"]
   .titlebar {
   zoom: 60% !important;
 }
@@ -1493,7 +1518,7 @@ body.window-maximized #left-controls,
     :fullscreen body,
     body:-webkit-full-screen,
     :-webkit-full-screen body
-  )[data-zoom="150"]
+  )[data-effective-zoom="150"]
   .titlebar {
   zoom: 75% !important;
 }
@@ -1504,7 +1529,7 @@ body.window-maximized #left-controls,
     :fullscreen body,
     body:-webkit-full-screen,
     :-webkit-full-screen body
-  )[data-zoom="125"]
+  )[data-effective-zoom="125"]
   .titlebar {
   zoom: 75% !important;
 }
@@ -1515,7 +1540,7 @@ body.window-maximized #left-controls,
     :fullscreen body,
     body:-webkit-full-screen,
     :-webkit-full-screen body
-  )[data-zoom="75"]
+  )[data-effective-zoom="75"]
   .titlebar {
   zoom: 100% !important;
 }

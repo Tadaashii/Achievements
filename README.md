@@ -1,59 +1,56 @@
 # 🎮 Achievements
 
-A desktop application built with Electron that monitors running games and displays beautiful animated notifications for:
+A desktop application built with Electron that monitors running games and displays animated notifications for:
 
 - ✅ Achievement unlocks
 - ⏱️ Playtime tracking (Now Playing / You Played X minutes)
 - 📈 Progress updates
 - 🖼️ Game image overlays
 - 📊 Real-time achievement dashboard
+- ?? Steam/Uplay/GOG/Epic schema support (auto-detected where possible)
 
 ## ✨ Features
 
 - **Achievement Tracking**
-
   - Detects running games using their process names
   - Sends notifications with custom HTML/CSS animation
   - Real-time progress monitoring and updates
   - Screenshots achievements when unlocked (optional)
-
 - **Smart Dashboard**
-
   - Grid view of all configured games
   - Real-time progress tracking per game
   - Multiple sorting options:
-    - Alphabetical (A→Z / Z→A)
-    - Progress (Low→High / High→Low)
-    - Last Updated (Recent→Old / Old→Recent)
+    - Alphabetical (A-Z / Z-A)
+    - Progress (Low-High / High-Low)
+    - Last Updated (Recent-Old / Old-Recent)
   - Quick game search and filtering
   - Click-to-load configs
   - Play game launch button (requires executable and optional arguments)
   - Automatically refreshes when config or save files change
-
 - **Notification System**
-
   - Multiple notification types:
     - Achievement unlocks
     - Progress updates
     - Playtime tracking (Now Playing / Session Ended)
   - Customizable sounds and visual presets
-  - Adjustable position and scaling (All presets now supports maximum 200% scale)
+  - Adjustable position, duration, and scaling (presets support up to 200%)
   - Non-intrusive overlay system
   - Playtime header artwork cached locally for faster repeat notifications
-
+  - Per-game progress mute (when a config is active)
 - **Playtime Tracker**
-
   - Detects when configured games start and stop via process monitoring
   - Stores total Playtime per config inside `%APPDATA%/Achievements/playtime-totals.json`
   - Shows Playtime totals in the Achievements panel
   - Triggers dedicated notifications rendered by `playtime.html`
-
 - **Customization**
-
   - Modern settings UI with tabs
   - Multiple visual themes/presets
   - Startup options (maximized/minimized)
   - UI scaling (75% to 200%)
+  - Achievement duration slider (auto or custom)
+  - Achievement sound volume (0% to 200%)
+  - Show hidden descriptions (when available)
+  - Close-to-tray option
   - Multi-language support for achievements
 
 ## 📁 Project Structure
@@ -92,12 +89,14 @@ A desktop application built with Electron that monitors running games and displa
 
 ```bash
 npm start
+
 ```
 
 ## 🧱 Building a Windows Executable
 
 ```bash
 npm run dist
+
 ```
 
 Creates a standalone `.exe` installer in the `dist/` folder.
@@ -131,6 +130,14 @@ Creates a standalone `.exe` installer in the `dist/` folder.
 
 ## 🎮 Setup & Configuration
 
+### Quick Start (Tutorial)
+
+1. Open **Settings** and set Preset, and Scale.
+2. Add your **Watched Folders** (recommended) so the app can detect saves/emulators.
+3. Start a game once so its save folder appears; the watcher will auto-create a config when possible.
+4. Let the game identify and auto-select the config, or Select the config manually, set your Language to view achievements, progress, and playtime.
+5. Optional: mute progress notifications for that config using the checkbox under the config dropdown.
+
 ### Basic Setup
 
 #### Manual Configuration
@@ -147,29 +154,26 @@ Creates a standalone `.exe` installer in the `dist/` folder.
 
 #### Auto Configuration
 
-1. Click "Generate Auto-Configs" and select your game saves directory
+1. Use **Watched Folders** (recommended) to scan your emulator/save directories.
 2. The app will:
-   - Scan for game folders with numeric names (Steam AppIDs)
-   - Fetch game info from Steam Store or Steam Hunters
-   - Download achievement data and images using Steam API
-   - Create pre-configured entries for each detected game
-   - Add configs to your dashboard automatically  
-3. Watched Folders:
-   - By default the following folders are watched and configs are load automatically, or schema is created when new APPID is created.  
-    ["PUBLIC", ["Documents", "Steam", "CODEX"]],
-    ["PUBLIC", ["Documents", "Steam", "RUNE"]],
-    ["PUBLIC", ["Documents", "OnlineFix"]],
-    ["PUBLIC", ["Documents", "EMPRESS"]],
-    ["APPDATA", ["Goldberg SteamEmu Saves"]],
-    ["APPDATA", ["GSE Saves"]],
-    ["APPDATA", ["EMPRESS"]],
-    ["LOCALAPPDATA", ["anadius", "LSX emu", "achievement_watcher"]],
-    ["APPDATA", ["Steam", "CODEX"]],
-    ["APPDATA", ["SmartSteamEmu"]],
-    ["LOCALAPPDATA", ["SKIDROW"]],
-  
+   - detect AppIDs and platform,
+   - fetch game name + schema,
+   - download achievement data and images when available,
+   - generate configs automatically.
+3. Default watched folders include:
+   - %PUBLIC%\Documents\Steam\CODEX
+   - %PUBLIC%\Documents\Steam\RUNE
+   - %PUBLIC%\Documents\OnlineFix
+   - %PUBLIC%\Documents\EMPRESS
+   - %APPDATA%\Goldberg SteamEmu Saves
+   - %APPDATA%\GSE Saves
+   - %APPDATA%\EMPRESS
+   - %LOCALAPPDATA%\anadius\LSX emu\achievement_watcher
+   - %APPDATA%\Steam\CODEX
+   - %APPDATA%\SmartSteamEmu
+   - %LOCALAPPDATA%\SKIDROW
 
-**Note**: Auto-configuration requires a Steam API key (optional) in `my_login.txt` with format: `key=YOUR_API_KEY`. Without a key, only English achievements will be fetched from SteamDB/Steam Hunters.
+**Note**: Auto-configuration uses the Steam Web API when a key is provided in Settings. Without a key, it falls back to SteamDB/SteamHunters (English only).
 
 ### Dashboard
 
@@ -186,12 +190,17 @@ Creates a standalone `.exe` installer in the `dist/` folder.
 - Choose notification preset and screen position
 - Select notification sounds and language
 - Adjust UI scale (75% to 200%)
+- Adjust achievement duration (auto or custom)
+- Adjust achievement sound volume (0% to 200%)
+- Toggle Show Hidden Description for hidden achievements
+- Enable Close to Tray (X button hides to tray)
 - Configure overlay shortcut or disable the overlay entirely
 - Enable/disable features:
   - Achievement screenshots
   - Progress Notification
   - Playtime Notification
   - Startup behavior
+- Per-game progress notifications can be muted when a config is active
 - Toggle "Start with Windows" to create/remove a Task Scheduler entry using the current executable path
 - All preferences persist to `%APPDATA%/Achievements/preferences.json` and are restored on startup
 
@@ -216,7 +225,10 @@ Creates a standalone `.exe` installer in the `dist/` folder.
 - Automatically detects and imports existing achievements
 - Supports multiple achievement languages if available in Config
 
-https://youtu.be/4w8ENj3rlSY
+### Videos
+
+https://youtu.be/fsqoKiMGLkw
+https://youtu.be/nOoiU5lPopM
 
 ## 👤 Author
 

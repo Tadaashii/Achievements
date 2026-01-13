@@ -1472,6 +1472,8 @@
                 </div>
               </div>
             </div>
+
+
           </div>
 
           <div class="config-controls clean">
@@ -1731,6 +1733,23 @@
             aria-label="Games list"
             tabindex="0"
           ></div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="appConfirmModal"
+      class="modal hidden"
+      aria-hidden="true"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="modal-content confirm-modal">
+        <h3 id="appConfirmTitle">Confirm</h3>
+        <p id="appConfirmMessage"></p>
+        <div class="confirm-actions">
+          <button id="appConfirmCancelBtn" type="button">Cancel</button>
+          <button id="appConfirmOkBtn" type="button">OK</button>
         </div>
       </div>
     </div>
@@ -3446,6 +3465,161 @@
         }
       }
 
+      const confirmModal = document.getElementById("appConfirmModal");
+      const confirmTitleEl = document.getElementById("appConfirmTitle");
+      const confirmMessageEl = document.getElementById("appConfirmMessage");
+      const confirmOkBtn = document.getElementById("appConfirmOkBtn");
+      const confirmCancelBtn = document.getElementById("appConfirmCancelBtn");
+      let confirmResolve = null;
+      let confirmLastFocus = null;
+
+      function closeAppConfirm(result) {
+        if (!confirmModal || !confirmResolve) return;
+        const resolver = confirmResolve;
+        confirmResolve = null;
+        confirmModal.classList.add("hidden");
+        confirmModal.setAttribute("aria-hidden", "true");
+        confirmModal.inert = false;
+        document.body.classList.remove("modal-open");
+        if (confirmLastFocus && typeof confirmLastFocus.focus === "function") {
+          try {
+            confirmLastFocus.focus();
+          } catch {}
+        }
+        confirmLastFocus = null;
+        resolver(result);
+      }
+
+      async function showAppConfirm(opts = {}) {
+        if (
+          !confirmModal ||
+          !confirmTitleEl ||
+          !confirmMessageEl ||
+          !confirmOkBtn ||
+          !confirmCancelBtn
+        ) {
+          return window.confirm(opts?.message || "Are you sure?");
+        }
+
+        if (confirmResolve) {
+          closeAppConfirm(false);
+        }
+
+        try {
+          await safeRefocus();
+        } catch {}
+
+        confirmLastFocus = document.activeElement;
+        confirmTitleEl.textContent = opts.title || "Confirm";
+        confirmMessageEl.textContent = opts.message || "";
+        confirmOkBtn.textContent = opts.okText || "OK";
+        confirmCancelBtn.textContent = opts.cancelText || "Cancel";
+        confirmModal.inert = false;
+        confirmModal.classList.remove("hidden");
+        confirmModal.setAttribute("aria-hidden", "false");
+        document.body.classList.add("modal-open");
+        confirmOkBtn.focus();
+
+        return new Promise((resolve) => {
+          confirmResolve = resolve;
+        });
+      }
+
+      if (confirmOkBtn) {
+        confirmOkBtn.addEventListener("click", () => closeAppConfirm(true));
+      }
+      if (confirmCancelBtn) {
+        confirmCancelBtn.addEventListener("click", () =>
+          closeAppConfirm(false)
+        );
+      }
+      if (confirmModal) {
+        confirmModal.addEventListener("click", (event) => {
+          if (event.target === confirmModal) {
+            closeAppConfirm(false);
+          }
+        });
+      }
+      document.addEventListener("keydown", (event) => {
+        if (!confirmResolve) return;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closeAppConfirm(false);
+        }
+        if (event.key === "Enter") {
+          event.preventDefault();
+          closeAppConfirm(true);
+        }
+      });
+
+      function logUiEvent(level, message, meta) {
+        try {
+          const safeLevel = level || "info";
+          window.api?.logUiEvent?.(safeLevel, message, meta);
+        } catch {}
+      }
+
+      async function safeConfirm(opts) {
+        logUiEvent("info", "ui:confirm:start", {
+          title: opts?.title || "",
+          message: opts?.message || "",
+        });
+        try {
+          const result = await showAppConfirm(opts);
+          logUiEvent("info", "ui:confirm:result", { result });
+          return result;
+        } catch (err) {
+          logUiEvent("warn", "ui:confirm-failed", {
+            message: err?.message || String(err),
+          });
+        }
+        try {
+          const message = opts?.message || "Are you sure?";
+          const result = window.confirm(message);
+          logUiEvent("info", "ui:confirm:fallback-result", { result });
+          return result;
+        } catch {
+          return false;
+        }
+      }
+
+      async function safeRefocus() {
+        try {
+          if (window.ui?.refocus) {
+            logUiEvent("info", "ui:refocus:start");
+            await window.ui.refocus();
+          }
+        } catch (err) {
+          console.warn("Refocus failed:", err);
+          logUiEvent("warn", "ui:refocus-failed", {
+            message: err?.message || String(err),
+          });
+        }
+      }
+
+      function logUiError(label, err) {
+        const message =
+          err && typeof err === "object"
+            ? err.message || String(err)
+            : String(err || "");
+        const stack =
+          err && typeof err === "object" && err.stack ? err.stack : undefined;
+        try {
+          window.api?.logUiEvent?.("error", label, { message, stack });
+        } catch {}
+        try {
+          console.error(label, err);
+        } catch {}
+      }
+
+      window.addEventListener("error", (event) => {
+        logUiError("ui:error", event?.error || event?.message || event);
+      });
+
+      window.addEventListener("unhandledrejection", (event) => {
+        logUiError("ui:unhandled-rejection", event?.reason || event);
+      });
+
       function normalizeProgressMutePath(value) {
         if (!value) return "";
         return String(value).trim().replace(/\//g, "\\").toLowerCase();
@@ -3795,13 +3969,13 @@
           const selectedConfig = configList.value;
           if (!selectedConfig) return;
 
-          const confirmDelete = await window.ui.confirm({
+          const confirmDelete = await safeConfirm({
             title: "Delete config",
             message: `Do you want to delete: ${selectedConfig}?`,
           });
           if (!confirmDelete) return;
 
-          await window.ui.refocus();
+          await safeRefocus();
 
           try {
             const response = await window.api.deleteConfig(selectedConfig);
@@ -3847,71 +4021,104 @@
           }
         });
         blacklistConfigBtn.addEventListener("click", async () => {
-          const selectedConfig = configList.value;
-          if (!selectedConfig) return;
-          const configMeta =
-            lastSelectedConfigMeta ||
-            (await window.api.getConfigByName(selectedConfig));
-          const targetAppId = configMeta?.appid
-            ? String(configMeta.appid)
-            : null;
-          if (!targetAppId) {
-            alert("Missing AppID for this configuration.");
-            return;
-          }
+          try {
+            const selectedConfig = configList.value;
+            if (!selectedConfig) return;
+            const configMeta =
+              lastSelectedConfigMeta ||
+              (await window.api.getConfigByName(selectedConfig));
+            const targetAppId = configMeta?.appid
+              ? String(configMeta.appid)
+              : null;
+            if (!targetAppId) {
+              alert("Missing AppID for this configuration.");
+              return;
+            }
 
-          const currentlyBlacklisted = isAppIdInBlacklist(targetAppId);
-          const removeMode =
-            blacklistState.showBlacklisted && currentlyBlacklisted;
+            const currentlyBlacklisted = isAppIdInBlacklist(targetAppId);
+            const removeMode =
+              blacklistState.showBlacklisted && currentlyBlacklisted;
 
-          const confirmed = await window.ui.confirm({
-            title: removeMode ? "Remove from blacklist" : "Add to blacklist",
-            message: removeMode
-              ? `Remove ${selectedConfig} from blacklist?`
-              : `Ignore ${selectedConfig} and stop tracking it?`,
-          });
-          if (!confirmed) return;
-
-          await window.ui.refocus();
-
-          const response = await window.api.blacklistConfig({
-            configName: selectedConfig,
-            appid: targetAppId,
-            remove: removeMode,
-          });
-          if (!response?.success) {
-            alert(response?.error || "Failed to update blacklist");
-            return;
-          }
-
-          if (Array.isArray(response.blacklist)) {
-            blacklistState.appids = new Set(response.blacklist);
-          } else {
-            await syncBlacklistList();
-          }
-          renderBlacklistList();
-
-          await reloadConfigsDropdown(true);
-          if (!blacklistState.showBlacklisted) {
-            configList.value = "";
-            [
-              "deleteConfigBtn",
-              "blacklistConfigBtn",
-              "editConfigBtn",
-              "playBtn",
-            ].forEach((id) => {
-              const el = document.getElementById(id);
-              if (el) el.style.display = "none";
+            logUiEvent("info", "ui:blacklist-config:click", {
+              configName: selectedConfig,
+              appid: targetAppId,
+              remove: removeMode,
             });
-            document.getElementById("backButton").style.display = "none";
-            updateMuteProgressUI().catch(() => {});
-            window.__showFallbackLogo?.();
-          } else {
-            configList.dispatchEvent(new Event("change", { bubbles: true }));
-          }
 
-          if (typeof buildDashboard === "function") {
-            await buildDashboard();
+            const confirmed = await safeConfirm({
+              title: removeMode ? "Remove from blacklist" : "Add to blacklist",
+              message: removeMode
+                ? `Remove ${selectedConfig} from blacklist?`
+                : `Ignore ${selectedConfig} and stop tracking it?`,
+            });
+            logUiEvent("info", "ui:blacklist-config:confirm", {
+              configName: selectedConfig,
+              appid: targetAppId,
+              remove: removeMode,
+              confirmed,
+            });
+            if (!confirmed) return;
+
+            await safeRefocus();
+
+            logUiEvent("info", "ui:blacklist-config:ipc-start", {
+              configName: selectedConfig,
+              appid: targetAppId,
+              remove: removeMode,
+            });
+            const response = await window.api.blacklistConfig({
+              configName: selectedConfig,
+              appid: targetAppId,
+              remove: removeMode,
+            });
+            logUiEvent(
+              response?.success ? "info" : "warn",
+              "ui:blacklist-config:ipc-result",
+              {
+                configName: selectedConfig,
+                appid: targetAppId,
+                remove: removeMode,
+                success: response?.success === true,
+                error: response?.error || null,
+              }
+            );
+            if (!response?.success) {
+              alert(response?.error || "Failed to update blacklist");
+              return;
+            }
+
+            if (Array.isArray(response.blacklist)) {
+              blacklistState.appids = new Set(response.blacklist);
+            } else {
+              await syncBlacklistList();
+            }
+            renderBlacklistList();
+
+            await reloadConfigsDropdown(true);
+            if (!blacklistState.showBlacklisted) {
+              configList.value = "";
+              [
+                "deleteConfigBtn",
+                "blacklistConfigBtn",
+                "editConfigBtn",
+                "playBtn",
+              ].forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = "none";
+              });
+              document.getElementById("backButton").style.display = "none";
+              updateMuteProgressUI().catch(() => {});
+              window.__showFallbackLogo?.();
+            } else {
+              configList.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+
+            if (typeof buildDashboard === "function") {
+              await buildDashboard();
+            }
+          } catch (err) {
+            logUiError("ui:blacklist-config-failed", err);
+            alert("Failed to update blacklist. See logs for details.");
           }
         });
       });
@@ -3940,15 +4147,26 @@
 
       if (resetBlacklistBtn) {
         resetBlacklistBtn.addEventListener("click", async () => {
-          const confirmed = await window.ui.confirm({
-            title: "Reset blacklist",
-            message: "Remove all blacklisted games?",
-          });
-          if (!confirmed) return;
-
-          await window.ui.refocus();
           try {
-            await window.api.resetBlacklist();
+            logUiEvent("info", "ui:blacklist-reset:click");
+            const confirmed = await safeConfirm({
+              title: "Reset blacklist",
+              message: "Remove all blacklisted games?",
+            });
+            logUiEvent("info", "ui:blacklist-reset:confirm", { confirmed });
+            if (!confirmed) return;
+
+            await safeRefocus();
+            logUiEvent("info", "ui:blacklist-reset:ipc-start");
+            const response = await window.api.resetBlacklist();
+            logUiEvent(
+              response?.success ? "info" : "warn",
+              "ui:blacklist-reset:ipc-result",
+              {
+                success: response?.success === true,
+                error: response?.error || null,
+              }
+            );
             await syncBlacklistList();
             renderBlacklistList();
             await reloadConfigsDropdown(true);
@@ -3956,7 +4174,7 @@
               await buildDashboard();
             }
           } catch (err) {
-            console.error("Failed to reset blacklist:", err);
+            logUiError("ui:blacklist-reset-failed", err);
             alert(err?.message || "Failed to reset blacklist");
           }
         });
@@ -4413,6 +4631,9 @@
             document.body.dataset.zoom = String(
               Math.round((prefs.windowZoomFactor || 1) * 100)
             );
+            document.body.dataset.effectiveZoom = String(
+              Math.round((prefs.windowZoomFactor || 1) * 100)
+            );
             window.api.setZoom(prefs.windowZoomFactor);
           }
         }
@@ -4553,6 +4774,9 @@
                 document.body.dataset.zoom = String(
                   Math.round((prefs.windowZoomFactor || 1) * 100)
                 );
+                document.body.dataset.effectiveZoom = String(
+                  Math.round((prefs.windowZoomFactor || 1) * 100)
+                );
                 window.api.setZoom(prefs.windowZoomFactor);
               }
             }
@@ -4624,9 +4848,10 @@
 
           if (steamApiKeyClearBtn) {
             steamApiKeyClearBtn.addEventListener("click", async () => {
-              const confirmed = window.confirm(
-                "Remove the stored Steam API key?"
-              );
+              const confirmed = await safeConfirm({
+                title: "Remove Steam API key",
+                message: "Remove the stored Steam API key?",
+              });
               if (!confirmed) return;
               try {
                 await window.api.savePreferences({ steamApiKey: "" });
@@ -4794,6 +5019,9 @@
               windowZoomFactor: zoomValue,
             };
             document.body.dataset.zoom = String(
+              Math.round((zoomValue || 1) * 100)
+            );
+            document.body.dataset.effectiveZoom = String(
               Math.round((zoomValue || 1) * 100)
             );
             window.api.savePreferences(prefs);
@@ -5627,6 +5855,22 @@
           updateSettingsScaleLabel();
         }
 
+        const prefs = getCachedPreferences();
+        const settingsDurationSlider = document.getElementById(
+          "settings-durationSlider"
+        );
+        if (settingsDurationSlider) {
+          settingsDurationSlider.value = prefs.notificationDuration ?? 0;
+          updateSettingsDurationLabel();
+        }
+        const settingsSoundVolumeSlider = document.getElementById(
+          "settings-soundVolumeSlider"
+        );
+        if (settingsSoundVolumeSlider) {
+          settingsSoundVolumeSlider.value = prefs.soundVolume ?? 100;
+          updateSettingsSoundVolumeLabel();
+        }
+
         // Sync disable progress checkbox
         const mainDisableProgressCheckbox = document.getElementById(
           "disableProgressCheckbox"
@@ -6099,6 +6343,7 @@
           "dashboardOverlay",
           "appSettingsDontHide",
           "titlebar",
+          "appConfirmModal",
         ]);
 
         Array.from(document.body.children).forEach((el) => {
@@ -6943,42 +7188,74 @@
               blockBtn.addEventListener("click", async (ev) => {
                 ev.preventDefault();
                 ev.stopPropagation();
-                if (!appidValue) return;
-                const removeMode =
-                  blacklistState.showBlacklisted && cardBlacklisted;
-                const confirmed = await window.ui.confirm({
-                  title: removeMode ? "Remove from blacklist" : "Ignore game",
-                  message: removeMode
-                    ? `Remove ${cfgName} from blacklist?`
-                    : `Ignore ${cfgName} and stop tracking it?`,
-                });
-                if (!confirmed) return;
+                try {
+                  if (!appidValue) return;
+                  const removeMode =
+                    blacklistState.showBlacklisted && cardBlacklisted;
+                  logUiEvent("info", "ui:blacklist-dashboard:click", {
+                    configName: cfgName,
+                    appid: appidValue,
+                    remove: removeMode,
+                  });
+                  const confirmed = await safeConfirm({
+                    title: removeMode ? "Remove from blacklist" : "Ignore game",
+                    message: removeMode
+                      ? `Remove ${cfgName} from blacklist?`
+                      : `Ignore ${cfgName} and stop tracking it?`,
+                  });
+                  logUiEvent("info", "ui:blacklist-dashboard:confirm", {
+                    configName: cfgName,
+                    appid: appidValue,
+                    remove: removeMode,
+                    confirmed,
+                  });
+                  if (!confirmed) return;
 
-                await window.ui.refocus();
+                  await safeRefocus();
 
-                const response = await window.api.blacklistConfig({
-                  configName: cfgName,
-                  appid: appidValue,
-                  remove: removeMode,
-                });
-                if (!response?.success) {
-                  alert(response?.error || "Failed to update blacklist");
-                  return;
+                  logUiEvent("info", "ui:blacklist-dashboard:ipc-start", {
+                    configName: cfgName,
+                    appid: appidValue,
+                    remove: removeMode,
+                  });
+                  const response = await window.api.blacklistConfig({
+                    configName: cfgName,
+                    appid: appidValue,
+                    remove: removeMode,
+                  });
+                  logUiEvent(
+                    response?.success ? "info" : "warn",
+                    "ui:blacklist-dashboard:ipc-result",
+                    {
+                      configName: cfgName,
+                      appid: appidValue,
+                      remove: removeMode,
+                      success: response?.success === true,
+                      error: response?.error || null,
+                    }
+                  );
+                  if (!response?.success) {
+                    alert(response?.error || "Failed to update blacklist");
+                    return;
+                  }
+
+                  localStorage.removeItem(`${DASH_PROGRESS_PREFIX}${cfgName}`);
+                  localStorage.removeItem(`${IMG_CACHE_PREFIX}${cfgName}`);
+                  dashboardImageCache?.delete?.(appidValue);
+                  if (Array.isArray(response.blacklist)) {
+                    blacklistState.appids = new Set(response.blacklist);
+                  } else {
+                    await syncBlacklistList();
+                  }
+
+                  if (typeof reloadConfigsDropdown === "function") {
+                    await reloadConfigsDropdown(true);
+                  }
+                  await buildDashboard();
+                } catch (err) {
+                  logUiError("ui:blacklist-dashboard-failed", err);
+                  alert("Failed to update blacklist. See logs for details.");
                 }
-
-                localStorage.removeItem(`${DASH_PROGRESS_PREFIX}${cfgName}`);
-                localStorage.removeItem(`${IMG_CACHE_PREFIX}${cfgName}`);
-                dashboardImageCache?.delete?.(appidValue);
-                if (Array.isArray(response.blacklist)) {
-                  blacklistState.appids = new Set(response.blacklist);
-                } else {
-                  await syncBlacklistList();
-                }
-
-                if (typeof reloadConfigsDropdown === "function") {
-                  await reloadConfigsDropdown(true);
-                }
-                await buildDashboard();
               });
 
               card.appendChild(blockBtn);
@@ -7570,6 +7847,9 @@
         __userZoom = userZoom;
         __effectiveZoom = effectiveZoom;
         document.body.dataset.zoom = String(Math.round(__userZoom * 100));
+        document.body.dataset.effectiveZoom = String(
+          Math.round(__effectiveZoom * 100)
+        );
         const scaleFactor =
           __effectiveZoom > 0 ? __userZoom / __effectiveZoom : 1;
         const next = {
@@ -7620,6 +7900,9 @@
           const z = parseFloat(e.target.value) || 1;
           __userZoom = z;
           document.body.dataset.zoom = String(
+            Math.round((__userZoom || 1) * 100)
+          );
+          document.body.dataset.effectiveZoom = String(
             Math.round((__userZoom || 1) * 100)
           );
           applyDashSize();

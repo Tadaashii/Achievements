@@ -9,7 +9,9 @@ const {
 } = require("electron");
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
 app.commandLine.appendSwitch("disable-hid-blocklist");
-const { spawn, fork, execFile, execFileSync } = require("child_process");
+app.setName("Achievements");
+const { spawn, fork, execFile, execFileSync, spawnSync } =
+  require("child_process");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
@@ -35,6 +37,7 @@ const appLogger = createLogger("app");
 const notificationLogger = createLogger("notifications");
 const windowLogger = createLogger("windows");
 const ipcLogger = createLogger("ipc");
+const uiLogger = createLogger("ui");
 const coverUiLogger = createLogger("covers");
 const prefsLogger = createLogger("preferences");
 const persistenceLogger = createLogger("persistence");
@@ -42,6 +45,59 @@ const execLogger = createLogger("execution");
 const schemaLogger = createLogger("achschema");
 
 const PRESETS_MIGRATION_VERSION = "2026-01-12-duration";
+
+function runWindowsConfirm({ title, message }) {
+  const ps = process.env.SystemRoot
+    ? path.join(
+        process.env.SystemRoot,
+        "System32",
+        "WindowsPowerShell",
+        "v1.0",
+        "powershell.exe"
+      )
+    : "powershell.exe";
+  const script = [
+    "Add-Type -AssemblyName System.Windows.Forms;",
+    "$title = $env:ACH_CONFIRM_TITLE;",
+    "$message = $env:ACH_CONFIRM_MESSAGE;",
+    "$result = [System.Windows.Forms.MessageBox]::Show($message, $title, 'OKCancel', 'Question');",
+    "if ($result -eq [System.Windows.Forms.DialogResult]::OK) { exit 0 } else { exit 1 }",
+  ].join(" ");
+  const encoded = Buffer.from(script, "utf16le").toString("base64");
+  const env = {
+    ...process.env,
+    ACH_CONFIRM_TITLE: title || app.getName() || "Confirm",
+    ACH_CONFIRM_MESSAGE: message || "Are you sure?",
+  };
+  try {
+    const res = spawnSync(
+      ps,
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-WindowStyle",
+        "Hidden",
+        "-EncodedCommand",
+        encoded,
+      ],
+      { env, stdio: "ignore", windowsHide: true }
+    );
+    if (typeof res.status === "number") {
+      return res.status === 0;
+    }
+    if (res.error) {
+      appLogger.error("ui:confirm:powershell-failed", {
+        error: res.error?.message || String(res.error),
+      });
+    }
+    return null;
+  } catch (err) {
+    appLogger.error("ui:confirm:powershell-failed", {
+      error: err?.message || String(err),
+    });
+    return null;
+  }
+}
 
 function migrateDefaultPresetsIfNeeded() {
   const versionFile = path.join(userPresetsFolder, ".presets-version");
@@ -211,6 +267,20 @@ function normalizeAppIdValue(value) {
   return /^[0-9a-fA-F]+$/.test(trimmed) ? trimmed : "";
 }
 
+process.on("uncaughtException", (err) => {
+  ipcLogger.error("process:uncaught-exception", {
+    error: err?.message || String(err),
+    stack: err?.stack,
+  });
+});
+
+process.on("unhandledRejection", (reason) => {
+  ipcLogger.error("process:unhandled-rejection", {
+    error: reason?.message || String(reason),
+    stack: reason?.stack,
+  });
+});
+
 function normalizeProgressMutePath(value) {
   if (!value) return "";
   const normalized = path.normalize(String(value));
@@ -287,15 +357,31 @@ function isAppIdBlacklisted(appid) {
 }
 
 function refreshBlacklistEffects() {
-  if (watchedFoldersApi?.refreshConfigState) {
-    watchedFoldersApi.refreshConfigState();
+  try {
+    if (watchedFoldersApi?.refreshConfigState) {
+      watchedFoldersApi.refreshConfigState();
+    }
+  } catch (err) {
+    ipcLogger.error("blacklist:refresh-config-state-failed", {
+      error: err?.message || String(err),
+    });
   }
-  if (watchedFoldersApi?.rebuildKnownAppIds) {
-    watchedFoldersApi.rebuildKnownAppIds();
+  try {
+    if (watchedFoldersApi?.rebuildKnownAppIds) {
+      watchedFoldersApi.rebuildKnownAppIds();
+    }
+  } catch (err) {
+    ipcLogger.error("blacklist:rebuild-known-appids-failed", {
+      error: err?.message || String(err),
+    });
   }
   try {
     notifyConfigsChanged();
-  } catch {}
+  } catch (err) {
+    ipcLogger.error("blacklist:notify-configs-changed-failed", {
+      error: err?.message || String(err),
+    });
+  }
 }
 
 const MY_LOGIN_FILENAME = "my_login.txt";
@@ -1321,34 +1407,86 @@ ipcMain.handle("get-sound-path", (_event, fileName) => {
 });
 
 ipcMain.handle("ui:confirm", async (e, { title, message, detail }) => {
+  appLogger.info("ui:confirm:request", {
+    title: title || "",
+    message: message || "",
+    hasDetail: !!detail,
+  });
+  ipcLogger.info("ui:confirm:request", {
+    title: title || "",
+    message: message || "",
+    hasDetail: !!detail,
+  });
+  if (app.isPackaged && process.platform === "win32") {
+    const result = runWindowsConfirm({ title, message });
+    if (result !== null) {
+      appLogger.info("ui:confirm:powershell-result", { ok: result });
+      ipcLogger.info("ui:confirm:powershell-result", { ok: result });
+      return result;
+    }
+    appLogger.warn("ui:confirm:powershell-fallback");
+    ipcLogger.warn("ui:confirm:powershell-fallback");
+    throw new Error("native-confirm-failed");
+  }
   const win = BrowserWindow.fromWebContents(e.sender);
-  const res = await dialog.showMessageBox(win, {
+  const baseOptions = {
     type: "question",
     buttons: ["Cancel", "OK"],
     defaultId: 1,
     cancelId: 0,
     noLink: true,
-    modal: true,
-    title: title || "Confirm",
-    message,
+    title: title || app.getName() || "Confirm",
+    message: message || "Are you sure?",
     detail: detail || "",
-  });
+  };
   try {
-    win.setIgnoreMouseEvents(false);
-    if (!win.isVisible()) win.show();
-    win.focus();
-  } catch {}
-  return res.response === 1;
+    const canParent =
+      win &&
+      !win.isDestroyed() &&
+      win.isVisible() &&
+      !app.isPackaged &&
+      !win.isMinimized();
+    const options = canParent
+      ? { ...baseOptions, modal: false }
+      : baseOptions;
+    const res = canParent
+      ? await dialog.showMessageBox(win, options)
+      : await dialog.showMessageBox(options);
+    try {
+      if (win && !win.isDestroyed()) {
+        win.setIgnoreMouseEvents(false);
+        if (!win.isVisible()) win.show();
+        win.focus();
+      }
+    } catch {}
+    appLogger.info("ui:confirm:dispatch", {
+      parent: canParent,
+      packaged: app.isPackaged,
+    });
+    appLogger.info("ui:confirm:response", { ok: res.response === 1 });
+    ipcLogger.info("ui:confirm:response", { ok: res.response === 1 });
+    return res.response === 1;
+  } catch (err) {
+    ipcLogger.warn("ui:confirm:failed", {
+      error: err?.message || String(err),
+    });
+    appLogger.error("ui:confirm:failed", {
+      error: err?.message || String(err),
+    });
+    return false;
+  }
 });
 
 ipcMain.handle("ui:refocus", (e) => {
   const win = BrowserWindow.fromWebContents(e.sender);
-  if (!win) return;
+  if (!win || win.isDestroyed()) return;
   try {
     win.setAlwaysOnTop(true, "screen-saver");
     setTimeout(() => {
-      win.setAlwaysOnTop(false);
-      win.focus();
+      if (win && !win.isDestroyed()) {
+        win.setAlwaysOnTop(false);
+        win.focus();
+      }
     }, 0);
   } catch {}
 });
@@ -1961,18 +2099,27 @@ ipcMain.handle("blacklist:list", async () => {
 });
 
 ipcMain.handle("blacklist:reset", async () => {
-  const before = readBlacklistFromPrefs();
-  resetBlacklist();
-  if (Array.isArray(before) && before.length) {
-    try {
-      ipcMain.emit("blacklist:removed-appid", null, before);
-    } catch {}
-  }
-  refreshBlacklistEffects();
+  ipcLogger.info("blacklist:reset:request");
   try {
-    broadcastToAll("blacklist:updated", { appids: readBlacklistFromPrefs() });
-  } catch {}
-  return { success: true, appids: [] };
+    const before = readBlacklistFromPrefs();
+    resetBlacklist();
+    if (Array.isArray(before) && before.length) {
+      try {
+        ipcMain.emit("blacklist:removed-appid", null, before);
+      } catch {}
+    }
+    refreshBlacklistEffects();
+    try {
+      broadcastToAll("blacklist:updated", { appids: readBlacklistFromPrefs() });
+    } catch {}
+    ipcLogger.info("blacklist:reset:success", { count: before?.length || 0 });
+    return { success: true, appids: [] };
+  } catch (err) {
+    ipcLogger.error("blacklist:reset:error", {
+      error: err?.message || String(err),
+    });
+    return { success: false, error: err?.message || "Reset failed" };
+  }
 });
 
 ipcMain.on("set-animation-duration", (_event, duration) => {
@@ -4322,6 +4469,13 @@ ipcMain.on("tray:action", (_event, action) => {
 });
 
 app.whenReady().then(async () => {
+  appLogger.info("app:ready", {
+    version: app.getVersion(),
+    packaged: app.isPackaged,
+    userData: app.getPath("userData"),
+    platform: process.platform,
+    arch: process.arch,
+  });
   // Load preferences
   try {
     const prefs = fs.existsSync(preferencesPath)
@@ -5304,6 +5458,24 @@ ipcMain.handle("covers:ui-log", async (_event, payload = {}) => {
   return true;
 });
 
+ipcMain.handle("ui:log", async (_event, payload = {}) => {
+  const level = ["debug", "info", "warn", "error"].includes(
+    String(payload.level || "").toLowerCase()
+  )
+    ? String(payload.level || "").toLowerCase()
+    : "info";
+  const message = String(payload.message || "").trim();
+  const meta =
+    payload.meta && typeof payload.meta === "object" ? payload.meta : {};
+  try {
+    uiLogger[level](
+      message || "ui:log",
+      Object.keys(meta).length ? meta : undefined
+    );
+  } catch {}
+  return true;
+});
+
 const makeWatchedFolders = require("./utils/watched-folders");
 
 watchedFoldersApi = makeWatchedFolders({
@@ -5444,6 +5616,10 @@ async function flagPlatinumFromCacheOnBoot() {
 }
 
 app.on("before-quit", () => {
+  appLogger.info("app:before-quit", {
+    isQuitting,
+    hasMainWindow: !!mainWindow && !mainWindow.isDestroyed(),
+  });
   isQuitting = true;
   manualLaunchInProgress = false;
   if (playtimeWindow && !playtimeWindow.isDestroyed()) {
@@ -5456,7 +5632,40 @@ app.on("before-quit", () => {
 
 flagPlatinumFromCacheOnBoot();
 app.on("window-all-closed", () => {
+  appLogger.info("app:window-all-closed");
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+app.on("render-process-gone", (_event, webContents, details) => {
+  appLogger.error("process:render-gone", {
+    reason: details?.reason,
+    exitCode: details?.exitCode,
+    type: details?.type,
+    id: webContents?.id,
+    url: webContents?.getURL?.() || null,
+  });
+  ipcLogger.error("process:render-gone", {
+    reason: details?.reason,
+    exitCode: details?.exitCode,
+    type: details?.type,
+    id: webContents?.id,
+    url: webContents?.getURL?.() || null,
+  });
+});
+
+app.on("child-process-gone", (_event, details) => {
+  appLogger.error("process:child-gone", {
+    type: details?.type,
+    reason: details?.reason,
+    exitCode: details?.exitCode,
+    name: details?.name,
+  });
+  ipcLogger.error("process:child-gone", {
+    type: details?.type,
+    reason: details?.reason,
+    exitCode: details?.exitCode,
+    name: details?.name,
+  });
 });
