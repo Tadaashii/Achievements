@@ -3275,6 +3275,57 @@ function getCachePath(configName) {
   return path.join(cacheDir, `${configName}_achievements_cache.json`);
 }
 
+const bootSeededCacheKeys = new Set();
+let bootManualSeedScheduled = false;
+let bootManualSeedRunning = false;
+
+function normalizeCacheSeedPath(input) {
+  if (!input) return "";
+  let resolved = "";
+  try {
+    resolved = fs.realpathSync(input);
+  } catch {
+    try {
+      resolved = path.resolve(String(input));
+    } catch {
+      resolved = String(input);
+    }
+  }
+  if (!resolved) return "";
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+}
+
+function buildCacheSeedKey(config) {
+  if (!config || typeof config !== "object") return "";
+  const cfgPath = normalizeCacheSeedPath(config.config_path);
+  if (cfgPath) return `cfg:${cfgPath}`;
+  const savePath = normalizeCacheSeedPath(config.save_path);
+  if (savePath) return `save:${savePath}`;
+  const name = sanitizeConfigName(config.name || config.displayName || "");
+  return name ? `name:${name}` : "";
+}
+
+function markCacheSeedKeyFromConfig(config) {
+  const key = buildCacheSeedKey(config);
+  if (key) bootSeededCacheKeys.add(key);
+  return key;
+}
+
+function markCacheSeedKeyFromName(configName) {
+  const safeName = sanitizeConfigName(configName);
+  if (!safeName) return "";
+  const cfgPath = path.join(configsDir, `${safeName}.json`);
+  if (fs.existsSync(cfgPath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+      return markCacheSeedKeyFromConfig(data);
+    } catch {}
+  }
+  const fallback = `name:${safeName}`;
+  bootSeededCacheKeys.add(fallback);
+  return fallback;
+}
+
 function loadPreviousAchievements(configName) {
   const cachePath = getCachePath(configName);
   if (fs.existsSync(cachePath)) {
@@ -3350,6 +3401,16 @@ function savePreviousAchievements(configName, data) {
       error: e.message,
     });
   }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function seedCacheFromSnapshot(configName, snapshot) {
+  if (!configName || !snapshot) return;
+  savePreviousAchievements(configName, snapshot);
+  markCacheSeedKeyFromName(configName);
 }
 
 function sleepSync(ms) {
@@ -4996,6 +5057,120 @@ const {
   buildCrcNameMap,
   resolveConfigSchemaPath,
 } = require("./utils/achievement-data");
+
+async function seedManualConfigsAtBoot() {
+  if (bootManualSeedRunning) return;
+  bootManualSeedRunning = true;
+  let files = [];
+  try {
+    if (!fs.existsSync(configsDir)) {
+      bootManualSeedRunning = false;
+      return;
+    }
+    files = fs
+      .readdirSync(configsDir)
+      .filter((f) => f.toLowerCase().endsWith(".json"));
+  } catch {
+    bootManualSeedRunning = false;
+    return;
+  }
+
+  persistenceLogger.info("boot-cache:manual-start", { total: files.length });
+  for (const file of files) {
+    const full = path.join(configsDir, file);
+    let config;
+    try {
+      config = JSON.parse(fs.readFileSync(full, "utf8"));
+    } catch {
+      continue;
+    }
+    const configName = config?.name || path.basename(file, ".json");
+    const savePathRaw = config?.save_path;
+    if (!savePathRaw) continue;
+
+    const seedKey = buildCacheSeedKey(config);
+    if (seedKey && bootSeededCacheKeys.has(seedKey)) continue;
+
+    const cachePath = getCachePath(configName);
+    if (fs.existsSync(cachePath)) {
+      if (seedKey) bootSeededCacheKeys.add(seedKey);
+      continue;
+    }
+
+    let saveRoot = savePathRaw;
+    let candidatePath = null;
+    try {
+      const stat = fs.statSync(savePathRaw);
+      if (stat.isFile()) {
+        candidatePath = savePathRaw;
+        saveRoot = path.dirname(savePathRaw);
+      }
+    } catch {}
+    if (!candidatePath) {
+      if (!fs.existsSync(saveRoot)) continue;
+      const appid = String(config?.appid || "").trim();
+      const saveJsonPath = resolveSaveFilePath(saveRoot, appid);
+      const {
+        tenokeIni: tenokeIniPath,
+        ini: iniPath,
+        ofx: onlineFixIniPath,
+        bin: binPath,
+      } = resolveSaveSidecarPaths(saveRoot, appid);
+      if (fs.existsSync(saveJsonPath)) candidatePath = saveJsonPath;
+      else if (tenokeIniPath) candidatePath = tenokeIniPath;
+      else if (onlineFixIniPath) candidatePath = onlineFixIniPath;
+      else if (iniPath) candidatePath = iniPath;
+      else if (binPath) candidatePath = binPath;
+      else if (appid) {
+        candidatePath = findAchievementFileDeepForAppId(saveRoot, appid, 2);
+      } else {
+        candidatePath = findAchievementFileDeep(saveRoot, 2);
+      }
+    }
+    if (!candidatePath) continue;
+
+    let schemaPath = null;
+    try {
+      schemaPath = resolveConfigSchemaPath(
+        config,
+        config?.config_path || null
+      );
+    } catch {}
+    const snapshot = loadAchievementsFromSaveFile(
+      path.dirname(candidatePath),
+      {},
+      {
+        configMeta: config,
+        selectedConfigPath: config?.config_path || null,
+        fullSchemaPath: schemaPath,
+      }
+    );
+    if (snapshot && Object.keys(snapshot).length) {
+      seedCacheFromSnapshot(configName, snapshot);
+      if (seedKey) bootSeededCacheKeys.add(seedKey);
+      persistenceLogger.info("boot-cache:manual-seeded", {
+        config: configName,
+        entries: Object.keys(snapshot).length,
+      });
+    }
+    await sleep(40);
+  }
+  persistenceLogger.info("boot-cache:manual-complete", { total: files.length });
+  bootManualSeedRunning = false;
+}
+
+function scheduleManualCacheSeedAfterBoot() {
+  if (bootManualSeedScheduled) return;
+  bootManualSeedScheduled = true;
+  const tick = async () => {
+    if (global.bootDone === true) {
+      await seedManualConfigsAtBoot();
+      return;
+    }
+    setTimeout(tick, 500);
+  };
+  setTimeout(tick, 500);
+}
 const {
   migrateConfigPlatforms,
   normalizePlatform,
@@ -5329,7 +5504,7 @@ ipcMain.handle("generate-auto-configs", async (event, folderPath) => {
     const result = await generateGameConfigs(folderPath, outputDir, {
       onSeedCache: ({ appid, configName, snapshot }) => {
         try {
-          savePreviousAchievements(configName, snapshot);
+          seedCacheFromSnapshot(configName, snapshot);
         } catch (e) {
           console.warn(
             `[seed-cache] ${configName} (${appid}) failed: ${e.message}`
@@ -5491,7 +5666,7 @@ watchedFoldersApi = makeWatchedFolders({
   requestDashboardRefresh,
   onSeedCache: ({ appid, configName, snapshot }) => {
     try {
-      savePreviousAchievements(configName, snapshot);
+      seedCacheFromSnapshot(configName, snapshot);
     } catch (e) {
       console.warn(`${configName} (${appid}) failed: ${e.message}`);
     }
@@ -5517,6 +5692,8 @@ watchedFoldersApi = makeWatchedFolders({
     sanitizeConfigName(name) === sanitizeConfigName(selectedConfig),
   onPlatinumComplete: handlePlatinumComplete,
 });
+
+scheduleManualCacheSeedAfterBoot();
 
 // === screenshots support ===
 let screenshot = null;
