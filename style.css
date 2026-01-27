@@ -1379,6 +1379,11 @@ body.window-maximized .dashboard-grid {
   line-height: 1;
 }
 
+.wf-row--missing {
+  border-color: #3d3428;
+  background: rgba(125, 96, 52, 0.08);
+}
+
 .wf-row:hover {
   border-color: #2f3546;
   background: #1a1f2b;
@@ -1395,6 +1400,12 @@ body.window-maximized .dashboard-grid {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.wf-path[data-status]::after {
+  content: " (" attr(data-status) ")";
+  color: #c9a36a;
+  font-size: 11px;
 }
 
 .wf-actions {
@@ -1935,4 +1946,56 @@ kbd {
 .dash-block:hover {
   background: var(--dracula-cyan);
   color: #ff0000;
+}
+
+#dashboardContextMenu {
+  position: fixed;
+  min-width: 190px;
+  background: #1f212a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+  padding: 6px;
+  z-index: 10050;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#dashboardContextMenu.hidden {
+  display: none !important;
+}
+
+.dash-menu-item {
+  width: 100%;
+  text-align: left;
+  margin: 0;
+  padding: 10px 15px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #e9eef8;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.dash-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.dash-menu-item:focus-visible {
+  outline: 2px solid #6ee7ff;
+  outline-offset: 1px;
+}
+
+.dash-menu-item.is-danger {
+  color: #ff6b6b;
+}
+
+.dash-menu-item.is-disabled,
+.dash-menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

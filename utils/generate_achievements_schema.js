@@ -19,11 +19,18 @@ const { execFileSync } = require("child_process");
 const fs = require("fs/promises");
 const crypto = require("crypto");
 const { createLogger } = require("./logger");
+const {
+  EXOPHASE_LANG_KEYS,
+  EXOPHASE_LANG_MAP,
+  buildExophaseSlug,
+  buildExophaseSlugVariants,
+  fetchExophaseAchievementsMultiLang,
+} = require("./exophase-scraper");
 const DEFAULT_UPLAY_MAP_PATH = path.join(
   __dirname,
   "..",
   "assets",
-  "uplay-steam.json"
+  "uplay-steam.json",
 );
 let uplaySteamMapPath = DEFAULT_UPLAY_MAP_PATH;
 let uplaySteamMap = [];
@@ -103,8 +110,8 @@ function emit(level, message, data = {}) {
       level === "error"
         ? console.error
         : level === "warn"
-        ? console.warn
-        : console.log;
+          ? console.warn
+          : console.log;
     fn(message);
   }
 }
@@ -179,10 +186,10 @@ const OUTPUT_PLATFORM =
   PLATFORM_MODE === "uplay"
     ? "uplay"
     : PLATFORM_MODE === "gog"
-    ? "gog"
-    : PLATFORM_MODE === "epic"
-    ? "epic"
-    : "steam";
+      ? "gog"
+      : PLATFORM_MODE === "epic"
+        ? "epic"
+        : "steam";
 const EFFECTIVE_PLATFORM_MODE = PLATFORM_MODE;
 
 function resolveAppMeta(appid, mode = "auto") {
@@ -270,39 +277,45 @@ const resolvedAppIds = buildResolvedAppIds(APPIDS, EFFECTIVE_PLATFORM_MODE);
 
 if (!APPIDS.length) {
   error(
-    "Usage: node generate_achievements_schema.js <APPID...> [--headed] [--verbose] [--apps-concurrency=2] [--langs=english,german,...] [--key=XXXXX] [--out=ABS_OR_REL_PATH] [--platform=steam|uplay|epic|gog] [--gog] [--gog-user=email --gog-pass=pass] [--gog-tokens-file=PATH]"
+    "Usage: node generate_achievements_schema.js <APPID...> [--headed] [--verbose] [--apps-concurrency=2] [--langs=english,german,...] [--key=XXXXX] [--out=ABS_OR_REL_PATH] [--platform=steam|uplay|epic|gog] [--gog] [--gog-user=email --gog-pass=pass] [--gog-tokens-file=PATH]",
   );
   process.exit(1);
 }
 
 /* ---------- langs ---------- */
 const DEFAULT_LANGS = [
-  "english",
-  "german",
-  "french",
-  "italian",
-  "spanish",
-  "brazilian",
-  "russian",
-  "polish",
-  "japanese",
-  "koreana",
-  "tchinese",
+  "arabic",
+  "bulgarian",
   "schinese",
-  "LATAM",
-];
-const EXTENDED_STEAM_LANGS = [
-  ...DEFAULT_LANGS,
-  "thai",
-  "portuguese",
+  "tchinese",
+  "czech",
   "danish",
   "dutch",
-  "swedish",
+  "english",
+  "finnish",
+  "french",
+  "german",
+  "greek",
   "hungarian",
+  "indonesian",
+  "italian",
+  "japanese",
+  "koreana",
+  "norwegian",
+  "polish",
+  "portuguese",
+  "brazilian",
+  "romanian",
+  "russian",
+  "spanish",
+  "latam",
+  "swedish",
+  "thai",
   "turkish",
   "ukrainian",
   "vietnamese",
 ];
+const EXTENDED_STEAM_LANGS = [...DEFAULT_LANGS];
 const LANGS = (langsArg ? langsArg.split(",") : DEFAULT_LANGS)
   .map((s) => s.trim())
   .filter(Boolean);
@@ -495,12 +508,12 @@ async function gogHeadlessLogin() {
   try {
     const page = await browser.newPage();
     const authUrl = `${GOG_AUTH_BASE}/auth?client_id=${GOG_CLIENT_ID}&redirect_uri=${encodeURIComponent(
-      GOG_REDIRECT_URI
+      GOG_REDIRECT_URI,
     )}&response_type=code&layout=client2`;
     await page.goto(authUrl, { waitUntil: "domcontentloaded" });
 
     const signInToggle = await page.$(
-      'button:has-text("Sign in"), a:has-text("Sign in"), button:has-text("Already have an account"), a:has-text("Already have an account")'
+      'button:has-text("Sign in"), a:has-text("Sign in"), button:has-text("Already have an account"), a:has-text("Already have an account")',
     );
     if (signInToggle) {
       await signInToggle.click().catch(() => {});
@@ -527,7 +540,7 @@ async function gogHeadlessLogin() {
 
     const submit = loginForm
       .locator(
-        '#login_login, button:has-text("Log in now"), button:has-text("Log in"), button[type="submit"]'
+        '#login_login, button:has-text("Log in now"), button:has-text("Log in"), button[type="submit"]',
       )
       .first();
     if ((await submit.count()) > 0) {
@@ -628,7 +641,7 @@ async function processGogApp(productId, outBaseDir) {
         parsed.pathname
           .split("/")
           .pop()
-          .replace(/\.[^.]+$/, "")
+          .replace(/\.[^.]+$/, ""),
       ) || sanitize(fallbackName || "gog_icon");
     const fileName = `${baseName}${extFromUrl(url)}`;
     await download(url, path.join(imgDir, fileName));
@@ -643,7 +656,7 @@ async function processGogApp(productId, outBaseDir) {
       entry?.achievement_key || entry?.name || `gog_${results.length}`;
     const iconRel = await downloadImageIfNeeded(
       unlocked,
-      `${fallbackBase}_icon`
+      `${fallbackBase}_icon`,
     );
     const grayRel = await downloadImageIfNeeded(locked, `${fallbackBase}_gray`);
     const hidden = entry?.visible ? 1 : 0;
@@ -660,7 +673,7 @@ async function processGogApp(productId, outBaseDir) {
   await fs.writeFile(
     path.join(outDir, "achievements.json"),
     JSON.stringify(results, null, 2),
-    "utf8"
+    "utf8",
   );
 
   if (!results.length) {
@@ -672,20 +685,38 @@ async function processGogApp(productId, outBaseDir) {
 }
 
 /* ---------- Epic helpers ---------- */
-const EPIC_LOCALE_MAP = {
+const LANG_MAP = {
+  arabic: "ar",
+  bulgarian: "bg",
+  schinese: "zh-CN",
+  tchinese: "zh-TW",
+  czech: "cs",
+  danish: "da",
+  dutch: "nl",
   english: "en",
-  german: "de",
+  finnish: "fi",
   french: "fr",
+  german: "de",
+  greek: "el",
+  hungarian: "hu",
+  indonesian: "id",
   italian: "it",
-  spanish: "es-ES",
-  latam: "es-MX",
-  brazilian: "pt-BR",
-  russian: "ru",
-  polish: "pl",
   japanese: "ja",
   koreana: "ko",
-  tchinese: "zh-TW",
-  schinese: "zh-CN",
+  norwegian: "no",
+  polish: "pl",
+  portuguese: "pt",
+  brazilian: "pt-BR",
+  romanian: "ro",
+  russian: "ru",
+  spanish: "es",
+  latam: "es-419",
+  LATAM: "es-419",
+  swedish: "sv",
+  thai: "th",
+  turkish: "tr",
+  ukrainian: "uk",
+  vietnamese: "vi",
 };
 
 function epicLocaleForLang(lang) {
@@ -708,7 +739,7 @@ async function fetchEpicAchievements(appid, locale) {
 function parseEpicAchievement(entry) {
   const ach = entry?.achievement || entry || {};
   const apiName = String(
-    ach.name || ach.id || ach.apiName || ach.achievementName || ""
+    ach.name || ach.id || ach.apiName || ach.achievementName || "",
   ).trim();
   if (!apiName) return null;
   const displayName =
@@ -754,6 +785,123 @@ function normalizeHidden(descEN) {
   }
 
   return { hidden, clean: s };
+}
+
+function normalizeMatchText(value) {
+  if (!value) return "";
+  return String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function buildMatchKey(title, description) {
+  const t = normalizeMatchText(title);
+  if (!t) return "";
+  const d = normalizeMatchText(description);
+  return `${t}|${d}`;
+}
+
+function mapExophasePlatformForScrape(meta, fallback = "steam") {
+  const raw = String(meta?.platform || "")
+    .toLowerCase()
+    .trim();
+  if (!raw) return fallback;
+  if (raw === "uplay") return "steam";
+  if (raw === "steam") return "steam";
+  return fallback;
+}
+
+async function enrichScrapedWithExophase(achievements, exoData, imgDir, appid) {
+  const items = exoData?.items || [];
+  if (!items.length || !Array.isArray(achievements) || !achievements.length) {
+    return { updated: false, matched: 0, icons: 0 };
+  }
+
+  const keyMap = new Map();
+  const keyDupes = new Set();
+  const titleMap = new Map();
+  const titleDupes = new Set();
+
+  const register = (map, dupes, key, item) => {
+    if (!key) return;
+    const prev = map.get(key);
+    if (prev && prev !== item) {
+      dupes.add(key);
+      return;
+    }
+    map.set(key, item);
+  };
+
+  for (const item of items) {
+    const titles = item?.titles || {};
+    const descriptions = item?.descriptions || {};
+    for (const langKey of Object.keys(titles)) {
+      const title = titles[langKey] || "";
+      const desc = descriptions[langKey] || "";
+      const key = buildMatchKey(title, desc);
+      register(keyMap, keyDupes, key, item);
+      const titleKey = normalizeMatchText(title);
+      register(titleMap, titleDupes, titleKey, item);
+    }
+  }
+
+  if (keyDupes.size || titleDupes.size) {
+    emit("warn", "steam-scrape:exophase:duplicates", {
+      appid,
+      keyDuplicates: keyDupes.size,
+      titleDuplicates: titleDupes.size,
+    });
+  }
+
+  let updated = false;
+  let matched = 0;
+
+  for (const entry of achievements) {
+    const title = entry?.displayName?.english || "";
+    const desc = entry?.description?.english || "";
+    let match = null;
+    const key = buildMatchKey(title, desc);
+    if (key && !keyDupes.has(key)) {
+      match = keyMap.get(key) || null;
+    }
+    if (!match) {
+      const titleKey = normalizeMatchText(title);
+      if (titleKey && !titleDupes.has(titleKey)) {
+        match = titleMap.get(titleKey) || null;
+      }
+    }
+    if (!match) continue;
+
+    matched += 1;
+    const titles = match.titles || {};
+    const descriptions = match.descriptions || {};
+    for (const [langKey, value] of Object.entries(titles)) {
+      if (!value) continue;
+      entry.displayName = entry.displayName || {};
+      entry.displayName[langKey] = value;
+      updated = true;
+    }
+    for (const [langKey, value] of Object.entries(descriptions)) {
+      if (!value) continue;
+      entry.description = entry.description || {};
+      entry.description[langKey] = value;
+      updated = true;
+    }
+
+    // Images are already downloaded via SteamDB/SteamHunters.
+  }
+
+  emit("info", "steam-scrape:exophase:merged", {
+    appid,
+    matched,
+    updated,
+  });
+
+  return { updated, matched };
 }
 
 function createLimiter(concurrency = 1) {
@@ -814,16 +962,16 @@ async function launchChromiumSafe(opts = {}) {
           "app.asar.unpacked",
           "node_modules",
           "playwright-core",
-          ".local-browsers"
+          ".local-browsers",
         ),
         path.join(
           process.resourcesPath,
           "app.asar.unpacked",
           "node_modules",
           "playwright",
-          ".local-browsers"
+          ".local-browsers",
         ),
-        path.join(process.resourcesPath, "playwright-browsers")
+        path.join(process.resourcesPath, "playwright-browsers"),
       );
     }
 
@@ -833,7 +981,7 @@ async function launchChromiumSafe(opts = {}) {
       for (const d of dirs) {
         if (/^chromium_headless_shell-/i.test(d)) {
           exeCandidates.push(
-            path.join(root, d, "chrome-win", "headless_shell.exe")
+            path.join(root, d, "chrome-win", "headless_shell.exe"),
           );
         }
         if (/^chromium-/i.test(d)) {
@@ -900,60 +1048,75 @@ async function fetchJsonWithTimeout(url, timeoutMs) {
     clearTimeout(t);
   }
 }
+
+function getSteamLangVariants(lang) {
+  const raw = String(lang || "").trim();
+  if (!raw) return [];
+  const lower = raw.toLowerCase();
+  if (lower === "latam") {
+    const alt = raw === "latam" ? "LATAM" : "latam";
+    return raw === alt ? [raw] : [raw, alt];
+  }
+  return [raw];
+}
 async function fetchSchemaLang(appid, key, lang) {
   const base = `https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${encodeURIComponent(
-    key
+    key,
   )}&appid=${encodeURIComponent(appid)}`;
-  const urls = [
-    `${base}&language=${encodeURIComponent(lang)}`,
-    `${base}&l=${encodeURIComponent(lang)}`,
-  ];
   let lastErr = null;
+  const variants = getSteamLangVariants(lang);
 
-  for (let i = 0; i < urls.length; i++) {
-    const url = urls[i];
-    const mode = i === 0 ? "language" : "l";
-    try {
-      emit("info", "steam-schema:request", { appid, lang, mode });
-      const { response: r, json: j } = await fetchJsonWithTimeout(
-        url,
-        STEAM_API_TIMEOUT_MS
-      );
-      if (!r.ok) throw new Error(`Steam API ${appid} ${lang} HTTP ${r.status}`);
-      const list = j?.game?.availableGameStats?.achievements || [];
-      if (!list.length) {
-        emit("warn", "steam-schema:empty", { appid, lang, mode });
-        continue;
-      }
-      const map = new Map();
-      for (const a of list) {
-        if (!a || !a.name) continue;
-        map.set(a.name, {
-          displayName: a.displayName || "",
-          description: a.description || "",
-          hidden: Number(a.hidden) ? 1 : 0,
-          icon: a.icon || "",
-          icongray: a.icongray || "",
+  for (const variant of variants) {
+    const urls = [
+      `${base}&language=${encodeURIComponent(variant)}`,
+      `${base}&l=${encodeURIComponent(variant)}`,
+    ];
+    for (let i = 0; i < urls.length; i++) {
+      const url = urls[i];
+      const mode = i === 0 ? "language" : "l";
+      try {
+        emit("info", "steam-schema:request", { appid, lang: variant, mode });
+        const { response: r, json: j } = await fetchJsonWithTimeout(
+          url,
+          STEAM_API_TIMEOUT_MS,
+        );
+        if (!r.ok)
+          throw new Error(`Steam API ${appid} ${variant} HTTP ${r.status}`);
+        const list = j?.game?.availableGameStats?.achievements || [];
+        if (!list.length) {
+          emit("warn", "steam-schema:empty", { appid, lang: variant, mode });
+          continue;
+        }
+        const map = new Map();
+        for (const a of list) {
+          if (!a || !a.name) continue;
+          map.set(a.name, {
+            displayName: a.displayName || "",
+            description: a.description || "",
+            hidden: Number(a.hidden) ? 1 : 0,
+            icon: a.icon || "",
+            icongray: a.icongray || "",
+          });
+        }
+        emit("info", "steam-schema:success", {
+          appid,
+          lang: variant,
+          mode,
+          count: map.size,
+        });
+        return map;
+      } catch (err) {
+        lastErr = err;
+        emit("warn", "steam-schema:failed", {
+          appid,
+          lang: variant,
+          mode,
+          error: err?.message || String(err),
         });
       }
-      emit("info", "steam-schema:success", {
-        appid,
-        lang,
-        mode,
-        count: map.size,
-      });
-      return map;
-    } catch (err) {
-      lastErr = err;
-      emit("warn", "steam-schema:failed", {
-        appid,
-        lang,
-        mode,
-        error: err?.message || String(err),
-      });
-    }
-    if (i < urls.length - 1 && STEAM_API_GAP_MS > 0) {
-      await sleep(STEAM_API_GAP_MS);
+      if (i < urls.length - 1 && STEAM_API_GAP_MS > 0) {
+        await sleep(STEAM_API_GAP_MS);
+      }
     }
   }
 
@@ -962,66 +1125,77 @@ async function fetchSchemaLang(appid, key, lang) {
 }
 async function fetchAchievementsLang(appid, key, lang) {
   const base = `https://api.steampowered.com/IPlayerService/GetGameAchievements/v1/?key=${encodeURIComponent(
-    key
+    key,
   )}&appid=${encodeURIComponent(appid)}`;
-  const urls = [
-    `${base}&language=${encodeURIComponent(lang)}`,
-    `${base}&l=${encodeURIComponent(lang)}`,
-  ];
   let lastErr = null;
+  const variants = getSteamLangVariants(lang);
 
-  for (let i = 0; i < urls.length; i++) {
-    const url = urls[i];
-    const mode = i === 0 ? "language" : "l";
-    try {
-      emit("info", "steam-achievements:request", { appid, lang, mode });
-      const { response: r, json: j } = await fetchJsonWithTimeout(
-        url,
-        STEAM_API_TIMEOUT_MS
-      );
-      if (!r.ok)
-        throw new Error(
-          `Steam Achievements API ${appid} ${lang} HTTP ${r.status}`
+  for (const variant of variants) {
+    const urls = [
+      `${base}&language=${encodeURIComponent(variant)}`,
+      `${base}&l=${encodeURIComponent(variant)}`,
+    ];
+    for (let i = 0; i < urls.length; i++) {
+      const url = urls[i];
+      const mode = i === 0 ? "language" : "l";
+      try {
+        emit("info", "steam-achievements:request", {
+          appid,
+          lang: variant,
+          mode,
+        });
+        const { response: r, json: j } = await fetchJsonWithTimeout(
+          url,
+          STEAM_API_TIMEOUT_MS,
         );
-      const list = j?.response?.achievements || [];
-      if (!list.length) {
-        emit("warn", "steam-achievements:empty", { appid, lang, mode });
-        continue;
-      }
-
-      const map = new Map();
-      for (const a of list) {
-        const apiName = a?.internal_name || a?.name || "";
-        if (!apiName) continue;
-        map.set(apiName, {
-          displayName: a?.localized_name || "",
-          description: a?.localized_desc || "",
-          hidden: a?.hidden ? 1 : 0,
-          icon: normalizeSteamIconUrl(appid, a?.icon || ""),
-          icongray: normalizeSteamIconUrl(
+        if (!r.ok)
+          throw new Error(
+            `Steam Achievements API ${appid} ${variant} HTTP ${r.status}`,
+          );
+        const list = j?.response?.achievements || [];
+        if (!list.length) {
+          emit("warn", "steam-achievements:empty", {
             appid,
-            a?.icon_gray || a?.icongray || ""
-          ),
+            lang: variant,
+            mode,
+          });
+          continue;
+        }
+
+        const map = new Map();
+        for (const a of list) {
+          const apiName = a?.internal_name || a?.name || "";
+          if (!apiName) continue;
+          map.set(apiName, {
+            displayName: a?.localized_name || "",
+            description: a?.localized_desc || "",
+            hidden: a?.hidden ? 1 : 0,
+            icon: normalizeSteamIconUrl(appid, a?.icon || ""),
+            icongray: normalizeSteamIconUrl(
+              appid,
+              a?.icon_gray || a?.icongray || "",
+            ),
+          });
+        }
+        emit("info", "steam-achievements:success", {
+          appid,
+          lang: variant,
+          mode,
+          count: map.size,
+        });
+        return map;
+      } catch (err) {
+        lastErr = err;
+        emit("warn", "steam-achievements:failed", {
+          appid,
+          lang: variant,
+          mode,
+          error: err?.message || String(err),
         });
       }
-      emit("info", "steam-achievements:success", {
-        appid,
-        lang,
-        mode,
-        count: map.size,
-      });
-      return map;
-    } catch (err) {
-      lastErr = err;
-      emit("warn", "steam-achievements:failed", {
-        appid,
-        lang,
-        mode,
-        error: err?.message || String(err),
-      });
-    }
-    if (i < urls.length - 1 && STEAM_API_GAP_MS > 0) {
-      await sleep(STEAM_API_GAP_MS);
+      if (i < urls.length - 1 && STEAM_API_GAP_MS > 0) {
+        await sleep(STEAM_API_GAP_MS);
+      }
     }
   }
 
@@ -1065,6 +1239,13 @@ async function scrapeSteamDB(appid) {
     throw new Error("No achievements found");
   }
   log(`[${appid}] achievements: ${count}`);
+  const gameTitle = safeText(
+    await page
+      .locator("h1")
+      .first()
+      .textContent()
+      .catch(() => ""),
+  );
 
   for (let i = 0; i < count; i++) {
     await list
@@ -1135,28 +1316,28 @@ async function scrapeSteamDB(appid) {
       safeText(
         await el
           .locator(
-            "div.achievement_inner > div > div.achievement_right > div.achievement_api"
+            "div.achievement_inner > div > div.achievement_right > div.achievement_api",
           )
           .textContent()
-          .catch(() => "")
+          .catch(() => ""),
       ) || id.replace(/^achievement-/, "");
     const nameEN =
       safeText(
         await el
           .locator(
-            "div.achievement_inner > div > div:nth-child(1) > div.achievement_name"
+            "div.achievement_inner > div > div:nth-child(1) > div.achievement_name",
           )
           .textContent()
-          .catch(() => "")
+          .catch(() => ""),
       ) || "";
     const descEN0 =
       safeText(
         await el
           .locator(
-            "div.achievement_inner > div > div:nth-child(1) > div.achievement_desc"
+            "div.achievement_inner > div > div:nth-child(1) > div.achievement_desc",
           )
           .textContent()
-          .catch(() => "")
+          .catch(() => ""),
       ) || "";
     const { hidden, clean: descEN } = normalizeHidden(descEN0);
 
@@ -1170,7 +1351,7 @@ async function scrapeSteamDB(appid) {
   }
 
   await browser.close();
-  return rows;
+  return { rows, title: gameTitle };
 }
 
 /* ---------- Scraping SteamHunters ---------- */
@@ -1247,7 +1428,7 @@ async function scrapeSteamHunters(appid) {
             img.getAttribute("src") ||
             img.getAttribute("data-src") ||
             takeFromSrcset(
-              img.getAttribute("srcset") || img.getAttribute("data-srcset")
+              img.getAttribute("srcset") || img.getAttribute("data-srcset"),
             );
           iconUrl = abs(iconUrl);
         }
@@ -1283,13 +1464,20 @@ async function scrapeSteamHunters(appid) {
         uniq.push(r);
       }
       return uniq;
-    }
+    },
   );
 
+  const gameTitle = safeText(
+    await page
+      .locator("h1")
+      .first()
+      .textContent()
+      .catch(() => ""),
+  );
   await browser.close();
 
   if (!rows.length) throw new Error("No achievements found (SteamHunters)");
-  return rows;
+  return { rows, title: gameTitle };
 }
 
 function uniqueLangsWithEnglish(langs) {
@@ -1297,23 +1485,36 @@ function uniqueLangsWithEnglish(langs) {
   s.add("english");
   return Array.from(s);
 }
-async function buildAchievementsFromScrape(appid, imgDir) {
+async function buildAchievementsFromScrape(appid, imgDir, meta = {}) {
   let scraped = [];
+  let scrapedTitle = "";
   try {
-    scraped = await scrapeSteamDB(appid);
+    const data = await scrapeSteamDB(appid);
+    if (Array.isArray(data)) {
+      scraped = data;
+    } else {
+      scraped = data?.rows || [];
+      scrapedTitle = data?.title || "";
+    }
   } catch (e) {
     warn(
       `[${appid}] SteamDB failed: ${String(
-        e?.message || e
-      )} -> trying SteamHunters`
+        e?.message || e,
+      )} -> trying SteamHunters`,
     );
     try {
-      scraped = await scrapeSteamHunters(appid);
+      const data = await scrapeSteamHunters(appid);
+      if (Array.isArray(data)) {
+        scraped = data;
+      } else {
+        scraped = data?.rows || [];
+        scrapedTitle = data?.title || scrapedTitle;
+      }
     } catch (e2) {
       warn(
         `[${appid}] SteamHunters failed: ${String(
-          e2?.message || e2
-        )} -> continue`
+          e2?.message || e2,
+        )} -> continue`,
       );
       scraped = [];
     }
@@ -1329,7 +1530,7 @@ async function buildAchievementsFromScrape(appid, imgDir) {
     if (a.iconUrl) {
       const baseName =
         sanitize(
-          path.basename(new URL(a.iconUrl).pathname).replace(/\.[^.]+$/, "")
+          path.basename(new URL(a.iconUrl).pathname).replace(/\.[^.]+$/, ""),
         ) || sanitize(a.apiName + "_icon");
       const file = `${baseName}${extFromUrl(a.iconUrl)}`;
       await download(a.iconUrl, path.join(imgDir, file));
@@ -1340,7 +1541,7 @@ async function buildAchievementsFromScrape(appid, imgDir) {
         sanitize(
           path
             .basename(new URL(a.iconGrayUrl).pathname)
-            .replace(/\.[^.]+$/, "")
+            .replace(/\.[^.]+$/, ""),
         ) || sanitize(a.apiName + "_gray");
       const file = `${baseName}${extFromUrl(a.iconGrayUrl)}`;
       await download(a.iconGrayUrl, path.join(imgDir, file));
@@ -1357,6 +1558,60 @@ async function buildAchievementsFromScrape(appid, imgDir) {
       icon_gray: iconGrayRel,
       name: a.apiName,
     });
+  }
+
+  const platform = mapExophasePlatformForScrape(meta, "steam");
+  const title = (meta && meta.title) || scrapedTitle || "";
+  const slugCandidates = title ? buildExophaseSlugVariants(title) : [];
+  if (slugCandidates.length && platform && results.length) {
+    const primarySlug = slugCandidates[0];
+    emit("info", "steam-scrape:exophase:start", {
+      appid,
+      slug: primarySlug,
+      platform,
+      variants: slugCandidates.length,
+    });
+    let exoData = null;
+    let lastError = null;
+    let usedSlug = primarySlug;
+    for (const candidate of slugCandidates) {
+      try {
+        exoData = await fetchExophaseAchievementsMultiLang({
+          slug: candidate,
+          platform,
+          langKeys: EXOPHASE_LANG_KEYS,
+          langMap: EXOPHASE_LANG_MAP,
+        });
+        usedSlug = candidate;
+        break;
+      } catch (err) {
+        lastError = err;
+        warn("steam-scrape:exophase:retry", {
+          appid,
+          slug: candidate,
+          platform,
+          error: err?.message || String(err),
+        });
+      }
+    }
+    if (exoData) {
+      if (usedSlug !== primarySlug) {
+        emit("info", "steam-scrape:exophase:alt-slug", {
+          appid,
+          slug: usedSlug,
+          platform,
+        });
+      }
+      await enrichScrapedWithExophase(results, exoData, imgDir, appid);
+    } else if (lastError) {
+      warn("steam-scrape:exophase:failed", {
+        appid,
+        slug: primarySlug,
+        platform,
+        error: lastError?.message || String(lastError),
+        tried: slugCandidates,
+      });
+    }
   }
 
   return results;
@@ -1381,8 +1636,8 @@ async function processOneApp(appMeta, apiKey, outBaseDir) {
   const targetPlatform = wantsGog
     ? "gog"
     : wantsEpic
-    ? "epic"
-    : OUTPUT_PLATFORM;
+      ? "epic"
+      : OUTPUT_PLATFORM;
   const outDir = path.join(base, targetPlatform, folderId);
   const imgDir = path.join(outDir, "img");
   await fs.mkdir(imgDir, { recursive: true });
@@ -1416,7 +1671,7 @@ async function processOneApp(appMeta, apiKey, outBaseDir) {
           });
           perLangByApi[lang] = new Map();
         }
-      })
+      }),
     );
 
     let enMap = perLangByApi["english"];
@@ -1456,7 +1711,7 @@ async function processOneApp(appMeta, apiKey, outBaseDir) {
       if (iconUrl) {
         const baseName =
           sanitize(
-            path.basename(new URL(iconUrl).pathname).replace(/\.[^.]+$/, "")
+            path.basename(new URL(iconUrl).pathname).replace(/\.[^.]+$/, ""),
           ) || sanitize(apiName);
         const file = `${baseName}${extFromUrl(iconUrl)}`;
         await download(iconUrl, path.join(imgDir, file));
@@ -1465,7 +1720,9 @@ async function processOneApp(appMeta, apiKey, outBaseDir) {
       if (iconGrayUrl) {
         const baseName =
           sanitize(
-            path.basename(new URL(iconGrayUrl).pathname).replace(/\.[^.]+$/, "")
+            path
+              .basename(new URL(iconGrayUrl).pathname)
+              .replace(/\.[^.]+$/, ""),
           ) || sanitize(apiName + "_gray");
         const file = `${baseName}${extFromUrl(iconGrayUrl)}`;
         await download(iconGrayUrl, path.join(imgDir, file));
@@ -1559,7 +1816,7 @@ async function processOneApp(appMeta, apiKey, outBaseDir) {
       if (iconUrl) {
         const baseName =
           sanitize(
-            path.basename(new URL(iconUrl).pathname).replace(/\.[^.]+$/, "")
+            path.basename(new URL(iconUrl).pathname).replace(/\.[^.]+$/, ""),
           ) || sanitize(apiName + "_icon");
         const file = `${baseName}${extFromUrl(iconUrl)}`;
         await download(iconUrl, path.join(imgDir, file));
@@ -1568,7 +1825,9 @@ async function processOneApp(appMeta, apiKey, outBaseDir) {
       if (iconGrayUrl) {
         const baseName =
           sanitize(
-            path.basename(new URL(iconGrayUrl).pathname).replace(/\.[^.]+$/, "")
+            path
+              .basename(new URL(iconGrayUrl).pathname)
+              .replace(/\.[^.]+$/, ""),
           ) || sanitize(apiName + "_gray");
         const file = `${baseName}${extFromUrl(iconGrayUrl)}`;
         await download(iconGrayUrl, path.join(imgDir, file));
@@ -1585,11 +1844,19 @@ async function processOneApp(appMeta, apiKey, outBaseDir) {
       });
     }
     if (achievements.length === 0) {
-      achievements.push(...(await buildAchievementsFromScrape(appid, imgDir)));
+      achievements.push(
+        ...(await buildAchievementsFromScrape(appid, imgDir, {
+          platform: meta?.platform || targetPlatform,
+        })),
+      );
     }
   } else {
     // ===== STEAMDB-ONLY =====
-    achievements.push(...(await buildAchievementsFromScrape(appid, imgDir)));
+    achievements.push(
+      ...(await buildAchievementsFromScrape(appid, imgDir, {
+        platform: meta?.platform || targetPlatform,
+      })),
+    );
   }
 
   const gogCredentialsReady =
@@ -1614,7 +1881,7 @@ async function processOneApp(appMeta, apiKey, outBaseDir) {
   await fs.writeFile(
     path.join(outDir, "achievements.json"),
     JSON.stringify(finalAchievements, null, 2),
-    "utf8"
+    "utf8",
   );
 
   const count = finalAchievements.length;
@@ -1622,10 +1889,74 @@ async function processOneApp(appMeta, apiKey, outBaseDir) {
   if (count === 0) {
     emit(
       "info",
-      `⏭ [${folderId}] Achievements schema skipped. No Achievements found!`
+      `⏭ [${folderId}] Achievements schema skipped. No Achievements found!`,
     );
   } else {
     emit("info", `✅ [${folderId}] Achievements schema done.`);
+
+    // RPCS3: attempt Exophase multilanguage (trophies)
+    if (meta.platform === "rpcs3") {
+      const title = meta.title || meta.name || folderId;
+      const baseVariants = buildExophaseSlugVariants(title);
+      const slugCandidates = [
+        ...baseVariants,
+        ...baseVariants.map((s) => `${s}-ps3`),
+      ];
+      emit("info", "rpcs3:exophase:start", {
+        appid: folderId,
+        slug: slugCandidates[0],
+        variants: slugCandidates.length,
+      });
+      let exoData = null;
+      let lastError = null;
+      let usedSlug = slugCandidates[0];
+      for (const candidate of slugCandidates) {
+        try {
+          exoData = await fetchExophaseAchievementsMultiLang({
+            slug: candidate,
+            platform: "rpcs3",
+            langKeys: EXOPHASE_LANG_KEYS,
+            langMap: EXOPHASE_LANG_MAP,
+            logger: schemaLogger,
+            outputDir: outDir,
+            mergeIntoSchema: true,
+            expectedCount: count,
+          });
+          usedSlug = candidate;
+          break;
+        } catch (err) {
+          lastError = err;
+          warn("rpcs3:exophase:retry", {
+            appid: folderId,
+            slug: candidate,
+            platform: "rpcs3",
+            error: err?.message || String(err),
+          });
+        }
+      }
+      if (exoData) {
+        if (usedSlug !== slugCandidates[0]) {
+          emit("info", "rpcs3:exophase:alt-slug", {
+            appid: folderId,
+            slug: usedSlug,
+            platform: "rpcs3",
+          });
+        }
+        emit("info", "rpcs3:exophase:merged", {
+          appid: folderId,
+          slug: usedSlug,
+          expected: count,
+        });
+      } else if (lastError) {
+        warn("rpcs3:exophase:failed", {
+          appid: folderId,
+          slug: slugCandidates[0],
+          platform: "rpcs3",
+          error: lastError?.message || String(lastError),
+          tried: slugCandidates,
+        });
+      }
+    }
   }
 
   //console.log(`✔ [${appid}] ${count} achievements -> ${path.join(outDir, 'achievements.json')}`);
@@ -1640,13 +1971,13 @@ async function processOneApp(appMeta, apiKey, outBaseDir) {
       "info",
       apiKey
         ? "ℹ Steam API key loaded"
-        : "ℹ Steam API key not found. Running in SteamDB/SteamHunters mode. (English only)"
+        : "ℹ Steam API key not found. Running in SteamDB/SteamHunters mode. (English only)",
     );
 
     await Promise.all(
       resolvedAppIds.map((meta) =>
-        appLimit(() => processOneApp(meta, apiKey, OUT_BASE))
-      )
+        appLimit(() => processOneApp(meta, apiKey, OUT_BASE)),
+      ),
     );
   } catch (e) {
     emit("error", String(e?.message || e));

@@ -1,7 +1,16 @@
 const fs = require("fs");
 const path = require("path");
 
-const VALID_PLATFORMS = new Set(["steam", "uplay", "epic", "gog"]);
+const VALID_PLATFORMS = new Set([
+  "steam",
+  "steam-official",
+  "uplay",
+  "epic",
+  "gog",
+  "xenia",
+  "rpcs3",
+  "shadps4",
+]);
 
 function normalizePlatform(value) {
   const raw = String(value || "")
@@ -13,6 +22,25 @@ function normalizePlatform(value) {
 function sanitizeAppId(value) {
   const raw = String(value || "").trim();
   return /^[0-9a-fA-F]+$/.test(raw) ? raw : "";
+}
+
+function sanitizeAppIdForPlatform(value, platform) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const normalized = normalizePlatform(platform);
+  if (normalized === "rpcs3") {
+    // Trophy set ids like NPWR12345_00
+    return /^NP[A-Z0-9_]+$/i.test(raw) ? raw : "";
+  }
+  if (normalized === "shadps4") {
+    return /^CUSA[0-9]+$/i.test(raw) ? raw : "";
+  }
+  if (normalized === "xenia") {
+    if (/^0x[0-9a-f]+$/i.test(raw)) return raw.slice(2);
+    if (/^[0-9a-f]+$/i.test(raw)) return raw;
+    return raw;
+  }
+  return sanitizeAppId(raw);
 }
 
 function inferPlatformAndSteamId({ config, mapping }) {
@@ -46,6 +74,8 @@ function inferPlatformAndSteamId({ config, mapping }) {
       steamAppId = "";
     }
   } else if (platform === "epic" || platform === "gog") {
+    steamAppId = "";
+  } else if (platform === "xenia" || platform === "rpcs3") {
     steamAppId = "";
   }
 
@@ -87,10 +117,13 @@ function migrateConfigPlatforms({
       continue;
     }
 
+    const rawAppId = String(
+      data.appid || data.appId || data.steamAppId || "",
+    ).trim();
+    const normalizedPlatform = normalizePlatform(data.platform);
     const appid =
-      sanitizeAppId(data.appid) ||
-      sanitizeAppId(data.appId) ||
-      sanitizeAppId(data.steamAppId);
+      sanitizeAppId(rawAppId) ||
+      (normalizedPlatform === "rpcs3" ? rawAppId : "");
     const mapping = appid ? mappingByUplayId.get(appid) : null;
     const { platform, steamAppId } = inferPlatformAndSteamId({
       config: data,
@@ -127,9 +160,14 @@ function migrateConfigPlatforms({
     }
 
     const finalPlatform = normalizePlatform(data.platform) || "steam";
-    if (appid) {
-      if (!platformIndex.has(appid)) platformIndex.set(appid, new Set());
-      platformIndex.get(appid).add(finalPlatform);
+    const indexAppId =
+      sanitizeAppId(rawAppId) ||
+      (finalPlatform === "rpcs3" ? rawAppId : "") ||
+      (finalPlatform === "shadps4" ? rawAppId : "");
+    if (indexAppId) {
+      if (!platformIndex.has(indexAppId))
+        platformIndex.set(indexAppId, new Set());
+      platformIndex.get(indexAppId).add(finalPlatform);
     }
   }
 
@@ -177,8 +215,8 @@ function migrateSchemaStorage({ configsDir, platformIndex, logger = console }) {
     const targetPlatform = prefersUplay
       ? "uplay"
       : prefersGog
-      ? "gog"
-      : "steam";
+        ? "gog"
+        : "steam";
     const targetDir = path.join(schemaRoot, targetPlatform, appid);
     try {
       if (fs.existsSync(targetDir)) {
@@ -218,7 +256,19 @@ function migrateSchemaStorage({ configsDir, platformIndex, logger = console }) {
       if (!appid) continue;
       const platform = normalizePlatform(data?.platform) || "steam";
       const storagePlatform =
-        platform === "uplay" ? "uplay" : platform === "gog" ? "gog" : "steam";
+        platform === "uplay"
+          ? "uplay"
+          : platform === "gog"
+            ? "gog"
+            : platform === "epic"
+              ? "epic"
+              : platform === "xenia"
+                ? "xenia"
+                : platform === "rpcs3"
+                  ? "rpcs3"
+                : platform === "shadps4"
+                  ? "shadps4"
+                    : "steam";
       const legacyDir = path.join(schemaRoot, appid);
       const nextDir = path.join(schemaRoot, storagePlatform, appid);
       const currentPath =
@@ -256,6 +306,7 @@ module.exports = {
   migrateConfigPlatforms,
   normalizePlatform,
   sanitizeAppId,
+  sanitizeAppIdForPlatform,
   inferPlatformAndSteamId,
   migrateSchemaStorage,
 };

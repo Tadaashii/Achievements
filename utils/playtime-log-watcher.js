@@ -52,6 +52,38 @@ function resolveSteamAppId(appid) {
   return entry?.steam_appid ? String(entry.steam_appid) : null;
 }
 
+function splitArgsString(input) {
+  const argStr = String(input || "").trim();
+  if (!argStr) return [];
+  const matches = argStr.match(/(?:[^\s"]+|"[^"]*"|'[^']*')+/g) || [];
+  return matches
+    .map((part) => {
+      const trimmed = String(part || "").trim();
+      if (
+        (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+        (trimmed.startsWith("'") && trimmed.endsWith("'"))
+      ) {
+        return trimmed.slice(1, -1);
+      }
+      return trimmed;
+    })
+    .filter(Boolean);
+}
+
+function normalizeCommandLine(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/["']/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildArgsSignature(argString) {
+  const parts = splitArgsString(argString);
+  if (!parts.length) return "";
+  return parts.map((p) => p.toLowerCase()).join(" ");
+}
+
 const playtimeStartMap = new Map();
 const activeWatchers = new Map();
 
@@ -76,6 +108,53 @@ function readPrefsSafe() {
     }
   } catch {}
   return {};
+}
+
+const UI_LOCALE_DIR = path.join(__dirname, "..", "assets", "locales");
+const uiLocaleCache = new Map();
+
+function normalizeUiLanguage(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return "english";
+  return raw === "latam" || raw === "es-419" ? "latam" : raw;
+}
+
+function getUiLanguage() {
+  const prefs = readPrefsSafe();
+  return normalizeUiLanguage(prefs.uiLanguage || prefs.language || "english");
+}
+
+function loadUiLocale(lang) {
+  const normalized = normalizeUiLanguage(lang);
+  if (uiLocaleCache.has(normalized)) return uiLocaleCache.get(normalized);
+  let data = {};
+  const filePath = path.join(UI_LOCALE_DIR, `${normalized}.json`);
+  try {
+    data = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch {
+    if (normalized !== "english") {
+      try {
+        const fallbackPath = path.join(UI_LOCALE_DIR, "english.json");
+        data = JSON.parse(fs.readFileSync(fallbackPath, "utf8"));
+      } catch {
+        data = {};
+      }
+    }
+  }
+  uiLocaleCache.set(normalized, data);
+  return data;
+}
+
+function tUi(key, params = {}, fallback = "") {
+  const strings = loadUiLocale(getUiLanguage());
+  let template = strings[key] || fallback || key;
+  if (!params || typeof params !== "object") return template;
+  return template.replace(/\{(\w+)\}/g, (_m, name) => {
+    if (Object.prototype.hasOwnProperty.call(params, name)) {
+      return String(params[name] ?? "");
+    }
+    return `{${name}}`;
+  });
 }
 
 function isPlaytimeDisabled() {
@@ -132,6 +211,14 @@ async function cacheHeaderImage(
     }
   } catch {}
   const fallbackName = String(options?.gameName || "").trim();
+  const stripCoverSuffix = (name) => {
+    let out = String(name || "").trim();
+    if (!out) return "";
+    const rx = /\s*\((?:steam|steam[-\s]?official|xenia|rpcs3|ps4|shadps4)\)\s*$/i;
+    while (rx.test(out)) out = out.replace(rx, "").trim();
+    return out;
+  };
+  const coverName = stripCoverSuffix(fallbackName) || fallbackName;
   const fallbackSize = options?.gridSize || "460x215";
   const downloadToLocal = async (url) => {
     await downloadImage(url, headerPath);
@@ -144,12 +231,16 @@ async function cacheHeaderImage(
   } catch (err) {
     // fallthrough to steamgrid
   }
-  if (fallbackName) {
+  if (coverName) {
     try {
-      const gridUrl = await fetchSteamGridDbImage(fallbackName, {
+      const gridUrl = await fetchSteamGridDbImage(coverName, {
         size: fallbackSize,
       });
-      return await downloadToLocal(gridUrl);
+      try {
+        return await downloadToLocal(gridUrl);
+      } catch {
+        return { headerUrl: gridUrl };
+      }
     } catch (gridErr) {
       console.warn(
         `steamgriddb header fallback failed for ${appid}:`,
@@ -198,28 +289,73 @@ function sendPlaytimeNotification(playData) {
 }
 
 function formatDuration(ms) {
+  const prefix = tUi(
+    "playtime.duration.prefix",
+    {},
+    "You played for",
+  );
+  const formatUnit = (count, unit, fallback) => {
+    const key = `playtime.duration.${unit}.${count === 1 ? "one" : "other"}`;
+    return tUi(key, { count }, fallback);
+  };
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
   if (totalSeconds < 60) {
     const sec = totalSeconds;
-    return `You played for ${sec} second${sec !== 1 ? "s" : ""}`;
+    const label = formatUnit(
+      sec,
+      "seconds",
+      `${sec} second${sec !== 1 ? "s" : ""}`,
+    );
+    return `${prefix} ${label}`;
   }
 
   const totalMinutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   if (totalMinutes < 60) {
     const mins = totalMinutes;
-    const parts = [`${mins} minute${mins !== 1 ? "s" : ""}`];
-    if (seconds) parts.push(`${seconds} second${seconds !== 1 ? "s" : ""}`);
-    return `You played for ${parts.join(" ")}`;
+    const parts = [
+      formatUnit(
+        mins,
+        "minutes",
+        `${mins} minute${mins !== 1 ? "s" : ""}`,
+      ),
+    ];
+    if (seconds) {
+      parts.push(
+        formatUnit(
+          seconds,
+          "seconds",
+          `${seconds} second${seconds !== 1 ? "s" : ""}`,
+        ),
+      );
+    }
+    return `${prefix} ${parts.join(" ")}`;
   }
 
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  const parts = [`${hours}h`];
-  if (minutes) parts.push(`${minutes} minute${minutes !== 1 ? "s" : ""}`);
-  if (!minutes && seconds)
-    parts.push(`${seconds} second${seconds !== 1 ? "s" : ""}`);
-  return `You played for ${parts.join(" ")}`;
+  const parts = [
+    formatUnit(hours, "hours", `${hours} hour${hours !== 1 ? "s" : ""}`),
+  ];
+  if (minutes) {
+    parts.push(
+      formatUnit(
+        minutes,
+        "minutes",
+        `${minutes} minute${minutes !== 1 ? "s" : ""}`,
+      ),
+    );
+  }
+  if (!minutes && seconds) {
+    parts.push(
+      formatUnit(
+        seconds,
+        "seconds",
+        `${seconds} second${seconds !== 1 ? "s" : ""}`,
+      ),
+    );
+  }
+  return `${prefix} ${parts.join(" ")}`;
 }
 
 /* ----------------- Main watcher ----------------- */
@@ -231,6 +367,14 @@ function startPlaytimeLogWatcher(configData) {
   const appid = String(configData?.appid || "").trim();
   const processName = String(configData?.process_name || "").trim();
   const platform = normalizePlatform(configData?.platform) || "steam";
+  const isSteamGridOnly =
+    platform === "xenia" || platform === "rpcs3" || platform === "shadps4";
+  const argsSignature = buildArgsSignature(configData?.arguments);
+  const launchPid =
+    Number.isFinite(Number(configData?.__launchPid)) &&
+    Number(configData.__launchPid) > 0
+      ? Number(configData.__launchPid)
+      : null;
   const normalizedProcessName = path.basename(processName).toLowerCase();
   const existing = activeWatchers.get(appid);
   if (existing) {
@@ -254,12 +398,18 @@ function startPlaytimeLogWatcher(configData) {
     return () => {};
   }
 
+  if (!playtimeStartMap.has(appid)) {
+    playtimeStartMap.set(appid, Date.now());
+  }
+
   const { preferencesPath } = require("./paths");
   const userDataDir = path.dirname(preferencesPath);
 
   // Header URLs
   const effectiveAppId = resolveSteamAppId(appid) || appid;
-  const remoteHeaderUrl = `https://cdn.steamstatic.com/steam/apps/${effectiveAppId}/header.jpg`;
+  const remoteHeaderUrl = isSteamGridOnly
+    ? ""
+    : `https://cdn.steamstatic.com/steam/apps/${effectiveAppId}/header.jpg`;
   const logoFallbackPath = path.join(__dirname, "..", "assets", "achievements-logo.png");
   const headerPathLocal = path.join(
     userDataDir,
@@ -282,13 +432,14 @@ function startPlaytimeLogWatcher(configData) {
     return null;
   };
   const fallbackHeaderUrl =
-    platform === "gog" || platform === "epic"
+    platform === "gog" || platform === "epic" || isSteamGridOnly
       ? pathToFileURL(logoFallbackPath).toString()
       : remoteHeaderUrl;
 
   let interval = null;
   let closed = false;
   let startNotified = false;
+  let lastHeaderUrl = null;
   const tracker = {
     playtimeKey:
       configData?.__playtimeKey ||
@@ -309,13 +460,17 @@ function startPlaytimeLogWatcher(configData) {
   const sendStart = (headerUrl) => {
     if (startNotified) return;
     startNotified = true;
-    playtimeStartMap.set(appid, Date.now());
+    if (!playtimeStartMap.has(appid)) {
+      playtimeStartMap.set(appid, Date.now());
+    }
+    lastHeaderUrl = headerUrl || lastHeaderUrl || null;
     if (!isPlaytimeDisabled()) {
+      const desc = tUi("playtime.descStart", {}, "Start Playtime!");
       sendPlaytimeNotification({
         phase: "start",
         displayName: gameName,
-        description: "Start Playtime!",
-        headerUrl,
+        description: desc,
+        headerUrl: headerUrl || fallbackHeaderUrl,
       });
     }
   };
@@ -338,7 +493,7 @@ function startPlaytimeLogWatcher(configData) {
         phase: "stop",
         displayName: gameName,
         description: desc,
-        headerUrl: headerUrlLocal,
+        headerUrl: headerUrlLocal || lastHeaderUrl || fallbackHeaderUrl,
       });
     }
   };
@@ -371,7 +526,14 @@ function startPlaytimeLogWatcher(configData) {
     try {
       const processes = await getProcessesSafe();
       const exeName = path.basename(processName).toLowerCase();
-      const running = processes.some((p) => p.name.toLowerCase() === exeName);
+      const running = processes.some((p) => {
+        if (launchPid && p.pid === launchPid) return true;
+        if (String(p.name || "").toLowerCase() !== exeName) return false;
+        if (!argsSignature) return true;
+        const cmd = normalizeCommandLine(p.cmd || "");
+        if (!cmd) return false;
+        return cmd.includes(argsSignature);
+      });
 
       if (!running) {
         try {
@@ -388,7 +550,7 @@ function startPlaytimeLogWatcher(configData) {
             String(appid),
             "header.jpg"
           );
-          let headerLocal = remoteHeaderUrl;
+          let headerLocal = remoteHeaderUrl || lastHeaderUrl || fallbackHeaderUrl;
           if (fs.existsSync(headerPathNew)) {
             headerLocal = pathToFileURL(headerPathNew).toString();
           } else if (fs.existsSync(headerPathLegacy)) {

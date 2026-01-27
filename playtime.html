@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -89,7 +89,8 @@
       }
 
       .playtime-in {
-        animation: play-in var(--transition) ease-out forwards,
+        animation:
+          play-in var(--transition) ease-out forwards,
           play-hold calc(var(--displaytime) - var(--transition) * 2) linear
             forwards var(--transition),
           play-out var(--transition) ease-in forwards
@@ -190,7 +191,7 @@
             parseFloat(styles.getPropertyValue("--transition")) || 0.3;
           setTimeout(
             () => ipcRenderer.send("close-playtime-window"),
-            transition * 1000
+            transition * 1000,
           );
         });
       });

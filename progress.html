@@ -1,139 +1,153 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<link rel="stylesheet" href="style.css">
-<meta width="350" height="120">
-<title>Progress Notification</title>
-<style>
-:root {
-  --transition: 0.3s;
-  --displaytime: 5s;
-  --scale: 0.95;
-  --roundness: 8px;
-}
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="style.css" />
+    <meta width="350" height="120" />
+    <title>Progress Notification</title>
+    <style>
+      :root {
+        --transition: 0.3s;
+        --displaytime: 5s;
+        --scale: 0.95;
+        --roundness: 8px;
+      }
 
-body {
-  margin: 0;
-  padding: 0;
-  background: transparent;
-  font-family: Arial, sans-serif;
-}
+      body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        font-family: Arial, sans-serif;
+      }
 
-.progress-notification {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  background: rgba(0, 0, 0, 0.75);
-  border-radius: var(--roundness);
-  padding: 10px 20px;
-  color: white;
-  transform: scale(0) translateY(30px);
-  opacity: 0;
-  animation:
-    ach-in var(--transition) ease-out forwards,
-    ach-hold calc(var(--displaytime) - var(--transition) * 2) ease forwards var(--transition),
-    ach-out var(--transition) ease-in forwards calc(var(--displaytime) - var(--transition));
-}
+      .progress-notification {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        background: rgba(0, 0, 0, 0.75);
+        border-radius: var(--roundness);
+        padding: 10px 20px;
+        color: white;
+        transform: scale(0) translateY(30px);
+        opacity: 0;
+        animation:
+          ach-in var(--transition) ease-out forwards,
+          ach-hold calc(var(--displaytime) - var(--transition) * 2) ease
+            forwards var(--transition),
+          ach-out var(--transition) ease-in forwards
+            calc(var(--displaytime) - var(--transition));
+      }
 
-@keyframes ach-in {
-  to {
-    transform: scale(var(--scale)) translateY(0);
-    opacity: 1;
-  }
-}
+      @keyframes ach-in {
+        to {
+          transform: scale(var(--scale)) translateY(0);
+          opacity: 1;
+        }
+      }
 
-@keyframes ach-hold {
-  to {
-    opacity: 1;
-    transform: scale(var(--scale)) translateY(0);
-  }
-}
+      @keyframes ach-hold {
+        to {
+          opacity: 1;
+          transform: scale(var(--scale)) translateY(0);
+        }
+      }
 
-@keyframes ach-out {
-  to {
-    transform: scale(0.85) translateY(-30px);
-    opacity: 0;
-  }
-}
+      @keyframes ach-out {
+        to {
+          transform: scale(0.85) translateY(-30px);
+          opacity: 0;
+        }
+      }
 
-.progress-icon img {
-  width: 64px;
-  height: 64px;
-}
+      .progress-icon img {
+        width: 64px;
+        height: 64px;
+      }
 
-.progress-text {
-  flex: 1;
-}
+      .progress-text {
+        flex: 1;
+      }
 
-.progress-bar {
-  height: 8px;
-  border-radius: 4px;
-  background: #444;
-  overflow: hidden;
-  margin-top: 5px;
-}
+      .progress-bar {
+        height: 8px;
+        border-radius: 4px;
+        background: #444;
+        overflow: hidden;
+        margin-top: 5px;
+      }
 
-.progress-fill {
-  height: 100%;
-  background-color: lime;
-  transition: width 0.5s ease;
-}
+      .progress-fill {
+        height: 100%;
+        background-color: lime;
+        transition: width 0.5s ease;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="progress-notification">
+      <div class="progress-icon"><img src="" alt="Icon" /></div>
+      <div class="progress-text">
+        <div class="title"></div>
+        <div class="bar-container">
+          <div class="progress-bar">
+            <div class="progress-fill"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="utils/i18n-ui.js"></script>
+    <script>
+      (async function () {
+        const tUi = (key, fallback) =>
+          window.i18nUi && typeof window.i18nUi.getString === "function"
+            ? window.i18nUi.getString(key, fallback)
+            : fallback;
+        async function resolveAchievementIcon(imgEl, cfgPath, rel) {
+          try {
+            const url = await window.api.resolveIconUrl(cfgPath, rel);
+            imgEl.onerror = null;
+            imgEl.src = url;
+          } catch {
+            imgEl.src =
+              "https://cdn-icons-png.flaticon.com/512/11455/11455431.png";
+          }
+        }
 
-</style>
-</head>
-<body>
-<div class="progress-notification">
-<div class="progress-icon"><img src="" alt="Icon"></div>
-<div class="progress-text">
-  <div class="title"></div>
-  <div class="bar-container">
-	<div class="progress-bar">
-	  <div class="progress-fill"></div>
-	</div>
-  </div>
-</div>
-</div>
-<script>
-(async function () {
-  async function resolveAchievementIcon(imgEl, cfgPath, rel) {
-    try {
-      const url = await window.api.resolveIconUrl(cfgPath, rel);
-      imgEl.onerror = null;
-      imgEl.src = url;
-    } catch {
-      imgEl.src = 'https://cdn-icons-png.flaticon.com/512/11455/11455431.png';
-    }
-  }
+        window.api.onProgressUpdate(async (data) => {
+          try {
+            if (!data) return;
 
-  window.api.onProgressUpdate(async (data) => {
-    try {
-      if (!data) return;
+            const titleEl = document.querySelector(".title");
+            const imgEl = document.querySelector(".progress-icon img");
+            const fill = document.querySelector(".progress-fill");
 
-      const titleEl = document.querySelector('.title');
-      const imgEl   = document.querySelector('.progress-icon img');
-      const fill    = document.querySelector('.progress-fill');
+            const name =
+              typeof data.displayName === "object"
+                ? data.displayName.english ||
+                  Object.values(data.displayName).find(
+                    (v) => typeof v === "string",
+                  ) ||
+                  tUi("progress.achievementFallback", "Achievement")
+                : data.displayName ||
+                  tUi("progress.achievementFallback", "Achievement");
 
-      const name = typeof data.displayName === 'object'
-        ? (data.displayName.english || Object.values(data.displayName).find(v => typeof v === 'string') || 'Achievement')
-        : (data.displayName || 'Achievement');
+            const cur = Number(data.progress ?? 0);
+            const max = Number(data.max_progress ?? 0);
+            const pct =
+              max > 0 ? Math.min(100, Math.round((cur / max) * 100)) : 0;
 
-      const cur = Number(data.progress ?? 0);
-      const max = Number(data.max_progress ?? 0);
-      const pct = max > 0 ? Math.min(100, Math.round((cur / max) * 100)) : 0;
+            titleEl.textContent = `${name}: ${cur}/${max}`;
+            await resolveAchievementIcon(imgEl, data.config_path, data.icon);
+            fill.style.width = `${pct}%`;
+          } catch (e) {
+            console.error("[progress.html] render error:", e);
+          }
+        });
 
-      titleEl.textContent = `${name}: ${cur}/${max}`;
-      await resolveAchievementIcon(imgEl, data.config_path, data.icon);
-      fill.style.width = `${pct}%`;
-    } catch (e) {
-      console.error('[progress.html] render error:', e);
-    }
-  });
-
-  setTimeout(() => {
-    window.api?.closeNotificationWindow?.();
-  }, 5000);
-})();
-</script>
-</body>
+        setTimeout(() => {
+          window.api?.closeNotificationWindow?.();
+        }, 5000);
+      })();
+    </script>
+  </body>
 </html>

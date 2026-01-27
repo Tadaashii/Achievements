@@ -1,0 +1,316 @@
+const fs = require("fs");
+const path = require("path");
+
+function readCString(buf, off) {
+  let i = off;
+  while (i < buf.length && buf[i] !== 0x00) i++;
+  const s = buf.toString("utf8", off, i);
+  return { s, next: i + 1 };
+}
+
+function addKey(obj, key, value) {
+  if (Object.prototype.hasOwnProperty.call(obj, key)) {
+    const cur = obj[key];
+    if (Array.isArray(cur)) cur.push(value);
+    else obj[key] = [cur, value];
+  } else obj[key] = value;
+}
+
+function parseNodeChildren(buf, offset) {
+  let off = offset;
+  const obj = {};
+  while (off < buf.length) {
+    const type = buf.readUInt8(off);
+    off += 1;
+    if (type === 0x08) return { obj, next: off };
+    const k = readCString(buf, off);
+    const key = k.s;
+    off = k.next;
+    if (type === 0x00) {
+      const child = parseNodeChildren(buf, off);
+      addKey(obj, key, child.obj);
+      off = child.next;
+      continue;
+    }
+    if (type === 0x01) {
+      const v = readCString(buf, off);
+      addKey(obj, key, v.s);
+      off = v.next;
+      continue;
+    }
+    if (type === 0x02) {
+      const v = buf.readInt32LE(off);
+      off += 4;
+      addKey(obj, key, v);
+      continue;
+    }
+    if (type === 0x03) {
+      const v = buf.readFloatLE(off);
+      off += 4;
+      addKey(obj, key, v);
+      continue;
+    }
+    if (type === 0x07) {
+      const v = buf.readBigUInt64LE(off);
+      off += 8;
+      addKey(obj, key, v.toString());
+      continue;
+    }
+    throw new Error(`Unsupported KV type 0x${type.toString(16)} (key="${key}")`);
+  }
+  return { obj, next: off };
+}
+
+function parseKVBinary(buf) {
+  if (!buf || buf.length < 2) throw new Error("Empty/invalid file");
+  let off = 0;
+  const firstType = buf.readUInt8(off);
+  off += 1;
+  let rootName = "root";
+  let rootObj = {};
+  if (firstType === 0x00) {
+    const r = readCString(buf, off);
+    rootName = r.s || "root";
+    off = r.next;
+    const parsed = parseNodeChildren(buf, off);
+    rootObj = parsed.obj;
+  } else {
+    off = 0;
+    const parsed = parseNodeChildren(buf, off);
+    rootObj = parsed.obj;
+  }
+  return { rootName, data: rootObj };
+}
+
+function extractUserStats(rootObj) {
+  const stats = {};
+  function findTimes(node) {
+    return (
+      node.AchievementTimes ||
+      node.achievementTimes ||
+      node.AchievementsTimes ||
+      node.achievement_times ||
+      null
+    );
+  }
+  function toTs(v) {
+    if (typeof v === "number") return v;
+    if (typeof v === "string" && /^\d+$/.test(v)) {
+      const n = Number(v);
+      return Number.isSafeInteger(n) ? n : null;
+    }
+    return null;
+  }
+  function walk(node, pathArr) {
+    if (!node || typeof node !== "object") return;
+    if (Object.prototype.hasOwnProperty.call(node, "data") && typeof node.data === "number") {
+      const statId = String(pathArr[pathArr.length - 1]);
+      const data_u32 = node.data >>> 0;
+      const times = {};
+      const tn = findTimes(node);
+      if (tn && typeof tn === "object") {
+        for (const [k, v] of Object.entries(tn)) {
+          const ts = toTs(v);
+          if (ts != null) times[String(k)] = ts;
+        }
+      }
+      stats[statId] = { data_u32, times };
+    }
+    for (const [k, v] of Object.entries(node)) {
+      if (v && typeof v === "object") walk(v, pathArr.concat(k));
+    }
+  }
+  walk(rootObj, ["root"]);
+  return stats;
+}
+
+function inferStatIdAndBit(pathArr) {
+  const isNum = (s) => typeof s === "string" && /^\d+$/.test(s);
+  let bit = null;
+  let statId = null;
+  for (let i = pathArr.length - 1; i >= 0; i--) {
+    if (isNum(pathArr[i])) {
+      bit = Number(pathArr[i]);
+      for (let j = i - 1; j >= 0; j--) {
+        if (isNum(pathArr[j])) {
+          statId = Number(pathArr[j]);
+          return { statId, bit };
+        }
+      }
+      break;
+    }
+  }
+  return { statId, bit };
+}
+
+function ensureLangObj(val) {
+  if (val && typeof val === "object" && !Array.isArray(val)) return { ...val };
+  if (typeof val === "string") return { english: val };
+  return {};
+}
+
+function normalizeHidden(v) {
+  if (typeof v === "number") return v ? 1 : 0;
+  const s = String(v ?? "").toLowerCase().trim();
+  return s === "1" || s === "true" || s === "yes" ? 1 : 0;
+}
+
+function extractSchemaAchievements(schemaRootObj) {
+  const results = [];
+
+  const pushEntry = ({ api, display, desc, icon, iconGray, hidden, statId, bit }) => {
+    if (!api || statId == null || bit == null) return;
+    results.push({
+      api: String(api),
+      displayName: ensureLangObj(display || api),
+      description: ensureLangObj(desc || ""),
+      hidden: normalizeHidden(hidden),
+      icon,
+      icon_gray: iconGray || icon,
+      statId,
+      bit,
+    });
+  };
+
+  function walk(node, pathArr) {
+    if (!node || typeof node !== "object") return;
+
+    // Modern appcache schema shape: { "0": { type: "4", bits: { "0": { name, display, bit } } } }
+    if (node.bits && typeof node.bits === "object") {
+      const statId = Number(pathArr[pathArr.length - 1]);
+      for (const [bitKey, bitVal] of Object.entries(node.bits)) {
+        const bit = Number(bitVal?.bit ?? bitKey);
+        const name =
+          bitVal?.name ||
+          bitVal?.api ||
+          bitVal?.statname ||
+          bitVal?.display?.name?.token ||
+          bitVal?.display?.name ||
+          null;
+        const display = bitVal?.display?.name || bitVal?.displayName || bitVal?.name;
+        const desc = bitVal?.display?.desc || bitVal?.description || "";
+        const icon = bitVal?.display?.icon || bitVal?.icon;
+        const iconGray =
+          bitVal?.display?.icon_gray ||
+          bitVal?.display?.icongray ||
+          bitVal?.icon_gray;
+        const hiddenVal = bitVal?.display?.hidden ?? bitVal?.hidden ?? node.hidden;
+        pushEntry({
+          api: name || `stat${statId}_bit${bit}`,
+          display,
+          desc,
+          icon,
+          iconGray,
+          hidden: hiddenVal,
+          statId: Number.isFinite(statId) ? statId : null,
+          bit: Number.isFinite(bit) ? bit : null,
+        });
+      }
+    }
+
+    // Fallback: legacy name+bit inference
+    if (typeof node.name === "string" && node.name) {
+      const { statId, bit } = inferStatIdAndBit(pathArr);
+      pushEntry({
+        api: node.name,
+        display: node.display || node.DisplayName || node.displayName || node.name,
+        desc: node.desc || node.description || node.Desc || "",
+        icon: node.icon || node.Icon || null,
+        iconGray: node.icon_gray || node.iconGray || null,
+        hidden: node.hidden,
+        statId,
+        bit,
+      });
+    }
+
+    for (const [k, v] of Object.entries(node)) {
+      if (v && typeof v === "object") walk(v, pathArr.concat(k));
+    }
+  }
+
+  walk(schemaRootObj, ["root"]);
+  const seen = new Set();
+  const dedup = [];
+  for (const r of results) {
+    if (seen.has(r.api)) continue;
+    seen.add(r.api);
+    dedup.push(r);
+  }
+  return dedup;
+}
+
+function buildSnapshotFromAppcache(schemaEntries, userStats) {
+  const snap = {};
+  for (const a of schemaEntries || []) {
+    const stat = userStats[String(a.statId)] || { data_u32: 0, times: {} };
+    const data = stat.data_u32 >>> 0;
+    const earned = ((data >>> a.bit) & 1) === 1;
+    const ts = stat.times && Object.prototype.hasOwnProperty.call(stat.times, String(a.bit))
+      ? stat.times[String(a.bit)]
+      : null;
+    snap[a.api] = {
+      earned,
+      earned_time: earned ? ts || 0 : null,
+    };
+  }
+  return snap;
+}
+
+function normalizeSteamIconUrl(appid, hash) {
+  if (!hash) return "";
+  if (/^https?:\/\//i.test(hash)) return hash;
+  if (hash.startsWith("//")) return "https:" + hash;
+  return `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${appid}/${hash}`;
+}
+
+function extractGameName(rootObj) {
+  let hit = null;
+  function walk(node) {
+    if (!node || typeof node !== "object") return;
+    for (const [k, v] of Object.entries(node)) {
+      if (typeof v === "string") {
+        const lk = String(k).toLowerCase();
+        // Only accept explicit gamename to avoid picking achievement strings.
+        if (lk === "gamename") {
+          hit = v;
+          return;
+        }
+      }
+      if (hit) return;
+      if (v && typeof v === "object") walk(v);
+      if (hit) return;
+    }
+  }
+  walk(rootObj);
+  return hit;
+}
+
+function pickLatestUserBin(statsDir, appid) {
+  const files = fs
+    .readdirSync(statsDir)
+    .filter((f) =>
+      f.toLowerCase().startsWith("usergamestats_") &&
+      f.toLowerCase().endsWith(`_${String(appid).toLowerCase()}.bin`)
+    );
+  if (!files.length) return null;
+  let best = files[0];
+  let bestM = fs.statSync(path.join(statsDir, best)).mtimeMs;
+  for (const f of files.slice(1)) {
+    const m = fs.statSync(path.join(statsDir, f)).mtimeMs;
+    if (m > bestM) {
+      best = f;
+      bestM = m;
+    }
+  }
+  return path.join(statsDir, best);
+}
+
+module.exports = {
+  parseKVBinary,
+  extractSchemaAchievements,
+  extractUserStats,
+  buildSnapshotFromAppcache,
+  normalizeSteamIconUrl,
+  pickLatestUserBin,
+  extractGameName,
+};

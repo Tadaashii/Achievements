@@ -1,5 +1,5 @@
 <!-- index.html -->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -128,7 +128,10 @@
         color: var(--dracula-purple, #bd93f9);
         border-radius: 8px;
         cursor: pointer;
-        transition: background 0.15s, color 0.15s, border-color 0.15s;
+        transition:
+          background 0.15s,
+          color 0.15s,
+          border-color 0.15s;
       }
 
       .sort-btn .dir {
@@ -155,7 +158,7 @@
     <div id="titlebar" class="titlebar">
       <div class="titlebar-logo">
         <img id="appIcon" alt="App Icon" />
-        <span class="titlebar-title">Achievements</span>
+        <span id="appTitle" class="titlebar-title">Achievements</span>
       </div>
       <div class="titlebar-controls">
         <button id="settingsBtn" class="titlebar-button">
@@ -185,8 +188,16 @@
           &times;
         </button>
 
-        <div class="settings-tabs" role="tablist" aria-label="Settings tabs">
-          <h3 style="margin: 0 0 15px 10px; color: var(--dracula-purple)">
+        <div
+          id="settingsTabs"
+          class="settings-tabs"
+          role="tablist"
+          aria-label="Settings tabs"
+        >
+          <h3
+            id="settingsTitle"
+            style="margin: 0 0 15px 10px; color: var(--dracula-purple)"
+          >
             Settings
           </h3>
           <button
@@ -228,7 +239,7 @@
           >
             <div style="padding: 0 5px">
               <div class="settings-section">
-                <h4>App Scale</h4>
+                <h4 id="settings-appScaleTitle">App Scale</h4>
                 <div class="settings-control">
                   <label for="app-zoom-dropdown">Zoom Level:</label>
                   <select id="app-zoom-dropdown">
@@ -241,7 +252,14 @@
                 </div>
               </div>
               <div class="settings-section" style="margin-bottom: 5px">
-                <h4>Overlay Shortcut</h4>
+                <h4 id="settings-appLanguageTitle">App Language</h4>
+                <div class="settings-control">
+                  <label for="appLanguageSelect">App Language:</label>
+                  <select id="appLanguageSelect"></select>
+                </div>
+              </div>
+              <div class="settings-section" style="margin-bottom: 5px">
+                <h4 id="settings-overlayShortcutTitle">Overlay Shortcut</h4>
                 <div class="settings-control">
                   <label for="overlay-shortcut-btn">Shortcut Key:</label>
                   <button id="overlay-shortcut-btn" type="button">
@@ -250,7 +268,9 @@
                 </div>
               </div>
               <div class="settings-section">
-                <h4>Hidden Achievements</h4>
+                <h4 id="settings-hiddenAchievementsTitle">
+                  Hidden Achievements
+                </h4>
                 <div class="checkbox-control">
                   <input type="checkbox" id="settings-showHiddenDescription" />
                   <label for="settings-showHiddenDescription">
@@ -259,7 +279,7 @@
                 </div>
               </div>
               <div class="settings-section">
-                <h4>Startup</h4>
+                <h4 id="settings-startupTitle">Startup</h4>
                 <div class="checkbox-control">
                   <input type="checkbox" id="settings-startWindowsCheckbox" />
                   <label for="settings-startWindowsCheckbox"
@@ -295,7 +315,7 @@
                 </div>
               </div>
               <div class="settings-section" style="margin-bottom: 5px">
-                <h4>Achievements Screenshots</h4>
+                <h4 id="settings-screenshotsTitle">Achievements Screenshots</h4>
                 <div class="settings-control">
                   <div class="input-with-button">
                     <label for="settings-screenshotFolder"
@@ -341,7 +361,7 @@
           >
             <div style="padding: 0 5px">
               <div class="settings-section">
-                <h4>Achievement Testing</h4>
+                <h4 id="settings-testingTitle">Achievement Testing</h4>
                 <button
                   id="settings-testAchievementBtn"
                   class="settings-test-button"
@@ -424,6 +444,7 @@
                     >Achievement Sound Volume:
                     <span id="settings-soundVolumeValue">100%</span>
                     <span
+                      id="settings-soundVolumeInfo"
                       class="info-dot"
                       title=">100% may distort"
                       aria-label=">100% may distort"
@@ -472,7 +493,9 @@
                 </div>
 
                 <hr />
-                <h4 style="margin-top: 10px">Platinum Notification</h4>
+                <h4 id="settings-platinumTitle" style="margin-top: 10px">
+                  Platinum Notification
+                </h4>
                 <div class="settings-control">
                   <label for="settings-platinumPositionDropdown"
                     >Platinum Achievement Position:</label
@@ -512,7 +535,9 @@
           >
             <div style="padding: 0 5px">
               <div class="settings-section">
-                <h4>Folders (auto-detect achievements)</h4>
+                <h4 id="settings-foldersTitle">
+                  Folders (auto-detect achievements)
+                </h4>
                 <div
                   class="settings-control"
                   style="display: flex; gap: 8px; flex-wrap: wrap"
@@ -534,7 +559,7 @@
             <div style="padding: 0 5px">
               <div class="settings-section">
                 <div class="settings-section" style="margin-bottom: 5px">
-                  <h4>Steam Web API</h4>
+                  <h4 id="settings-steamApiTitle">Steam Web API</h4>
                   <div class="settings-control">
                     <input
                       type="password"
@@ -553,7 +578,7 @@
                   </div>
                 </div>
                 <div class="settings-section">
-                  <h4>Blacklist</h4>
+                  <h4 id="settings-blacklistTitle">Blacklist</h4>
                   <div class="checkbox-control">
                     <input
                       type="checkbox"
@@ -592,7 +617,7 @@
               <div style="padding: 0 5px">
                 <!-- Global -->
                 <div class="settings-section">
-                  <h4>Global</h4>
+                  <h4 id="settings-globalTitle">Global</h4>
                   <ul class="shortcut-list">
                     <li class="shortcut-item" tabindex="0">
                       <div class="ctl-label">Settings</div>
@@ -626,6 +651,39 @@
                         <div class="ctl-line sub"><kbd>F2</kbd></div>
                         <div class="ctl-line sub">
                           <kbd>Ctrl</kbd>+<kbd>D</kbd>
+                        </div>
+                      </div>
+                      <div class="ctl-line">
+                        <span class="hint">Controller:</span>
+                        <div class="ctl-line sub">
+                          <span class="ctl ctl-xb"
+                            >Xbox:
+                            <span class="btn xb-Xboxbtn"
+                              >Xbox Button</span
+                            ></span
+                          >
+                        </div>
+                        <div class="ctl-line sub">
+                          <span class="ctl ctl-ps">
+                            PlayStation:
+                            <span class="btn ps-touchpad">Touchpad</span> |
+                            <span class="btn ps-ps">PS</span></span
+                          >
+                        </div>
+                      </div>
+                    </li>
+
+                    <li class="shortcut-item" tabindex="0">
+                      <div class="ctl-label">
+                        Show/Hide Options panel (on Dashboard)
+                      </div>
+                      <div class="ctl-line">
+                        <span class="hint">Keyboard:</span>
+                        <div class="ctl-line sub">
+                          <kbd>≣ (Context Menu)</kbd>
+                        </div>
+                        <div class="ctl-line sub">
+                          <kbd>Shift</kbd>+<kbd>F10</kbd>
                         </div>
                       </div>
                       <div class="ctl-line">
@@ -778,7 +836,7 @@
 
                 <!-- Dashboard -->
                 <div class="settings-section">
-                  <h4>Dashboard</h4>
+                  <h4 id="settings-dashboardTitle">Dashboard</h4>
                   <ul class="shortcut-list">
                     <li class="shortcut-item" tabindex="0">
                       <div class="ctl-label">Grid navigation</div>
@@ -934,7 +992,7 @@
 
                 <!-- Settings panel -->
                 <div class="settings-section">
-                  <h4>Settings panel</h4>
+                  <h4 id="settings-panelTitle">Settings panel</h4>
                   <ul class="shortcut-list">
                     <li class="shortcut-item" tabindex="0">
                       <div class="ctl-label">Open/Close</div>
@@ -1053,7 +1111,7 @@
 
                 <!-- Main screen -->
                 <div class="settings-section">
-                  <h4>Main screen</h4>
+                  <h4 id="settings-mainScreenTitle">Main screen</h4>
                   <ul class="shortcut-list">
                     <li class="shortcut-item" tabindex="0">
                       <div class="ctl-label">Toggle Options</div>
@@ -1134,7 +1192,7 @@
 
                 <!-- Drop-downs -->
                 <div class="settings-section">
-                  <h4>Drop-downs</h4>
+                  <h4 id="settings-dropdownsTitle">Drop-downs</h4>
                   <ul class="shortcut-list">
                     <li class="shortcut-item" tabindex="0">
                       <div class="ctl-label">Open</div>
@@ -1192,26 +1250,42 @@
 
                 <!-- Notes -->
                 <div class="settings-section">
-                  <h4>Notes</h4>
+                  <h4 id="settings-notesTitle">Notes</h4>
                   <ul class="shortcut-list">
                     <li class="shortcut-item" tabindex="0">
-                      <div class="ctl-label">Right Stick scrolling</div>
+                      <div class="ctl-label" id="notesRightStickTitle">
+                        Right Stick scrolling
+                      </div>
                       <div class="ctl-line">
                         <div class="ctl-line sub">
-                          Smooth scrolling in the active scrollable area.
+                          <span id="notesRightStickDesc">
+                            Smooth scrolling in the active scrollable area.
+                          </span>
                         </div>
                       </div>
                     </li>
 
                     <li class="shortcut-item" tabindex="0">
-                      <div class="ctl-label">Back is contextual</div>
+                      <div class="ctl-label" id="notesBackContextTitle">
+                        Back is contextual
+                      </div>
                       <div class="ctl-line sub">
-                        <div class="ctl-line sub">Settings Section → Tabs</div>
-                        <div class="ctl-line sub">Settings Tabs → Close</div>
-                        <div class="ctl-line sub">Dashboard → Close</div>
-                        <div class="ctl-line sub">Config modal → Close</div>
+                        <div class="ctl-line sub" id="notesBackSettingsSection">
+                          Settings Section → Tabs
+                        </div>
+                        <div class="ctl-line sub" id="notesBackSettingsTabs">
+                          Settings Tabs → Close
+                        </div>
+                        <div class="ctl-line sub" id="notesBackDashboard">
+                          Dashboard → Close
+                        </div>
+                        <div class="ctl-line sub" id="notesBackConfigModal">
+                          Config modal → Close
+                        </div>
                         <div class="ctl-line sub">
-                          Main with a selected config → Clear selection/back
+                          <span id="notesBackMainSelected">
+                            Main with a selected config → Clear selection/back
+                          </span>
                         </div>
                       </div>
                     </li>
@@ -1426,9 +1500,13 @@
                       <select id="platformSelect">
                         <option value="auto" selected>Auto</option>
                         <option value="steam">Steam</option>
+                        <option value="steam-official" disabled>Steam (Official)</option>
                         <option value="uplay">Uplay</option>
                         <option value="epic">Epic</option>
                         <option value="gog">GOG</option>
+                <option value="xenia" disabled>Xenia</option>
+                <option value="rpcs3" disabled>RPCS3</option>
+                <option value="shadps4" disabled>PS4 (shadps4)</option>
                       </select>
 
                       <div
@@ -1446,11 +1524,13 @@
                     </div>
                   </div>
 
-                  <!-- Buton Save -->
+                  <!-- Butoane Save / Regenerate -->
                   <div
                     style="
                       display: flex;
                       justify-content: center;
+                      gap: 10px;
+                      flex-wrap: wrap;
                       margin-top: 5px;
                     "
                   >
@@ -1468,12 +1548,25 @@
                     >
                       Save Config
                     </button>
+                    <button
+                      id="regenSchemaBtn"
+                      style="
+                        background-color: #2196f3;
+                        color: white;
+                        border: none;
+                        padding: 10px 24px;
+                        border-radius: 6px;
+                        font-weight: bold;
+                        width: auto;
+                        display: none;
+                      "
+                    >
+                      Regenerate Schema
+                    </button>
                   </div>
                 </div>
               </div>
             </div>
-
-
           </div>
 
           <div class="config-controls clean">
@@ -1537,7 +1630,16 @@
                 <option value="brazilian">Português (Brasil)</option>
                 <option value="ukrainian">Українська (Ukrainian)</option>
                 <option value="vietnamese">Tiếng Việt (Vietnamese)</option>
-                <option value="LATAM">
+                <option value="bulgarian">Български (Bulgarian)</option>
+                <option value="czech">Čeština (Czech)</option>
+                <option value="finnish">Suomi (Finnish)</option>
+                <option value="greek">Ελληνικά (Greek)</option>
+                <option value="indonesian">
+                  Bahasa Indonesia (Indonesian)
+                </option>
+                <option value="norwegian">Norsk (Norwegian)</option>
+                <option value="romanian">Română (Romanian)</option>
+                <option value="latam">
                   Español (Latinoamérica) (Spanish - Latin America)
                 </option>
               </select>
@@ -1563,6 +1665,8 @@
                 id="edit-btn"
                 type="button"
                 onclick="showAltAppIdPrompt()"
+                title="Edit image"
+                aria-label="Edit image"
               >
                 ✎
               </button>
@@ -1578,7 +1682,9 @@
                 color: white;
               "
             >
-              <p>⚠️ Does the game have a different Steam AppID on Steam?</p>
+              <p id="altAppIdPromptText">
+                ⚠️ Does the game have a different Steam AppID on Steam?
+              </p>
               <input
                 type="text"
                 id="altAppId"
@@ -1586,10 +1692,15 @@
                 style="padding: 5px; font-size: 16px; width: 200px"
               />
               <div style="margin-top: 10px">
-                <button type="button" onclick="downloadFromAlternativeAppId()">
+                <button
+                  id="altAppIdTryBtn"
+                  type="button"
+                  onclick="downloadFromAlternativeAppId()"
+                >
                   ✅ Try Alternative
                 </button>
                 <button
+                  id="altAppIdCancelBtn"
                   type="button"
                   onclick="cancelFallback()"
                   style="margin-left: 5px"
@@ -1656,9 +1767,15 @@
       >
         <div id="dashboardHeader">
           <div id="dashboardStats" aria-live="polite">
-            <span>Games: <strong id="gamesTotal">0</strong></span>
+            <span>
+              <span id="dashboardGamesLabel">Games:</span>
+              <strong id="gamesTotal">0</strong>
+            </span>
             <span class="sep">•</span>
-            <span>Perfect Games: <strong id="perfectTotal">0</strong></span>
+            <span>
+              <span id="dashboardPerfectLabel">Perfect Games:</span>
+              <strong id="perfectTotal">0</strong>
+            </span>
           </div>
 
           <!-- SEARCH -->
@@ -1735,6 +1852,46 @@
           ></div>
         </div>
       </div>
+
+      <div
+        id="dashboardContextMenu"
+        class="dash-context-menu hidden"
+        role="menu"
+        aria-hidden="true"
+      >
+        <button
+          id="dashboardMenuEdit"
+          class="dash-menu-item"
+          type="button"
+          data-action="edit"
+        >
+          Edit
+        </button>
+        <button
+          id="dashboardMenuRegenerate"
+          class="dash-menu-item"
+          type="button"
+          data-action="regen"
+        >
+          Regenerate Schema
+        </button>
+        <button
+          id="dashboardMenuIgnore"
+          class="dash-menu-item"
+          type="button"
+          data-action="ignore"
+        >
+          Ignore Game
+        </button>
+        <button
+          id="dashboardMenuDelete"
+          class="dash-menu-item is-danger"
+          type="button"
+          data-action="delete"
+        >
+          Delete
+        </button>
+      </div>
     </div>
 
     <div
@@ -1754,6 +1911,7 @@
       </div>
     </div>
 
+    <script src="utils/i18n-ui.js"></script>
     <script>
       window.__coverNameCache = window.__coverNameCache || {};
       function rememberCoverName(appid, displayName) {
@@ -1777,6 +1935,14 @@
 
       window.__preferencesCache = window.__preferencesCache || null;
       window.__preferencesLoadPromise = null;
+      const tUiFmt = (key, params = {}, fallback) => {
+        let text = tUi(key, fallback);
+        if (!params || typeof params !== "object") return text;
+        for (const [k, v] of Object.entries(params)) {
+          text = text.replaceAll(`{${k}}`, v);
+        }
+        return text;
+      };
       const blacklistLabelCache = new Map();
 
       function deepEqual(a, b) {
@@ -1815,7 +1981,10 @@
             window.__preferencesCache = { ...(prefs || {}) };
             return window.__preferencesCache;
           } catch (err) {
-            console.error("Failed to load preferences:", err);
+            console.error(
+              tUi("log.preferencesLoadFailed", "Failed to load preferences:"),
+              err,
+            );
             return window.__preferencesCache || {};
           } finally {
             window.__preferencesLoadPromise = null;
@@ -1832,13 +2001,19 @@
         try {
           await loadPreferencesCached();
         } catch (err) {
-          console.warn("Failed to refresh preferences cache:", err);
+          console.warn(
+            tUi(
+              "log.preferencesCacheRefreshFailed",
+              "Failed to refresh preferences cache:",
+            ),
+            err,
+          );
         }
       }
       async function maybeRequestPlatinum(
         configMeta,
         achievementsList,
-        savedAchievementsObj
+        savedAchievementsObj,
       ) {
         if (!configMeta) return;
         if (configMeta.platinum === true) return; // already flagged, skip
@@ -1874,11 +2049,17 @@
           } else if (window.electron?.ipcRenderer?.invoke) {
             await window.electron.ipcRenderer.invoke(
               "platinum:manual",
-              payload
+              payload,
             );
           }
         } catch (err) {
-          console.warn("Failed to trigger manual platinum:", err);
+          console.warn(
+            tUi(
+              "log.manualPlatinumTriggerFailed",
+              "Failed to trigger manual platinum:",
+            ),
+            err,
+          );
         }
       }
 
@@ -1903,7 +2084,13 @@
             delete merged.steamApiKeyMasked;
             window.__preferencesCache = merged;
           } catch (err) {
-            console.warn("Failed to update preferences cache:", err);
+            console.warn(
+              tUi(
+                "log.preferencesCacheUpdateFailed",
+                "Failed to update preferences cache:",
+              ),
+              err,
+            );
           }
           return result;
         };
@@ -1927,14 +2114,14 @@
       patchApiWithCacheRefresh(window.api, "getBlacklist");
       if (window.folders) {
         ["add", "remove", "block", "unblock"].forEach((method) =>
-          patchApiWithCacheRefresh(window.folders, method)
+          patchApiWithCacheRefresh(window.folders, method),
         );
       }
 
       //Start with Windows
       async function handleStartWithWindowsToggle(enabled) {
         const checkbox = document.getElementById(
-          "settings-startWindowsCheckbox"
+          "settings-startWindowsCheckbox",
         );
         try {
           await window.api.setStartWithWindows(enabled);
@@ -1942,7 +2129,10 @@
         } catch (err) {
           if (checkbox) checkbox.checked = !enabled;
           alert(
-            "Failed to update auto-start setting. Please run as administrator."
+            tUi(
+              "alert.autoStartUpdateFailed",
+              "Failed to update auto-start setting. Please run as administrator.",
+            ),
           );
         }
       }
@@ -1955,7 +2145,7 @@
         const fallbackBox = document.getElementById("embeddedFallbackPrompt");
         const fallbackIcon = new URL(
           "./assets/achievements-logo.png",
-          window.location.href
+          window.location.href,
         ).toString();
         const downloadIdCache = new Map();
         const steamGridUrlCache = new Map();
@@ -1965,10 +2155,31 @@
             .replace(/\+/g, " ")
             .replace(/\s+/g, "+");
         }
+        function normalizeCoverPlatform(value) {
+          return String(value || "").trim().toLowerCase();
+        }
+        function isSteamGridOnlyPlatform(value) {
+          const platform = normalizeCoverPlatform(value);
+          return (
+            platform === "xenia" ||
+            platform === "rpcs3" ||
+            platform === "shadps4" ||
+            platform === "ps4"
+          );
+        }
+        function stripCoverSuffix(name) {
+          let out = String(name || "").trim();
+          if (!out) return "";
+          const rx =
+            /\s*\((?:steam|steam[-\s]?official|xenia|rpcs3|ps4|shadps4)\)\s*$/i;
+          while (rx.test(out)) out = out.replace(rx, "").trim();
+          return out;
+        }
         async function downloadFromSteamGrid(
           targetAppId,
           rawTerm,
-          size = "600x900"
+          size = "600x900",
+          platformHint = null,
         ) {
           const term = buildSteamGridSearchTerm(rawTerm);
           if (!term) return false;
@@ -1984,7 +2195,7 @@
             const cached = steamGridUrlCache.get(cacheKey);
             if (cached === null) return false;
             try {
-              await downloadAndSave(targetAppId, cached);
+              await downloadAndSave(targetAppId, cached, platformHint);
               return true;
             } catch (err) {
               steamGridUrlCache.delete(cacheKey);
@@ -1997,7 +2208,7 @@
             });
             if (response?.ok && response.url) {
               steamGridUrlCache.set(cacheKey, response.url);
-              await downloadAndSave(targetAppId, response.url);
+              await downloadAndSave(targetAppId, response.url, platformHint);
               return true;
             }
             logCover("warn", "steamgrid:ipc-failed", {
@@ -2152,7 +2363,7 @@
         async function downloadFromCdnAndCache(
           targetAppId,
           fetchAppIdOverride = null,
-          options = {}
+          options = {},
         ) {
           const key = String(targetAppId);
           if (inFlightCovers.has(key)) {
@@ -2160,13 +2371,16 @@
           }
           const task = (async () => {
             const fetchAppId = fetchAppIdOverride || targetAppId;
-            const fallbackName = String(
-              options?.gameName || getCoverSearchTerm(targetAppId) || ""
-            ).trim();
             const platform =
               options?.platform ||
               (await resolvePlatformForCurrentApp(targetAppId)) ||
               null;
+            const rawFallbackName = String(
+              options?.gameName || getCoverSearchTerm(targetAppId) || "",
+            ).trim();
+            const fallbackName = stripCoverSuffix(rawFallbackName) || rawFallbackName;
+            const normalizedPlatform = normalizeCoverPlatform(platform);
+            const steamGridOnly = isSteamGridOnlyPlatform(normalizedPlatform);
             const steamGridSize =
               options?.gridSize && String(options.gridSize).trim().length
                 ? String(options.gridSize)
@@ -2182,9 +2396,35 @@
               targetAppId,
               fetchAppId,
               platform,
+              steamGridOnly,
               coverName: fallbackName || null,
               steamGridSize,
             });
+            if (steamGridOnly) {
+              if (fallbackName) {
+                const ok = await downloadFromSteamGrid(
+                  targetAppId,
+                  fallbackName,
+                  steamGridSize,
+                  platform,
+                );
+                if (ok) {
+                  logCover("info", "steamgrid:hit", {
+                    targetAppId,
+                    fetchAppId,
+                    term: fallbackName,
+                    steamGridSize,
+                  });
+                  return true;
+                }
+              }
+              logCover("warn", "steamgrid:only-miss", {
+                targetAppId,
+                fetchAppId,
+                term: fallbackName || null,
+              });
+              return false;
+            }
             const plain = [
               `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${fetchAppId}/library_600x900.jpg`,
               `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${fetchAppId}/library_600x900.jpg`,
@@ -2247,7 +2487,8 @@
               const ok = await downloadFromSteamGrid(
                 targetAppId,
                 fallbackName,
-                steamGridSize
+                steamGridSize,
+                platform,
               );
               if (ok) {
                 logCover("info", "steamgrid:hit", {
@@ -2272,12 +2513,12 @@
         }
         async function downloadFromStoreHeader(
           fetchAppId,
-          targetAppId = fetchAppId
+          targetAppId = fetchAppId,
         ) {
           try {
             const res = await fetch(
               `https://store.steampowered.com/api/appdetails?appids=${fetchAppId}`,
-              { cache: "no-store" }
+              { cache: "no-store" },
             );
             if (!res.ok) throw new Error(`Store API HTTP ${res.status}`);
 
@@ -2318,7 +2559,7 @@
           try {
             const localPath = await window.api.checkLocalGameImage(
               String(appid),
-              platform
+              platform,
             );
 
             if (localPath) {
@@ -2336,13 +2577,13 @@
             const ok = await downloadFromCdnAndCache(
               String(appid),
               fetchAppId,
-              { gameName: coverNameHint, platform }
+              { gameName: coverNameHint, platform },
             );
             if (!ok) return;
 
             const newLocal = await window.api.checkLocalGameImage(
               String(appid),
-              platform
+              platform,
             );
             if (newLocal) {
               try {
@@ -2391,7 +2632,7 @@
           const input = document.getElementById("altAppId");
           const alt = (input?.value || "").trim();
           if (!/^\d+$/.test(alt)) {
-            alert("Please enter a valid AppID");
+            alert(tUi("alert.invalidAppId", "Please enter a valid AppID"));
             return;
           }
 
@@ -2422,7 +2663,12 @@
           });
 
           if (!ok) {
-            alert("No image available for the alternate AppID.");
+            alert(
+              tUi(
+                "alert.altAppIdNoImage",
+                "No image available for the alternate AppID.",
+              ),
+            );
             return;
           }
 
@@ -2438,8 +2684,8 @@
               typeof payload === "object" && payload?.appid
                 ? String(payload.appid)
                 : /^\d+$/.test(String(payload))
-                ? String(payload)
-                : null;
+                  ? String(payload)
+                  : null;
             if (appid) await loadLocalCover(appid);
             else showFallbackLogo();
           });
@@ -2494,13 +2740,12 @@
 
       async function buildMainAchievementsTable(
         selectedConfig,
-        lang = "english"
+        lang = "english",
       ) {
         if (!selectedConfig) return;
 
-        const achievementsDataObj = await window.api.loadAchievementData(
-          selectedConfig
-        );
+        const achievementsDataObj =
+          await window.api.loadAchievementData(selectedConfig);
         if (
           !achievementsDataObj ||
           !Array.isArray(achievementsDataObj.achievements)
@@ -2510,17 +2755,21 @@
           const achStats = document.getElementById("achStats");
           if (achStats) achStats.style.display = "none";
           const playtimeLabel = document.getElementById("achStatsPlaytime");
-          if (playtimeLabel) playtimeLabel.textContent = "Playtime: 0m";
+          if (playtimeLabel)
+            playtimeLabel.textContent = tUiFmt(
+              "achStatsPlaytimeFmt",
+              { value: "0m" },
+              "Playtime: 0m",
+            );
           return;
         }
-        const savedAchievementsObj = await window.api.loadSavedAchievements(
-          selectedConfig
-        );
+        const savedAchievementsObj =
+          await window.api.loadSavedAchievements(selectedConfig);
         const currentConfig = await window.api.getConfigByName(selectedConfig);
         maybeRequestPlatinum(
           { name: selectedConfig, ...(currentConfig || {}) },
           achievementsDataObj?.achievements || [],
-          savedAchievementsObj
+          savedAchievementsObj,
         );
 
         const tableBody = document.getElementById("achievementsTableBody");
@@ -2546,7 +2795,7 @@
         const isUnlocked = (name) =>
           !!savedAchievementsObj?.achievements?.[name]?.earned;
         unique.sort(
-          (a, b) => (isUnlocked(b.name) ? 1 : 0) - (isUnlocked(a.name) ? 1 : 0)
+          (a, b) => (isUnlocked(b.name) ? 1 : 0) - (isUnlocked(a.name) ? 1 : 0),
         );
 
         function tsToLocal(ts) {
@@ -2558,11 +2807,11 @@
         for (const achievement of unique) {
           const displayName = getSafeLocalizedText(
             achievement.displayName,
-            lang
+            lang,
           );
           const description = getSafeLocalizedText(
             achievement.description,
-            lang
+            lang,
           );
           const iconGray = achievement.icon_gray || achievement.icongray;
           const icon = achievement.icon || iconGray;
@@ -2571,12 +2820,32 @@
           const imgRel = saved?.earned ? icon : iconGray;
           const imagePath = `file:///${`${achievementsDataObj.config_path}\\${imgRel}`.replace(
             /\\/g,
-            "/"
+            "/",
           )}`;
 
-          const statusHTML = saved?.earned
-            ? `<span class="unlocked">Unlocked</span>`
-            : `<span class="locked">Locked</span>`;
+        const statusLocked =
+          (window.i18nUi &&
+            typeof window.i18nUi.getString === "function" &&
+            window.i18nUi.getString("overlay.statusLocked", "Locked")) ||
+          "Locked";
+        const statusUnlocked =
+          (window.i18nUi &&
+            typeof window.i18nUi.getString === "function" &&
+            window.i18nUi.getString("overlay.statusUnlocked", "Unlocked")) ||
+          "Unlocked";
+        const progressLabel =
+          (window.i18nUi &&
+            typeof window.i18nUi.getString === "function" &&
+            window.i18nUi.getString("overlay.progressLabel", "Progress")) ||
+          "Progress";
+        const hiddenLabel =
+          (window.i18nUi &&
+            typeof window.i18nUi.getString === "function" &&
+            window.i18nUi.getString("overlay.hiddenFallback", "Hidden")) ||
+          "Hidden";
+        const statusHTML = saved?.earned
+          ? `<span class="unlocked">${statusUnlocked}</span>`
+          : `<span class="locked">${statusLocked}</span>`;
 
           const earnedTimeText = saved?.earned_time
             ? `<br>${tsToLocal(saved.earned_time)}`
@@ -2589,11 +2858,11 @@
           ) {
             const pct = Math.min(
               100,
-              Math.round((saved.progress / saved.max_progress) * 100)
+              Math.round((saved.progress / saved.max_progress) * 100),
             );
             progressText = `
                     <div class="achievement-progress">
-                    Progress: ${saved.progress} / ${saved.max_progress}
+                    ${progressLabel}: ${saved.progress} / ${saved.max_progress}
                     <div class="progress-bar">
                         <div class="progress-fill" style="width:${pct}%"></div>
                     </div>
@@ -2613,7 +2882,7 @@
           const tdText = document.createElement("td");
           tdText.className = "displayName";
           const strong = document.createElement("strong");
-          strong.textContent = displayName || "Hidden";
+          strong.textContent = displayName || hiddenLabel;
           const descWrap = document.createElement("span");
           descWrap.className = "description";
           descWrap.style.display = "block";
@@ -2626,7 +2895,7 @@
               : prefs.showHiddenDescription === true;
           const descText =
             isHiddenInSchema && !canShowHiddenDesc
-              ? "Hidden"
+              ? hiddenLabel
               : description || "";
           descWrap.appendChild(document.createElement("em")).textContent =
             descText;
@@ -2642,11 +2911,11 @@
           ) {
             const pct = Math.min(
               100,
-              Math.round((saved.progress / saved.max_progress) * 100)
+              Math.round((saved.progress / saved.max_progress) * 100),
             );
             const progWrap = document.createElement("div");
             progWrap.className = "achievement-progress";
-            progWrap.textContent = `Progress: ${saved.progress} / ${saved.max_progress}`;
+            progWrap.textContent = `${progressLabel}: ${saved.progress} / ${saved.max_progress}`;
             const bar = document.createElement("div");
             bar.className = "progress-bar";
             const fill = document.createElement("div");
@@ -2662,12 +2931,12 @@
           tdStatus.className = "status";
           const st = document.createElement("span");
           st.className = saved?.earned ? "unlocked" : "locked";
-          st.textContent = saved?.earned ? "Unlocked" : "Locked";
+          st.textContent = saved?.earned ? statusUnlocked : statusLocked;
           tdStatus.appendChild(st);
           if (saved?.earned_time) {
             tdStatus.appendChild(document.createElement("br"));
             tdStatus.appendChild(
-              document.createTextNode(tsToLocal(saved.earned_time))
+              document.createTextNode(tsToLocal(saved.earned_time)),
             );
           }
 
@@ -2677,13 +2946,13 @@
           resolveAchievementIcon(
             imgEl,
             achievementsDataObj.config_path,
-            imgRel
+            imgRel,
           );
         }
 
         // Main Progress Bar
         updateAchievementStats(
-          unique.map((a) => ({ ...a, earned: isUnlocked(a.name) }))
+          unique.map((a) => ({ ...a, earned: isUnlocked(a.name) })),
         );
         const achStats = document.getElementById("achStats");
         if (achStats) achStats.style.display = "block";
@@ -2713,7 +2982,7 @@
               configName || document.getElementById("configList")?.value;
             if (name) {
               const card = document.querySelector(
-                `.dash-card[data-name="${CSS.escape(name)}"]`
+                `.dash-card[data-name="${CSS.escape(name)}"]`,
               );
               if (card) {
                 try {
@@ -2755,9 +3024,17 @@
           const res = await window.api.getTotalPlaytime(configName);
           const totalMs =
             typeof res === "number" ? res : Number(res?.totalMs || 0);
-          label.textContent = `Playtime: ${formatPlaytimeLabel(totalMs)}`;
+          label.textContent = tUiFmt(
+            "achStatsPlaytimeFmt",
+            { value: formatPlaytimeLabel(totalMs) },
+            `Playtime: ${formatPlaytimeLabel(totalMs)}`,
+          );
         } catch {
-          label.textContent = "Playtime: 0m";
+          label.textContent = tUiFmt(
+            "achStatsPlaytimeFmt",
+            { value: "0m" },
+            "Playtime: 0m",
+          );
         }
       }
 
@@ -2827,7 +3104,7 @@
 
       window.api.onNotify(({ message, color }) => {
         const isConfigPathWarn = SUPPRESS_MSG_PATTERNS.some((rx) =>
-          rx.test(message)
+          rx.test(message),
         );
 
         if (window.__dashboardOpen && isConfigPathWarn) return;
@@ -2923,7 +3200,10 @@
         const appIdValue = appidInput?.value.trim();
         if (!appIdValue) {
           if (manualTrigger) {
-            showNotification("Enter the AppID.", "#FFC107");
+            showNotification(
+              tUi("notify.enterAppId", "Enter the AppID."),
+              "#FFC107",
+            );
           }
           return;
         }
@@ -2932,7 +3212,14 @@
           if (mapped) {
             steamAppIdInput.value = mapped;
             if (manualTrigger) {
-              showNotification(`Steam AppID found: ${mapped}`, "#4CAF50");
+              showNotification(
+                tUiFmt(
+                  "notify.steamAppIdFound",
+                  { appid: mapped },
+                  `Steam AppID found: ${mapped}`,
+                ),
+                "#4CAF50",
+              );
             }
             console.info("[platform] steam-id-resolved", {
               appid: appIdValue,
@@ -2941,24 +3228,33 @@
             });
           } else if (manualTrigger) {
             showNotification(
-              "No mapping found. Enter Steam AppID manually.",
-              "#FFC107"
+              tUi(
+                "notify.steamAppIdNotFound",
+                "No mapping found. Enter Steam AppID manually.",
+              ),
+              "#FFC107",
             );
           }
           if (!mapped) {
-            console.warn("[platform] steam-id-miss", {
+            console.warn(tUi("log.platformSteamIdMiss", "steam-id-miss"), {
               appid: appIdValue,
               manual: manualTrigger,
             });
           }
         } catch (err) {
           if (manualTrigger) {
-            showNotification("Lookup Steam ID failed.", "#f44336");
+            showNotification(
+              tUi("notify.steamAppIdLookupFailed", "Lookup Steam ID failed."),
+              "#f44336",
+            );
           }
-          console.error("[platform] steam-id-lookup-error", {
-            appid: appIdValue,
-            error: err?.message || String(err),
-          });
+          console.error(
+            tUi("log.platformSteamIdLookupError", "steam-id-lookup-error"),
+            {
+              appid: appIdValue,
+              error: err?.message || String(err),
+            },
+          );
         }
       }
 
@@ -2985,10 +3281,12 @@
       }
 
       let editingConfigName = null;
+      let pendingSchemaRefresh = null;
 
       function resetConfigForm() {
         const form = document.getElementById("new-config-form");
         const button = document.getElementById("createNewConfigBtn");
+        const regenBtn = document.getElementById("regenSchemaBtn");
         document.getElementById("configName").value = "";
         document.getElementById("appid").value = "";
         document.getElementById("configPath").value = "";
@@ -3007,15 +3305,20 @@
         }
 
         editingConfigName = null;
+        if (regenBtn) regenBtn.style.display = "none";
 
         if (!form.classList.contains("hidden")) {
           form.classList.add("hidden");
         }
 
-        button.innerHTML =
-          'Create New Config <span class="arrow-icon">▼</span>';
-        document.getElementById("configFormTitle").textContent =
-          "Create New Config";
+        button.innerHTML = `${tUi(
+          "ui.config.createNewBtn",
+          "Create New Config",
+        )} <span class="arrow-icon">▼</span>`;
+        document.getElementById("configFormTitle").textContent = tUi(
+          "ui.config.formCreateTitle",
+          "Create New Config",
+        );
       }
 
       document
@@ -3024,69 +3327,99 @@
           resetConfigForm();
           document.getElementById("configModal").classList.remove("hidden");
           document.getElementById("new-config-form").classList.remove("hidden");
-          document.getElementById("configFormTitle").textContent =
-            "Create New Config";
+          document.getElementById("configFormTitle").textContent = tUi(
+            "ui.config.formCreateTitle",
+            "Create New Config",
+          );
         });
+
+      async function openEditConfigModalByName(configName) {
+        if (!configName) return;
+        try {
+          if (window.__dashboardOpen) {
+            window.closeDashboard?.();
+          }
+          const currentConfig = await window.api.getConfigByName(configName);
+
+          if (!currentConfig) {
+            alert(tUi("alert.configNotFound", "Config not found!"));
+            return;
+          }
+
+          document.getElementById("configName").value = currentConfig.name;
+          document.getElementById("appid").value = currentConfig.appid;
+          document.getElementById("configPath").value =
+            currentConfig.config_path;
+          document.getElementById("savePath").value = currentConfig.save_path;
+          document.getElementById("executablePath").value =
+            currentConfig.executable || "";
+          document.getElementById("exeArgs").value =
+            currentConfig.arguments || "";
+          document.getElementById("processName").value =
+            currentConfig.process_name || "";
+          const currentPlatform = (
+            currentConfig.platform || "auto"
+          ).toLowerCase();
+          if (platformSelect) {
+            platformSelect.value = [
+              "steam",
+              "steam-official",
+              "uplay",
+              "epic",
+              "gog",
+              "xenia",
+              "rpcs3",
+              "shadps4",
+            ].includes(currentPlatform)
+              ? currentPlatform
+              : "auto";
+            platformSelect.disabled = true;
+            platformSelect.title = tUi(
+              "tooltip.platformLocked",
+              "Platform is locked for existing configs. Create a new config to change it.",
+            );
+            toggleSteamAppIdRow(platformSelect.value === "uplay");
+          }
+          if (steamAppIdInput) {
+            steamAppIdInput.value = currentConfig.steamAppId || "";
+          }
+
+          editingConfigName = currentConfig.name;
+          const regenBtn = document.getElementById("regenSchemaBtn");
+          if (regenBtn) regenBtn.style.display = "inline-block";
+          const form = document.getElementById("new-config-form");
+          if (form.style.display !== "block") {
+            document.getElementById("configModal").classList.remove("hidden");
+          }
+          const button = document.getElementById("createNewConfigBtn");
+
+          form.classList.remove("hidden");
+          button.innerHTML = `${tUi(
+            "ui.config.editing",
+            "Editing...",
+          )} <span class="arrow-icon" class="rotate-up"></span>`;
+          document.getElementById("configFormTitle").textContent = tUi(
+            "ui.config.formEditTitle",
+            "Edit Config",
+          );
+        } catch (err) {
+          console.error(tUi("log.editError", "Edit error:"), err);
+          alert(
+            tUi(
+              "alert.configLoadFailed",
+              "Something went wrong loading the config.",
+            ),
+          );
+        }
+      }
+      window.openEditConfigModalByName = openEditConfigModalByName;
 
       document
         .getElementById("editConfigBtn")
         .addEventListener("click", async () => {
           const configName = document.getElementById("configList").value;
           if (!configName) return;
-
-          try {
-            const currentConfig = await window.api.getConfigByName(configName);
-
-            if (!currentConfig) {
-              alert("Config not found!");
-              return;
-            }
-
-            document.getElementById("configName").value = currentConfig.name;
-            document.getElementById("appid").value = currentConfig.appid;
-            document.getElementById("configPath").value =
-              currentConfig.config_path;
-            document.getElementById("savePath").value = currentConfig.save_path;
-            document.getElementById("executablePath").value =
-              currentConfig.executable || "";
-            document.getElementById("exeArgs").value =
-              currentConfig.arguments || "";
-            document.getElementById("processName").value =
-              currentConfig.process_name || "";
-            const currentPlatform = (
-              currentConfig.platform || "auto"
-            ).toLowerCase();
-            if (platformSelect) {
-              platformSelect.value = ["steam", "uplay", "epic", "gog"].includes(
-                currentPlatform
-              )
-                ? currentPlatform
-                : "auto";
-              platformSelect.disabled = true;
-              platformSelect.title =
-                "Platform is locked for existing configs. Create a new config to change it.";
-              toggleSteamAppIdRow(platformSelect.value === "uplay");
-            }
-            if (steamAppIdInput) {
-              steamAppIdInput.value = currentConfig.steamAppId || "";
-            }
-
-            editingConfigName = currentConfig.name;
-            const form = document.getElementById("new-config-form");
-            if (form.style.display !== "block") {
-              document.getElementById("configModal").classList.remove("hidden");
-            }
-            const button = document.getElementById("createNewConfigBtn");
-
-            form.classList.remove("hidden");
-            button.innerHTML =
-              'Editing... <span class="arrow-icon" class="rotate-up">▲</span>';
-            document.getElementById("configFormTitle").textContent =
-              "Edit Config";
-          } catch (err) {
-            console.error("Edit error:", err);
-            alert("Something went wrong loading the config.");
-          }
+          await openEditConfigModalByName(configName);
         });
 
       document
@@ -3120,7 +3453,10 @@
 
         if (!configName || !appid) {
           const notif = document.createElement("div");
-          notif.textContent = "Name and AppID are required!";
+          notif.textContent = tUi(
+            "alert.nameAppIdRequired",
+            "Name and AppID are required!",
+          );
           notif.style.position = "fixed";
           notif.style.top = "100px";
           notif.style.left = "50%";
@@ -3143,13 +3479,20 @@
           const check = await window.api.isAppIdBlacklisted(appid);
           if (check?.blacklisted) {
             showNotification(
-              `${check.appid} is on Blacklist. Please remove it to continue.`,
-              "#f44336"
+              tUiFmt(
+                "alert.appidBlacklisted",
+                { appid: check.appid },
+                `${check.appid} is on Blacklist. Please remove it to continue.`,
+              ),
+              "#f44336",
             );
             return;
           }
         } catch (err) {
-          console.error("Blacklist check failed:", err);
+          console.error(
+            tUi("log.blacklistCheckFailed", "Blacklist check failed:"),
+            err,
+          );
         }
 
         const config = {
@@ -3161,12 +3504,7 @@
           arguments: arguments || "",
           process_name: processName || "",
         };
-        if (
-          selectedPlatform === "steam" ||
-          selectedPlatform === "uplay" ||
-          selectedPlatform === "epic" ||
-          selectedPlatform === "gog"
-        ) {
+        if (selectedPlatform && selectedPlatform !== "auto") {
           config.platform = selectedPlatform;
         }
         if (steamAppId) {
@@ -3180,20 +3518,196 @@
 
         showNotification(
           result.message,
-          result.success ? "#4CAF50" : "#f44336"
+          result.success ? "#4CAF50" : "#f44336",
         );
 
         if (result.success) {
+          const cacheOldName =
+            editingConfigName && editingConfigName !== configName
+              ? editingConfigName
+              : null;
+          window.__clearDashboardCachesFor?.(configName);
+          if (cacheOldName) {
+            window.__clearDashboardCachesFor?.(cacheOldName);
+          }
           editingConfigName = null;
-          document.getElementById("createNewConfigBtn").innerText =
-            "Create New Config";
+          document.getElementById("createNewConfigBtn").innerText = tUi(
+            "ui.config.createNewBtn",
+            "Create New Config",
+          );
           localStorage.setItem("configSavedMessage", result.message);
           localStorage.setItem(
             "configSavedSuccess",
-            result.success ? "true" : "false"
+            result.success ? "true" : "false",
           );
 
           window.location.reload();
+        }
+      });
+
+      const regenSchemaBtn = document.getElementById("regenSchemaBtn");
+      if (regenSchemaBtn) {
+        regenSchemaBtn.addEventListener("click", async () => {
+          const configName = document.getElementById("configName").value;
+          const appid = document.getElementById("appid").value;
+          const selectedPlatform =
+            platformSelect?.value?.toLowerCase() || "auto";
+
+          if (!configName || !appid) {
+            showNotification(
+              tUi("alert.nameAppIdRequired", "Name and AppID are required!"),
+              "#f44336",
+            );
+            return;
+          }
+          if (editingConfigName && editingConfigName !== configName) {
+            showNotification(
+              tUi(
+                "alert.saveRenamedConfigFirst",
+                "Save the renamed config before regenerating the schema.",
+              ),
+              "#FFC107",
+            );
+            return;
+          }
+
+          try {
+            const check = await window.api.isAppIdBlacklisted(appid);
+            if (check?.blacklisted) {
+              showNotification(
+                tUiFmt(
+                  "alert.appidBlacklisted",
+                  { appid: check.appid },
+                  `${check.appid} is on Blacklist. Please remove it to continue.`,
+                ),
+                "#f44336",
+              );
+              return;
+            }
+          } catch (err) {
+            console.error(
+              tUi("log.blacklistCheckFailed", "Blacklist check failed:"),
+              err,
+            );
+          }
+
+          try {
+            pendingSchemaRefresh = {
+              appid: String(appid).trim(),
+              name: editingConfigName || configName,
+            };
+            document.getElementById("closeConfigModal")?.click();
+
+            const result = await window.api.regenerateSchema({
+              name: editingConfigName || configName,
+              appid,
+              platform: selectedPlatform,
+            });
+            showNotification(
+              result?.message ||
+                tUi(
+                  "notify.schemaRegenerateFinished",
+                  "Schema regeneration finished.",
+                ),
+              result?.success ? "#4CAF50" : "#f44336",
+            );
+            if (result?.config_path) {
+              document.getElementById("configPath").value = result.config_path;
+            }
+            if (result?.success) {
+              const targetName = editingConfigName || configName;
+              const lang =
+                document.getElementById("languageSelect")?.value || "english";
+              const list = document.getElementById("configList");
+              if (list) {
+                list.value = targetName;
+                list.dispatchEvent(new Event("change", { bubbles: true }));
+              } else {
+                const preset =
+                  document.getElementById("presetDropdown")?.value || "default";
+                const position =
+                  document.getElementById("positionDropdown")?.value ||
+                  "center-bottom";
+                window.api.updateConfig({
+                  configName: targetName,
+                  preset,
+                  position,
+                });
+              }
+              try {
+                await buildMainAchievementsTable(targetName, lang);
+              } catch (err) {
+                console.error(
+                  tUi(
+                    "log.refreshAchievementsFailed",
+                    "Refresh achievements table failed:",
+                  ),
+                  err,
+                );
+              }
+            }
+          } catch (err) {
+            console.error(
+              tUi("log.schemaRegenerateFailed", "Regenerate schema failed:"),
+              err,
+            );
+            showNotification(
+              tUi(
+                "alert.schemaRegenerateFailed",
+                "Failed to regenerate schema.",
+              ),
+              "#f44336",
+            );
+          }
+        });
+      }
+
+      window.api.onSchemaReady(async (data) => {
+        if (!pendingSchemaRefresh) return;
+        const appidMatch =
+          data?.appid &&
+          pendingSchemaRefresh.appid &&
+          String(data.appid) === pendingSchemaRefresh.appid;
+        const nameMatch =
+          data?.name &&
+          pendingSchemaRefresh.name &&
+          String(data.name) === pendingSchemaRefresh.name;
+        if (!(appidMatch || nameMatch)) return;
+        const targetName = pendingSchemaRefresh.name;
+        pendingSchemaRefresh = null;
+
+        try {
+          if (typeof reloadConfigsDropdown === "function") {
+            await reloadConfigsDropdown(true);
+          }
+        } catch (err) {
+          console.error(
+            tUi(
+              "log.reloadConfigsAfterSchemaFailed",
+              "Reload configs after schema failed:",
+            ),
+            err,
+          );
+        }
+
+        const lang =
+          document.getElementById("languageSelect")?.value || "english";
+        const selected =
+          typeof window.selectConfigInDropdown === "function"
+            ? window.selectConfigInDropdown(targetName)
+            : false;
+        if (selected) {
+          try {
+            await buildMainAchievementsTable(targetName, lang);
+          } catch (err) {
+            console.error(
+              tUi(
+                "log.refreshAchievementsFailed",
+                "Refresh achievements table failed:",
+              ),
+              err,
+            );
+          }
         }
       });
 
@@ -3204,11 +3718,11 @@
           if (container.classList.contains("hidden")) {
             container.classList.remove("hidden");
             container.style.display = "flex";
-            this.textContent = "Hide Options";
+            this.textContent = tUi("ui.toggle.hideOptions", "Hide Options");
           } else {
             container.classList.add("hidden");
             container.style.display = "none";
-            this.textContent = "Show Options";
+            this.textContent = tUi("ui.toggle.showOptions", "Show Options");
           }
         });
 
@@ -3231,25 +3745,99 @@
         }
       });
 
-      document
-        .getElementById("languageSelect")
-        .addEventListener("change", async (e) => {
-          const selectedLang = e.target.value;
+      const languageSelect = document.getElementById("languageSelect");
+      const appLanguageSelect = document.getElementById("appLanguageSelect");
+      let uiLanguage = "english";
+      let achievementLanguageManual = false;
+      let syncingAchievementLanguage = false;
 
-          await window.api.savePreferences({ language: selectedLang });
+      const normalizeLangValue = (value) => {
+        const raw = String(value || "").trim();
+        if (!raw) return "english";
+        return raw === "LATAM" ? "latam" : raw.toLowerCase();
+      };
 
-          const configName = document.getElementById("configList").value;
-          window.api.refreshUILanguage({ language: selectedLang, configName });
+      const syncAppLanguageOptions = () => {
+        if (!languageSelect || !appLanguageSelect) return;
+        appLanguageSelect.innerHTML = languageSelect.innerHTML;
+      };
 
-          if (configName) {
-            await buildMainAchievementsTable(configName, selectedLang);
-          }
+      async function applyUiLanguage(lang) {
+        const prevLang = uiLanguage;
+        uiLanguage = normalizeLangValue(lang);
+        if (
+          window.i18nUi &&
+          typeof window.i18nUi.setUiLanguage === "function"
+        ) {
+          await window.i18nUi.setUiLanguage(uiLanguage);
+        }
+        syncAppLanguageOptions();
+        if (appLanguageSelect) appLanguageSelect.value = uiLanguage;
+        if (typeof updateSortIconsUI === "function") {
+          updateSortIconsUI();
+        }
+        if (typeof window.refreshFoldersList === "function") {
+          window.refreshFoldersList();
+        }
+        if (typeof window.refreshBlacklistList === "function") {
+          window.refreshBlacklistList();
+        }
+        if (typeof window.refreshShortcutLabel === "function") {
+          window.refreshShortcutLabel();
+        }
+        if (window.__dashboardOpen && typeof buildDashboard === "function") {
+          await buildDashboard();
+        }
+        if (window.api?.refreshUILanguage && uiLanguage !== prevLang) {
+          const configName = document.getElementById("configList")?.value;
+          window.api.refreshUILanguage({
+            uiLanguage,
+            configName: configName || null,
+          });
+        }
+      }
 
-          localStorage.setItem("preferredLanguage", selectedLang);
+      async function applyAchievementLanguage(lang, opts = {}) {
+        const normalized = normalizeLangValue(lang);
+        const configName = document.getElementById("configList").value;
+        const payload = { language: normalized };
+        if (opts.manual === true) {
+          payload.achievementLanguageManual = true;
+          achievementLanguageManual = true;
+        }
+        syncingAchievementLanguage = true;
+        if (languageSelect) languageSelect.value = normalized;
+        syncingAchievementLanguage = false;
+        await window.api.savePreferences(payload);
+        window.api.refreshUILanguage({
+          language: normalized,
+          configName,
+          uiLanguage,
         });
+        if (configName) {
+          await buildMainAchievementsTable(configName, normalized);
+        }
+        localStorage.setItem("preferredLanguage", normalized);
+      }
 
-      const savedLang = localStorage.getItem("preferredLanguage") || "english";
-      document.getElementById("languageSelect").value = savedLang;
+      if (appLanguageSelect) {
+        appLanguageSelect.addEventListener("change", async (e) => {
+          const selectedLang = normalizeLangValue(e.target.value);
+          await window.api.savePreferences({ uiLanguage: selectedLang });
+          await applyUiLanguage(selectedLang);
+          if (!achievementLanguageManual) {
+            await applyAchievementLanguage(selectedLang, { manual: false });
+          }
+        });
+      }
+
+      if (languageSelect) {
+        languageSelect.addEventListener("change", async (e) => {
+          if (syncingAchievementLanguage) return;
+          const selectedLang = normalizeLangValue(e.target.value);
+          await applyAchievementLanguage(selectedLang, { manual: true });
+        });
+      }
       function getLocalizedText(obj, lang = "english") {
         if (!obj) return "";
         if (typeof obj === "string") return obj;
@@ -3265,13 +3853,13 @@
       const blacklistConfigBtn = document.getElementById("blacklistConfigBtn");
       const muteProgressRow = document.getElementById("muteProgressRow");
       const muteProgressCheckbox = document.getElementById(
-        "muteProgressCheckbox"
+        "muteProgressCheckbox",
       );
       const showBlacklistedCheckbox = document.getElementById(
-        "settings-showBlacklistedCheckbox"
+        "settings-showBlacklistedCheckbox",
       );
       const resetBlacklistBtn = document.getElementById(
-        "settings-resetBlacklistBtn"
+        "settings-resetBlacklistBtn",
       );
 
       const configMetaIndex = new Map();
@@ -3329,7 +3917,10 @@
           const res = await window.api.getBlacklist();
           blacklistState.appids = new Set(res?.appids || []);
         } catch (err) {
-          console.warn("Failed to load blacklist:", err);
+          console.warn(
+            tUi("log.blacklistLoadFailed", "Failed to load blacklist:"),
+            err,
+          );
           blacklistState.appids = new Set();
         }
       }
@@ -3369,8 +3960,10 @@
 
         const entries = Array.from(blacklistState.appids || []);
         if (entries.length === 0) {
-          listEl.innerHTML =
-            '<div style="padding:10px; color:#aaa;"><small>No blacklisted apps.</small></div>';
+          listEl.innerHTML = `<div style="padding:10px; color:#aaa;"><small>${tUi(
+            "blacklist.empty",
+            "No blacklisted apps.",
+          )}</small></div>`;
           return;
         }
 
@@ -3411,7 +4004,10 @@
 
           const btnRemove = document.createElement("button");
           btnRemove.className = "icon-btn remove";
-          btnRemove.title = "Remove from blacklist";
+          btnRemove.title = tUi(
+            "tooltip.blacklistRemove",
+            "Remove from blacklist",
+          );
           btnRemove.innerHTML = '<i class="fa-regular fa-trash-can"></i>';
           btnRemove.addEventListener("click", async () => {
             try {
@@ -3426,8 +4022,19 @@
                 await buildDashboard();
               }
             } catch (err) {
-              console.error("Failed to remove from blacklist:", err);
-              alert("Failed to remove this AppID from blacklist.");
+              console.error(
+                tUi(
+                  "log.blacklistRemoveFailed",
+                  "Failed to remove from blacklist:",
+                ),
+                err,
+              );
+              alert(
+                tUi(
+                  "alert.blacklistRemoveFailed",
+                  "Failed to remove this AppID from blacklist.",
+                ),
+              );
             }
           });
 
@@ -3448,7 +4055,7 @@
                   res?.displayName || res?.name || `App ${appid}`;
                 blacklistLabelCache.set(appid, fetchedLabel);
                 const currentRow = listEl.querySelector(
-                  `.wf-row[data-appid="${appid}"] .wf-path`
+                  `.wf-row[data-appid="${appid}"] .wf-path`,
                 );
                 if (currentRow) {
                   currentRow.textContent = `${appid} — ${fetchedLabel}`;
@@ -3459,6 +4066,7 @@
           }
         }
       }
+      window.refreshBlacklistList = renderBlacklistList;
 
       function applyShowBlacklistPreference(value) {
         const next = !!value;
@@ -3473,15 +4081,24 @@
         if (!blacklistConfigBtn) return;
         if (!appid) {
           blacklistConfigBtn.disabled = true;
-          blacklistConfigBtn.textContent = "Ignore Game";
+          blacklistConfigBtn.textContent = tUi(
+            "dashboardMenuIgnore",
+            "Ignore Game",
+          );
           return;
         }
         blacklistConfigBtn.disabled = false;
         const isBlacklisted = isAppIdInBlacklist(appid);
         if (blacklistState.showBlacklisted && isBlacklisted) {
-          blacklistConfigBtn.textContent = "Remove from Blacklist";
+          blacklistConfigBtn.textContent = tUi(
+            "dashboardMenuRemoveBlacklist",
+            "Remove from Blacklist",
+          );
         } else {
-          blacklistConfigBtn.textContent = "Ignore Game";
+          blacklistConfigBtn.textContent = tUi(
+            "dashboardMenuIgnore",
+            "Ignore Game",
+          );
         }
       }
 
@@ -3492,6 +4109,10 @@
       const confirmCancelBtn = document.getElementById("appConfirmCancelBtn");
       let confirmResolve = null;
       let confirmLastFocus = null;
+      const tUi = (key, fallback) =>
+        window.i18nUi && typeof window.i18nUi.getString === "function"
+          ? window.i18nUi.getString(key, fallback)
+          : fallback;
 
       function closeAppConfirm(result) {
         if (!confirmModal || !confirmResolve) return;
@@ -3518,7 +4139,10 @@
           !confirmOkBtn ||
           !confirmCancelBtn
         ) {
-          return window.confirm(opts?.message || "Are you sure?");
+          return window.confirm(
+            opts?.message ||
+              tUi("main.dialog.confirm.message", "Are you sure?"),
+          );
         }
 
         if (confirmResolve) {
@@ -3530,10 +4154,13 @@
         } catch {}
 
         confirmLastFocus = document.activeElement;
-        confirmTitleEl.textContent = opts.title || "Confirm";
-        confirmMessageEl.textContent = opts.message || "";
-        confirmOkBtn.textContent = opts.okText || "OK";
-        confirmCancelBtn.textContent = opts.cancelText || "Cancel";
+        confirmTitleEl.textContent =
+          opts.title || tUi("appConfirmTitle", "Confirm");
+        confirmMessageEl.textContent =
+          opts.message || tUi("main.dialog.confirm.message", "Are you sure?");
+        confirmOkBtn.textContent = opts.okText || tUi("appConfirmOkBtn", "OK");
+        confirmCancelBtn.textContent =
+          opts.cancelText || tUi("appConfirmCancelBtn", "Cancel");
         confirmModal.inert = false;
         confirmModal.classList.remove("hidden");
         confirmModal.setAttribute("aria-hidden", "false");
@@ -3550,7 +4177,7 @@
       }
       if (confirmCancelBtn) {
         confirmCancelBtn.addEventListener("click", () =>
-          closeAppConfirm(false)
+          closeAppConfirm(false),
         );
       }
       if (confirmModal) {
@@ -3610,7 +4237,7 @@
             await window.ui.refocus();
           }
         } catch (err) {
-          console.warn("Refocus failed:", err);
+          console.warn(tUi("log.refocusFailed", "Refocus failed:"), err);
           logUiEvent("warn", "ui:refocus-failed", {
             message: err?.message || String(err),
           });
@@ -3664,7 +4291,7 @@
         }
         return buildProgressMuteKey(
           cfg?.config_path || cfg?.configPath || "",
-          selectedName
+          selectedName,
         );
       }
 
@@ -3702,6 +4329,78 @@
         }
       }
 
+      async function deleteConfigByName(configName, displayName = "") {
+        if (!configName) return;
+        const label = displayName || configName;
+        const confirmDelete = await safeConfirm({
+          title: tUi("confirm.deleteConfig.title", "Delete config"),
+          message: tUiFmt(
+            "confirm.deleteConfig.message",
+            { name: label },
+            `Do you want to delete: ${label}?`,
+          ),
+        });
+        if (!confirmDelete) return;
+
+        await safeRefocus();
+
+        try {
+          const wasSelected = configList?.value === configName;
+          const response = await window.api.deleteConfig(configName);
+          if (response?.success) {
+            if (typeof reloadConfigsDropdown === "function") {
+              await reloadConfigsDropdown(true);
+            }
+
+            if (wasSelected && configList) {
+              configList.value = "";
+              document.getElementById("backButton").style.display = "none";
+
+              const selectOption = configList.querySelector('option[value=""]');
+              if (selectOption) {
+                selectOption.selected = true;
+                selectOption.disabled = true;
+              }
+
+              document.getElementById("deleteConfigBtn").style.display = "none";
+              document.getElementById("blacklistConfigBtn").style.display =
+                "none";
+              document.getElementById("editConfigBtn").style.display = "none";
+              document.getElementById("playBtn").style.display = "none";
+              document.getElementById("achStats").style.display = "none";
+              updateMuteProgressUI().catch(() => {});
+              resetConfigForm();
+
+              const tableBody = document.getElementById(
+                "achievementsTableBody",
+              );
+              if (tableBody) tableBody.innerHTML = "";
+
+              window.api.updateConfig({
+                configName: null,
+                preset: null,
+                position: null,
+              });
+              window.api.toggleOverlay(null);
+              window.api.onLoadOverlayData(null);
+              window.__showFallbackLogo?.();
+            }
+
+            if (typeof buildDashboard === "function") {
+              await buildDashboard();
+            }
+          } else {
+            console.error(
+              tUi("log.deleteError", "Error on delete:"),
+              response?.error || response,
+            );
+          }
+        } catch (error) {
+          console.error(tUi("log.deleteError", "Error on delete:"), error);
+        }
+      }
+      window.deleteConfigByName = deleteConfigByName;
+
       presetDropdown.addEventListener("change", updateMainConfig);
 
       positionDropdown.addEventListener("change", updateMainConfig);
@@ -3737,7 +4436,7 @@
             input[lang] ||
             input.english ||
             Object.values(input).find(
-              (v) => typeof v === "string" && v.trim() !== ""
+              (v) => typeof v === "string" && v.trim() !== "",
             ) ||
             "Hidden"
           );
@@ -3770,7 +4469,10 @@
             });
           }
         } catch (error) {
-          console.error("Config Load Error:", error);
+          console.error(
+            tUi("log.configLoadError", "Config Load Error:"),
+            error,
+          );
         }
 
         function formatTimestamp(timestamp) {
@@ -3795,19 +4497,16 @@
               position: positionDropdown.value,
             });
           }
-          const achievementsDataObj = await window.api.loadAchievementData(
-            selectedConfig
-          );
-          const savedAchievementsObj = await window.api.loadSavedAchievements(
-            selectedConfig
-          );
-          const currentConfig = await window.api.getConfigByName(
-            selectedConfig
-          );
+          const achievementsDataObj =
+            await window.api.loadAchievementData(selectedConfig);
+          const savedAchievementsObj =
+            await window.api.loadSavedAchievements(selectedConfig);
+          const currentConfig =
+            await window.api.getConfigByName(selectedConfig);
           maybeRequestPlatinum(
             currentConfig,
             achievementsDataObj?.achievements || [],
-            savedAchievementsObj
+            savedAchievementsObj,
           );
           lastSelectedConfigMeta = currentConfig || null;
           updateBlacklistButtonState(currentConfig?.appid || null);
@@ -3834,7 +4533,9 @@
           if (tableBody) {
             tableBody.innerHTML = "";
           } else {
-            console.error("tableBody could not be found.");
+            console.error(
+              tUi("log.tableBodyMissing", "Table body could not be found."),
+            );
             return;
           }
 
@@ -3848,11 +4549,16 @@
               const achStats = document.getElementById("achStats");
               if (achStats) achStats.style.display = "none";
               const playtimeLabel = document.getElementById("achStatsPlaytime");
-              if (playtimeLabel) playtimeLabel.textContent = "Playtime: 0m";
+              if (playtimeLabel)
+                playtimeLabel.textContent = tUiFmt(
+                  "achStatsPlaytimeFmt",
+                  { value: "0m" },
+                  "Playtime: 0m",
+                );
               return;
             }
             console.warn(
-              "Achievements payload is not an array; skipping table render."
+              "Achievements payload is not an array; skipping table render.",
             );
             return;
           }
@@ -3928,7 +4634,10 @@
           presetDropdown.appendChild(highScalingGroup);
           presetDropdown.appendChild(regularGroup);
         } catch (error) {
-          console.error("Error loading presets:", error);
+          console.error(
+            tUi("log.presetsLoadError", "Error loading presets:"),
+            error,
+          );
         }
       });
 
@@ -3949,7 +4658,7 @@
           const position = positionDropdown.value;
           const sound = document.getElementById("soundSelect").value;
           const scale = parseFloat(
-            document.getElementById("scaleSlider").value
+            document.getElementById("scaleSlider").value,
           );
 
           window.api.showTestNotification({
@@ -3965,7 +4674,10 @@
           try {
             await reloadConfigsDropdown(true);
           } catch (error) {
-            console.error("Config Load Error:", error);
+            console.error(
+              tUi("log.configLoadError", "Config Load Error:"),
+              error,
+            );
           }
         }
         configList.addEventListener("change", function () {
@@ -3988,57 +4700,7 @@
         deleteConfigBtn.addEventListener("click", async function () {
           const selectedConfig = configList.value;
           if (!selectedConfig) return;
-
-          const confirmDelete = await safeConfirm({
-            title: "Delete config",
-            message: `Do you want to delete: ${selectedConfig}?`,
-          });
-          if (!confirmDelete) return;
-
-          await safeRefocus();
-
-          try {
-            const response = await window.api.deleteConfig(selectedConfig);
-            if (response.success) {
-              await loadConfigs();
-              const configList = document.getElementById("configList");
-              configList.value = "";
-              document.getElementById("backButton").style.display = "none";
-
-              const selectOption = configList.querySelector('option[value=""]');
-              if (selectOption) {
-                selectOption.selected = true;
-                selectOption.disabled = true;
-              }
-
-              document.getElementById("deleteConfigBtn").style.display = "none";
-              document.getElementById("blacklistConfigBtn").style.display =
-                "none";
-              document.getElementById("editConfigBtn").style.display = "none";
-              document.getElementById("playBtn").style.display = "none";
-              document.getElementById("achStats").style.display = "none";
-              updateMuteProgressUI().catch(() => {});
-              resetConfigForm();
-
-              const tableBody = document.getElementById(
-                "achievementsTableBody"
-              );
-              if (tableBody) tableBody.innerHTML = "";
-
-              window.api.updateConfig({
-                configName: null,
-                preset: null,
-                position: null,
-              });
-              window.api.toggleOverlay(null);
-              window.api.onLoadOverlayData(null);
-              window.__showFallbackLogo?.();
-            } else {
-              console.error("Error on delete:", response.error);
-            }
-          } catch (error) {
-            console.error("Error on delete:", error);
-          }
+          await deleteConfigByName(selectedConfig);
         });
         blacklistConfigBtn.addEventListener("click", async () => {
           try {
@@ -4051,7 +4713,12 @@
               ? String(configMeta.appid)
               : null;
             if (!targetAppId) {
-              alert("Missing AppID for this configuration.");
+              alert(
+                tUi(
+                  "alert.missingAppIdConfig",
+                  "Missing AppID for this configuration.",
+                ),
+              );
               return;
             }
 
@@ -4066,10 +4733,20 @@
             });
 
             const confirmed = await safeConfirm({
-              title: removeMode ? "Remove from blacklist" : "Add to blacklist",
+              title: removeMode
+                ? tUi("confirm.blacklistRemove.title", "Remove from blacklist")
+                : tUi("confirm.blacklistAdd.title", "Add to blacklist"),
               message: removeMode
-                ? `Remove ${selectedConfig} from blacklist?`
-                : `Ignore ${selectedConfig} and stop tracking it?`,
+                ? tUiFmt(
+                    "confirm.blacklistRemove.message",
+                    { name: selectedConfig },
+                    `Remove ${selectedConfig} from blacklist?`,
+                  )
+                : tUiFmt(
+                    "confirm.blacklistAdd.message",
+                    { name: selectedConfig },
+                    `Ignore ${selectedConfig} and stop tracking it?`,
+                  ),
             });
             logUiEvent("info", "ui:blacklist-config:confirm", {
               configName: selectedConfig,
@@ -4100,10 +4777,16 @@
                 remove: removeMode,
                 success: response?.success === true,
                 error: response?.error || null,
-              }
+              },
             );
             if (!response?.success) {
-              alert(response?.error || "Failed to update blacklist");
+              alert(
+                response?.error ||
+                  tUi(
+                    "alert.blacklistUpdateFailed",
+                    "Failed to update blacklist",
+                  ),
+              );
               return;
             }
 
@@ -4127,7 +4810,22 @@
                 if (el) el.style.display = "none";
               });
               document.getElementById("backButton").style.display = "none";
+              const tableBody = document.getElementById(
+                "achievementsTableBody",
+              );
+              if (tableBody) tableBody.innerHTML = "";
+              const achStats = document.getElementById("achStats");
+              if (achStats) achStats.style.display = "none";
               updateMuteProgressUI().catch(() => {});
+              try {
+                window.api.updateConfig({
+                  configName: null,
+                  preset: null,
+                  position: null,
+                });
+                window.api.toggleOverlay(null);
+                window.api.onLoadOverlayData(null);
+              } catch {}
               window.__showFallbackLogo?.();
             } else {
               configList.dispatchEvent(new Event("change", { bubbles: true }));
@@ -4138,7 +4836,12 @@
             }
           } catch (err) {
             logUiError("ui:blacklist-config-failed", err);
-            alert("Failed to update blacklist. See logs for details.");
+            alert(
+              tUi(
+                "alert.blacklistUpdateFailedDetails",
+                "Failed to update blacklist. See logs for details.",
+              ),
+            );
           }
         });
       });
@@ -4158,8 +4861,19 @@
             await syncBlacklistList();
             renderBlacklistList();
           } catch (err) {
-            console.error("Failed to toggle blacklist visibility:", err);
-            alert("Failed to update blacklist visibility setting.");
+            console.error(
+              tUi(
+                "log.blacklistVisibilityToggleFailed",
+                "Failed to toggle blacklist visibility:",
+              ),
+              err,
+            );
+            alert(
+              tUi(
+                "alert.blacklistVisibilityFailed",
+                "Failed to update blacklist visibility setting.",
+              ),
+            );
             e.target.checked = !next;
           }
         });
@@ -4170,8 +4884,11 @@
           try {
             logUiEvent("info", "ui:blacklist-reset:click");
             const confirmed = await safeConfirm({
-              title: "Reset blacklist",
-              message: "Remove all blacklisted games?",
+              title: tUi("confirm.blacklistReset.title", "Reset blacklist"),
+              message: tUi(
+                "confirm.blacklistReset.message",
+                "Remove all blacklisted games?",
+              ),
             });
             logUiEvent("info", "ui:blacklist-reset:confirm", { confirmed });
             if (!confirmed) return;
@@ -4185,7 +4902,7 @@
               {
                 success: response?.success === true,
                 error: response?.error || null,
-              }
+              },
             );
             await syncBlacklistList();
             renderBlacklistList();
@@ -4195,7 +4912,10 @@
             }
           } catch (err) {
             logUiError("ui:blacklist-reset-failed", err);
-            alert(err?.message || "Failed to reset blacklist");
+            alert(
+              err?.message ||
+                tUi("alert.blacklistResetFailed", "Failed to reset blacklist"),
+            );
           }
         });
       }
@@ -4224,7 +4944,7 @@
 
           try {
             getDashCards(false).forEach((c) =>
-              c.querySelector(".dash-play")?.classList.remove("force-show")
+              c.querySelector(".dash-play")?.classList.remove("force-show"),
             );
             card.querySelector(".dash-play")?.classList.add("force-show");
           } catch {}
@@ -4339,14 +5059,20 @@
               await window.openDashboard?.();
             }
           } catch (e) {
-            console.warn("Cannot open Dashboard after Back:", e);
+            console.warn(
+              tUi(
+                "log.dashboardOpenAfterBackFailed",
+                "Cannot open Dashboard after Back:",
+              ),
+              e,
+            );
           }
         });
 
       window.api.onToggleOverlayShortcut(() => {
         const selectedConfig = document.getElementById("configList").value;
         if (!selectedConfig) {
-          alert("Select a config!");
+          alert(tUi("alert.selectConfig", "Select a config!"));
           return;
         }
         window.api.toggleOverlay(selectedConfig);
@@ -4412,7 +5138,7 @@
 
           if (prefs.disablePlaytime !== undefined) {
             const cb = document.getElementById(
-              "settings-disablePlaytimeCheckbox"
+              "settings-disablePlaytimeCheckbox",
             );
 
             if (cb) cb.checked = !!prefs.disablePlaytime;
@@ -4426,7 +5152,7 @@
             window.api.setDisablePlaytime(!!prefs?.disablePlaytime);
           }
         } catch (err) {
-          console.error("Sound Load Error:", err);
+          console.error(tUi("log.soundLoadError", "Sound Load Error:"), err);
         }
       };
 
@@ -4445,7 +5171,13 @@
               blacklistState.appids = new Set(payload.appids);
             }
           } catch (err) {
-            console.warn("Blacklist update handling failed:", err);
+            console.warn(
+              tUi(
+                "log.blacklistUpdateHandlingFailed",
+                "Blacklist update handling failed:",
+              ),
+              err,
+            );
           }
         });
       }
@@ -4529,7 +5261,10 @@
           const volume = getSoundVolumeValue();
           playAudioWithVolume(audio, volume, "?? Custom sound play error:");
         } catch (err) {
-          console.error("? Failed to load sound path:", err);
+          console.error(
+            tUi("log.soundPathLoadFailed", "Failed to load sound path:"),
+            err,
+          );
         }
       }
 
@@ -4544,7 +5279,7 @@
         if (prefs.position)
           document.getElementById("positionDropdown").value = prefs.position;
         const settingsPositionDropdown = document.getElementById(
-          "settings-positionDropdown"
+          "settings-positionDropdown",
         );
         if (settingsPositionDropdown && prefs.position) {
           settingsPositionDropdown.value = prefs.position;
@@ -4552,7 +5287,7 @@
         if (prefs.preset)
           document.getElementById("presetDropdown").value = prefs.preset;
         const settingsPresetDropdown = document.getElementById(
-          "settings-presetDropdown"
+          "settings-presetDropdown",
         );
         if (settingsPresetDropdown && prefs.preset) {
           settingsPresetDropdown.value = prefs.preset;
@@ -4560,7 +5295,7 @@
         if (prefs.sound)
           document.getElementById("soundSelect").value = prefs.sound;
         const settingsSoundSelect = document.getElementById(
-          "settings-soundSelect"
+          "settings-soundSelect",
         );
         if (settingsSoundSelect && prefs.sound) {
           settingsSoundSelect.value = prefs.sound;
@@ -4570,7 +5305,7 @@
           scaleSlider.value = prefs.notificationScale;
           updateScaleLabel();
           const settingsScaleSlider = document.getElementById(
-            "settings-scaleSlider"
+            "settings-scaleSlider",
           );
           if (settingsScaleSlider) {
             settingsScaleSlider.value = prefs.notificationScale;
@@ -4579,7 +5314,7 @@
         }
         if (prefs.notificationDuration !== undefined) {
           const settingsDurationSlider = document.getElementById(
-            "settings-durationSlider"
+            "settings-durationSlider",
           );
           if (settingsDurationSlider) {
             settingsDurationSlider.value = prefs.notificationDuration;
@@ -4588,7 +5323,7 @@
         }
         if (prefs.soundVolume !== undefined) {
           const settingsSoundVolumeSlider = document.getElementById(
-            "settings-soundVolumeSlider"
+            "settings-soundVolumeSlider",
           );
           if (settingsSoundVolumeSlider) {
             settingsSoundVolumeSlider.value = prefs.soundVolume;
@@ -4598,7 +5333,7 @@
         const hiddenPlatPos = document.getElementById("platinumPositionValue");
         if (prefs.platinumPosition) {
           const el = document.getElementById(
-            "settings-platinumPositionDropdown"
+            "settings-platinumPositionDropdown",
           );
           if (el) el.value = prefs.platinumPosition;
         }
@@ -4639,7 +5374,7 @@
         }
         if (prefs.disablePlaytime !== undefined) {
           const cb = document.getElementById(
-            "settings-disablePlaytimeCheckbox"
+            "settings-disablePlaytimeCheckbox",
           );
           if (cb) cb.checked = prefs.disablePlaytime;
         }
@@ -4649,17 +5384,17 @@
           if (zoomDropdown) {
             zoomDropdown.value = prefs.windowZoomFactor.toString();
             document.body.dataset.zoom = String(
-              Math.round((prefs.windowZoomFactor || 1) * 100)
+              Math.round((prefs.windowZoomFactor || 1) * 100),
             );
             document.body.dataset.effectiveZoom = String(
-              Math.round((prefs.windowZoomFactor || 1) * 100)
+              Math.round((prefs.windowZoomFactor || 1) * 100),
             );
             window.api.setZoom(prefs.windowZoomFactor);
           }
         }
         if (prefs.disablePlatinum !== undefined) {
           const cb = document.getElementById(
-            "settings-disablePlatinumCheckbox"
+            "settings-disablePlatinumCheckbox",
           );
           if (cb) cb.checked = prefs.disablePlatinum;
         }
@@ -4673,6 +5408,21 @@
         try {
           await loadPreferencesCached();
           const prefs = getCachedPreferences();
+          const storedUiLang = normalizeLangValue(
+            prefs.uiLanguage || prefs.language || "english",
+          );
+          achievementLanguageManual = prefs.achievementLanguageManual === true;
+          await applyUiLanguage(storedUiLang);
+          const storedAchLang = normalizeLangValue(
+            prefs.language ||
+              localStorage.getItem("preferredLanguage") ||
+              "english",
+          );
+          if (!achievementLanguageManual) {
+            await applyAchievementLanguage(storedUiLang, { manual: false });
+          } else if (languageSelect) {
+            languageSelect.value = storedAchLang;
+          }
           renderSteamApiKeyStatusFromPrefs(prefs);
           applyShowBlacklistPreference(prefs?.showBlacklistedGames);
           if (prefs) {
@@ -4680,7 +5430,7 @@
               document.getElementById("positionDropdown").value =
                 prefs.position;
             const settingsPositionDropdown = document.getElementById(
-              "settings-positionDropdown"
+              "settings-positionDropdown",
             );
             if (settingsPositionDropdown && prefs.position) {
               settingsPositionDropdown.value = prefs.position;
@@ -4688,7 +5438,7 @@
             if (prefs.preset)
               document.getElementById("presetDropdown").value = prefs.preset;
             const settingsPresetDropdown = document.getElementById(
-              "settings-presetDropdown"
+              "settings-presetDropdown",
             );
             if (settingsPresetDropdown && prefs.preset) {
               settingsPresetDropdown.value = prefs.preset;
@@ -4696,7 +5446,7 @@
             if (prefs.sound)
               document.getElementById("soundSelect").value = prefs.sound;
             const settingsSoundSelect = document.getElementById(
-              "settings-soundSelect"
+              "settings-soundSelect",
             );
             if (settingsSoundSelect && prefs.sound) {
               settingsSoundSelect.value = prefs.sound;
@@ -4706,7 +5456,7 @@
               scaleSlider.value = prefs.notificationScale;
               updateScaleLabel();
               const settingsScaleSlider = document.getElementById(
-                "settings-scaleSlider"
+                "settings-scaleSlider",
               );
               if (settingsScaleSlider) {
                 settingsScaleSlider.value = prefs.notificationScale;
@@ -4715,7 +5465,7 @@
             }
             if (prefs.notificationDuration !== undefined) {
               const settingsDurationSlider = document.getElementById(
-                "settings-durationSlider"
+                "settings-durationSlider",
               );
               if (settingsDurationSlider) {
                 settingsDurationSlider.value = prefs.notificationDuration;
@@ -4723,11 +5473,11 @@
               }
             }
             const hiddenPlatPos = document.getElementById(
-              "platinumPositionValue"
+              "platinumPositionValue",
             );
             if (prefs.platinumPosition) {
               const el = document.getElementById(
-                "settings-platinumPositionDropdown"
+                "settings-platinumPositionDropdown",
               );
               if (el) el.value = prefs.platinumPosition;
             }
@@ -4739,11 +5489,11 @@
                 "center-bottom";
             }
             const hiddenPlatPreset = document.getElementById(
-              "platinumPresetValue"
+              "platinumPresetValue",
             );
             if (prefs.platinumPreset) {
               const el = document.getElementById(
-                "settings-platinumPresetDropdown"
+                "settings-platinumPresetDropdown",
               );
               if (el) el.value = prefs.platinumPreset;
             }
@@ -4758,7 +5508,7 @@
               document.getElementById("platinumSoundValue");
             if (prefs.platinumSound) {
               const el = document.getElementById(
-                "settings-platinumSoundSelect"
+                "settings-platinumSoundSelect",
               );
               if (el) el.value = prefs.platinumSound;
             }
@@ -4776,13 +5526,13 @@
 
             if (prefs.disablePlaytime !== undefined) {
               const cb1 = document.getElementById(
-                "settings-disablePlaytimeCheckbox"
+                "settings-disablePlaytimeCheckbox",
               );
               if (cb1) cb1.checked = prefs.disablePlaytime;
             }
             if (prefs.disablePlatinum !== undefined) {
               const cb = document.getElementById(
-                "settings-disablePlatinumCheckbox"
+                "settings-disablePlatinumCheckbox",
               );
               if (cb) cb.checked = prefs.disablePlatinum;
             }
@@ -4792,10 +5542,10 @@
               if (zoomDropdown) {
                 zoomDropdown.value = prefs.windowZoomFactor.toString();
                 document.body.dataset.zoom = String(
-                  Math.round((prefs.windowZoomFactor || 1) * 100)
+                  Math.round((prefs.windowZoomFactor || 1) * 100),
                 );
                 document.body.dataset.effectiveZoom = String(
-                  Math.round((prefs.windowZoomFactor || 1) * 100)
+                  Math.round((prefs.windowZoomFactor || 1) * 100),
                 );
                 window.api.setZoom(prefs.windowZoomFactor);
               }
@@ -4804,15 +5554,17 @@
               document.getElementById("overlay-shortcut-btn").textContent =
                 prefs.overlayShortcut;
             } else {
-              document.getElementById("overlay-shortcut-btn").textContent =
-                "Set Shortcut";
+              document.getElementById("overlay-shortcut-btn").textContent = tUi(
+                "overlay-shortcut-btn",
+                "Set Shortcut",
+              );
             }
 
             const ssInput = document.getElementById(
-              "settings-screenshotFolder"
+              "settings-screenshotFolder",
             );
             const ssButton = document.getElementById(
-              "settings-selectScreenshotFolder"
+              "settings-selectScreenshotFolder",
             );
             if (ssInput) {
               ssInput.value = prefs?.screenshotFolder || "";
@@ -4823,13 +5575,16 @@
                 if (dir) {
                   ssInput.value = dir;
                   await window.api.savePreferences({ screenshotFolder: dir });
-                  console.log("📁 Screenshot folder set to:", dir);
+                  console.log(
+                    tUi("log.screenshotFolderSet", "Screenshot folder set to:"),
+                    dir,
+                  );
                 }
               });
             }
 
             const dsCb = document.getElementById(
-              "settings-disableScreenshotCheckbox"
+              "settings-disableScreenshotCheckbox",
             );
             if (dsCb) {
               dsCb.checked = !!(prefs && prefs.disableAchievementScreenshot);
@@ -4842,13 +5597,13 @@
           }
 
           const steamApiKeyInput = document.getElementById(
-            "settings-steamApiKeyInput"
+            "settings-steamApiKeyInput",
           );
           const steamApiKeySaveBtn = document.getElementById(
-            "settings-steamApiKeySave"
+            "settings-steamApiKeySave",
           );
           const steamApiKeyClearBtn = document.getElementById(
-            "settings-steamApiKeyClear"
+            "settings-steamApiKeyClear",
           );
 
           steamApiKeySaveBtn.addEventListener("click", async () => {
@@ -4860,17 +5615,26 @@
             try {
               await window.api.savePreferences({ steamApiKey: raw });
               await refreshSteamApiKeyStatus();
-              console.log("Steam API key saved.");
+              console.log(tUi("log.steamApiKeySaved", "Steam API key saved."));
             } catch (err) {
-              console.error("Steam API key save error:", err);
+              console.error(
+                tUi("log.steamApiKeySaveError", "Steam API key save error:"),
+                err,
+              );
             }
           });
 
           if (steamApiKeyClearBtn) {
             steamApiKeyClearBtn.addEventListener("click", async () => {
               const confirmed = await safeConfirm({
-                title: "Remove Steam API key",
-                message: "Remove the stored Steam API key?",
+                title: tUi(
+                  "confirm.steamApiRemove.title",
+                  "Remove Steam API key",
+                ),
+                message: tUi(
+                  "confirm.steamApiRemove.message",
+                  "Remove the stored Steam API key?",
+                ),
               });
               if (!confirmed) return;
               try {
@@ -4878,12 +5642,21 @@
                 if (steamApiKeyInput) steamApiKeyInput.value = "";
                 await refreshSteamApiKeyStatus();
               } catch (err) {
-                console.error("Steam API key clear error:", err);
+                console.error(
+                  tUi(
+                    "log.steamApiKeyClearError",
+                    "Steam API key clear error:",
+                  ),
+                  err,
+                );
               }
             });
           }
         } catch (e) {
-          console.warn("Settings cannot be load:", e);
+          console.warn(
+            tUi("log.settingsLoadFailed", "Settings cannot be loaded:"),
+            e,
+          );
         }
       });
 
@@ -4892,7 +5665,7 @@
         const prefs = getCachedPreferences();
         renderSteamApiKeyStatusFromPrefs(prefs);
         const startMaxEl = document.getElementById(
-          "settings-startMaximizedCheckbox"
+          "settings-startMaximizedCheckbox",
         );
         if (startMaxEl) {
           startMaxEl.checked = !!prefs.startMaximized;
@@ -4902,13 +5675,16 @@
             });
             console.log(
               e.target.checked
-                ? "App will start maximized"
-                : "App will not force maximize on startup"
+                ? tUi("log.appStartMaximized", "App will start maximized")
+                : tUi(
+                    "log.appStartMaximizeDisabled",
+                    "App will not force maximize on startup",
+                  ),
             );
           });
         }
         const startInTrayEl = document.getElementById(
-          "settings-startInTrayCheckbox"
+          "settings-startInTrayCheckbox",
         );
         if (startInTrayEl) {
           startInTrayEl.checked = !!prefs.startInTray;
@@ -4916,13 +5692,13 @@
             await window.api.savePreferences({ startInTray: e.target.checked });
             console.log(
               e.target.checked
-                ? "App will start in tray"
-                : "App will show on startup"
+                ? tUi("log.appStartInTray", "App will start in tray")
+                : tUi("log.appShowOnStartup", "App will show on startup"),
             );
           });
         }
         const closeToTrayEl = document.getElementById(
-          "settings-closeToTrayCheckbox"
+          "settings-closeToTrayCheckbox",
         );
         if (closeToTrayEl) {
           closeToTrayEl.checked = !!prefs.closeToTray;
@@ -4930,14 +5706,14 @@
             await window.api.savePreferences({ closeToTray: e.target.checked });
             console.log(
               e.target.checked
-                ? "App will close to tray"
-                : "App will close fully"
+                ? tUi("log.appCloseToTray", "App will close to tray")
+                : tUi("log.appCloseFully", "App will close fully"),
             );
           });
         }
 
         const startWindowsEl = document.getElementById(
-          "settings-startWindowsCheckbox"
+          "settings-startWindowsCheckbox",
         );
         if (startWindowsEl) {
           let initial = await window.api
@@ -4946,12 +5722,12 @@
           if (initial === null) initial = !!prefs.startWithWindows;
           startWindowsEl.checked = initial;
           startWindowsEl.addEventListener("change", (e) =>
-            handleStartWithWindowsToggle(e.target.checked)
+            handleStartWithWindowsToggle(e.target.checked),
           );
         }
 
         const showHiddenDescEl = document.getElementById(
-          "settings-showHiddenDescription"
+          "settings-showHiddenDescription",
         );
         if (showHiddenDescEl) {
           showHiddenDescEl.checked = !!prefs.showHiddenDescription;
@@ -4972,7 +5748,7 @@
         }
 
         const showDashEl = document.getElementById(
-          "settings-showDashboardOnStartCheckbox"
+          "settings-showDashboardOnStartCheckbox",
         );
         if (showDashEl) {
           showDashEl.checked = !!prefs.showDashboardOnStart;
@@ -4982,8 +5758,14 @@
             });
             console.log(
               e.target.checked
-                ? "Dashboard will show on launch"
-                : "Dashboard will not show on launch"
+                ? tUi(
+                    "log.dashboardShowOnLaunch",
+                    "Dashboard will show on launch",
+                  )
+                : tUi(
+                    "log.dashboardHideOnLaunch",
+                    "Dashboard will not show on launch",
+                  ),
             );
           });
         }
@@ -5001,9 +5783,11 @@
         if (activeSafe && payloadSafe && activeSafe === payloadSafe) {
           const label = document.getElementById("achStatsPlaytime");
           if (label) {
-            label.textContent = `Playtime: ${formatPlaytimeLabel(
-              payload.totalMs
-            )}`;
+            label.textContent = tUiFmt(
+              "achStatsPlaytimeFmt",
+              { value: formatPlaytimeLabel(payload.totalMs) },
+              `Playtime: ${formatPlaytimeLabel(payload.totalMs)}`,
+            );
           }
         }
       });
@@ -5020,7 +5804,7 @@
         if (el) {
           el.addEventListener("change", () => {
             const zoomValue = parseFloat(
-              document.getElementById("app-zoom-dropdown")?.value || 1
+              document.getElementById("app-zoom-dropdown")?.value || 1,
             );
             const prefs = {
               position: document.getElementById("positionDropdown")?.value,
@@ -5028,21 +5812,21 @@
               sound: document.getElementById("soundSelect")?.value,
               language: document.getElementById("languageSelect")?.value,
               notificationScale: parseFloat(
-                document.getElementById("scaleSlider")?.value || 1
+                document.getElementById("scaleSlider")?.value || 1,
               ),
               disableProgress: document.getElementById(
-                "disableProgressCheckbox"
+                "disableProgressCheckbox",
               )?.checked,
               windowZoomFactor: parseFloat(
-                document.getElementById("app-zoom-dropdown")?.value || 1
+                document.getElementById("app-zoom-dropdown")?.value || 1,
               ),
               windowZoomFactor: zoomValue,
             };
             document.body.dataset.zoom = String(
-              Math.round((zoomValue || 1) * 100)
+              Math.round((zoomValue || 1) * 100),
             );
             document.body.dataset.effectiveZoom = String(
-              Math.round((zoomValue || 1) * 100)
+              Math.round((zoomValue || 1) * 100),
             );
             window.api.savePreferences(prefs);
             window.api.setZoom(prefs.windowZoomFactor); // set zoom live
@@ -5064,7 +5848,7 @@
       function updateAchievementStats(achievements) {
         const total = achievements.length;
         const unlocked = achievements.filter(
-          (a) => a.earned === true || a.earned === 1
+          (a) => a.earned === true || a.earned === 1,
         ).length;
 
         const label = document.getElementById("achStatsText");
@@ -5074,7 +5858,11 @@
         const percentage = total > 0 ? Math.round((unlocked / total) * 100) : 0;
 
         if (label && bar && percentLabel) {
-          label.textContent = `Progress: ${unlocked} / ${total}`;
+          label.textContent = tUiFmt(
+            "achStatsProgress",
+            { unlocked, total },
+            `Progress: ${unlocked} / ${total}`,
+          );
           bar.style.width = `${percentage}%`;
           percentLabel.textContent = `${percentage}%`;
           document.getElementById("achStats").style.display = "block";
@@ -5102,7 +5890,7 @@
 
         const ensureOption = async () => {
           const hasOption = !!configList.querySelector(
-            `option[value="${configName.replace(/"/g, '\\"')}"]`
+            `option[value="${configName.replace(/"/g, '\\"')}"]`,
           );
           if (!hasOption) {
             await reloadConfigsDropdown();
@@ -5113,7 +5901,7 @@
 
         // if still missing, abort gracefully
         const optionExists = !!configList.querySelector(
-          `option[value="${configName.replace(/"/g, '\\"')}"]`
+          `option[value="${configName.replace(/"/g, '\\"')}"]`,
         );
         if (!optionExists) return;
 
@@ -5127,7 +5915,9 @@
         }
         const dropdown = document.getElementById("configList");
         if (!dropdown) {
-          console.error("⚠️ configList element not found.");
+          console.error(
+            tUi("log.configListMissing", "configList element not found."),
+          );
           return;
         }
 
@@ -5161,15 +5951,15 @@
 
         const prevSanitized = sanitizeConfigName(selectedBefore || "");
         const autoSelectSanitized = sanitizeConfigName(
-          __watcherAutoSelect || ""
+          __watcherAutoSelect || "",
         );
         const findMatchingValue = () => {
           const byPrev = visibleConfigs.find(
-            (cfg) => sanitizeConfigName(cfg.name) === prevSanitized
+            (cfg) => sanitizeConfigName(cfg.name) === prevSanitized,
           );
           if (byPrev) return byPrev.name;
           const byAuto = visibleConfigs.find(
-            (cfg) => sanitizeConfigName(cfg.name) === autoSelectSanitized
+            (cfg) => sanitizeConfigName(cfg.name) === autoSelectSanitized,
           );
           if (byAuto) return byAuto.name;
           return "";
@@ -5196,18 +5986,33 @@
         .addEventListener("click", async () => {
           const selectedFolder = await window.api.selectFolder();
           if (!selectedFolder) {
-            alert("Canceled: You must select a save path folder to continue!");
+            alert(
+              tUi(
+                "alert.savePathRequired",
+                "Canceled: You must select a save path folder to continue!",
+              ),
+            );
             return;
           }
 
-          const result = await window.autoConfigApi.generateConfigs(
-            selectedFolder
-          );
+          const result =
+            await window.autoConfigApi.generateConfigs(selectedFolder);
           if (result.success) {
-            console.log("Configs generated successfully!");
+            console.log(
+              tUi(
+                "log.configsGeneratedSuccess",
+                "Configs generated successfully!",
+              ),
+            );
             await reloadConfigsDropdown();
           } else {
-            console.error("Failed to generate configs: " + result.message);
+            console.error(
+              tUiFmt(
+                "log.generateConfigsFailed",
+                { error: result.message },
+                `Failed to generate configs: ${result.message}`,
+              ),
+            );
           }
         });
 
@@ -5234,7 +6039,7 @@
             ? '<i class="far fa-clone"></i>'
             : '<i class="far fa-square"></i>';
           document.body.classList.toggle("window-maximized", !!isMaximized);
-        }
+        },
       );
 
       // Add visual feedback when clicking buttons
@@ -5294,7 +6099,7 @@
         };
         const getFocusable = () =>
           Array.from(container.querySelectorAll(sel)).filter(
-            (el) => !el.disabled && el.tabIndex !== -1 && visible(el)
+            (el) => !el.disabled && el.tabIndex !== -1 && visible(el),
           );
 
         const activeTab =
@@ -5439,7 +6244,7 @@
           if (!content) return;
           const activeTab = content.querySelector(".settings-tab.active");
           const firstFocusable = content.querySelector(
-            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
           );
           (activeTab || firstFocusable || content).focus?.({
             preventScroll: true,
@@ -5608,11 +6413,11 @@
             document.getElementById("settings-presetDropdown").value ||
             "default";
           const position = document.getElementById(
-            "settings-positionDropdown"
+            "settings-positionDropdown",
           ).value;
           const sound = document.getElementById("settings-soundSelect").value;
           const scale = parseFloat(
-            document.getElementById("settings-scaleSlider").value
+            document.getElementById("settings-scaleSlider").value,
           );
 
           window.api.showTestNotification({
@@ -5625,29 +6430,29 @@
 
       // Settings scale slider
       const settingsScaleSlider = document.getElementById(
-        "settings-scaleSlider"
+        "settings-scaleSlider",
       );
       const settingsScaleValue = document.getElementById("settings-scaleValue");
       const settingsScaleValueDisplay = document.getElementById(
-        "settings-scaleValueDisplay"
+        "settings-scaleValueDisplay",
       );
       const settingsDurationSlider = document.getElementById(
-        "settings-durationSlider"
+        "settings-durationSlider",
       );
       const settingsDurationValue = document.getElementById(
-        "settings-durationValue"
+        "settings-durationValue",
       );
       const settingsDurationValueDisplay = document.getElementById(
-        "settings-durationValueDisplay"
+        "settings-durationValueDisplay",
       );
       const settingsSoundVolumeSlider = document.getElementById(
-        "settings-soundVolumeSlider"
+        "settings-soundVolumeSlider",
       );
       const settingsSoundVolumeValue = document.getElementById(
-        "settings-soundVolumeValue"
+        "settings-soundVolumeValue",
       );
       const settingsSoundVolumeValueDisplay = document.getElementById(
-        "settings-soundVolumeValueDisplay"
+        "settings-soundVolumeValueDisplay",
       );
 
       function updateSettingsScaleLabel() {
@@ -5691,10 +6496,16 @@
 
         if (masked) {
           inputEl.value = masked;
-          inputEl.placeholder = "Enter your Steam Web API key";
+          inputEl.placeholder = tUi(
+            "placeholder.settings-steamApiKeyInputSaved",
+            "Enter your Steam Web API key",
+          );
         } else {
           inputEl.value = "";
-          inputEl.placeholder = "No key saved. Enter your Steam Web API key";
+          inputEl.placeholder = tUi(
+            "placeholder.settings-steamApiKeyInput",
+            "No key saved. Enter your Steam Web API key",
+          );
         }
       }
 
@@ -5707,7 +6518,10 @@
           await loadPreferencesCached();
           renderSteamApiKeyStatusFromPrefs(getCachedPreferences());
         } catch (err) {
-          console.error("Steam API key status error:", err);
+          console.error(
+            tUi("log.steamApiKeyStatusError", "Steam API key status error:"),
+            err,
+          );
         }
       }
 
@@ -5760,7 +6574,7 @@
       document
         .getElementById("settings-positionDropdown")
         .addEventListener("change", (e) =>
-          window.api.savePreferences({ position: e.target.value })
+          window.api.savePreferences({ position: e.target.value }),
         );
 
       document
@@ -5774,7 +6588,7 @@
       document
         .getElementById("settings-presetDropdown")
         .addEventListener("change", (e) =>
-          window.api.savePreferences({ preset: e.target.value })
+          window.api.savePreferences({ preset: e.target.value }),
         );
 
       document
@@ -5804,7 +6618,7 @@
         // Copy preset options
         const mainPresetDropdown = document.getElementById("presetDropdown");
         const settingsPresetDropdown = document.getElementById(
-          "settings-presetDropdown"
+          "settings-presetDropdown",
         );
 
         if (mainPresetDropdown && settingsPresetDropdown) {
@@ -5814,7 +6628,7 @@
           }
           const prefs = getCachedPreferences();
           const platinumPresetDropdown = document.getElementById(
-            "settings-platinumPresetDropdown"
+            "settings-platinumPresetDropdown",
           );
           if (platinumPresetDropdown) {
             platinumPresetDropdown.innerHTML = mainPresetDropdown.innerHTML;
@@ -5826,7 +6640,7 @@
         // Copy sound options
         const mainSoundSelect = document.getElementById("soundSelect");
         const settingsSoundSelect = document.getElementById(
-          "settings-soundSelect"
+          "settings-soundSelect",
         );
 
         if (mainSoundSelect && settingsSoundSelect) {
@@ -5836,7 +6650,7 @@
           }
           const prefs = getCachedPreferences();
           const platinumSoundSelect = document.getElementById(
-            "settings-platinumSoundSelect"
+            "settings-platinumSoundSelect",
           );
           if (platinumSoundSelect) {
             platinumSoundSelect.innerHTML = mainSoundSelect.innerHTML;
@@ -5849,14 +6663,14 @@
         const mainPositionDropdown =
           document.getElementById("positionDropdown");
         const settingsPositionDropdown = document.getElementById(
-          "settings-positionDropdown"
+          "settings-positionDropdown",
         );
 
         if (mainPositionDropdown && settingsPositionDropdown) {
           settingsPositionDropdown.value = mainPositionDropdown.value;
         }
         const settingsPlatinumPositionDropdown = document.getElementById(
-          "settings-platinumPositionDropdown"
+          "settings-platinumPositionDropdown",
         );
         if (settingsPlatinumPositionDropdown && mainPositionDropdown) {
           if (!settingsPlatinumPositionDropdown.value) {
@@ -5867,7 +6681,7 @@
         // Sync scale slider
         const mainScaleSlider = document.getElementById("scaleSlider");
         const settingsScaleSlider = document.getElementById(
-          "settings-scaleSlider"
+          "settings-scaleSlider",
         );
 
         if (mainScaleSlider && settingsScaleSlider) {
@@ -5877,14 +6691,14 @@
 
         const prefs = getCachedPreferences();
         const settingsDurationSlider = document.getElementById(
-          "settings-durationSlider"
+          "settings-durationSlider",
         );
         if (settingsDurationSlider) {
           settingsDurationSlider.value = prefs.notificationDuration ?? 0;
           updateSettingsDurationLabel();
         }
         const settingsSoundVolumeSlider = document.getElementById(
-          "settings-soundVolumeSlider"
+          "settings-soundVolumeSlider",
         );
         if (settingsSoundVolumeSlider) {
           settingsSoundVolumeSlider.value = prefs.soundVolume ?? 100;
@@ -5893,10 +6707,10 @@
 
         // Sync disable progress checkbox
         const mainDisableProgressCheckbox = document.getElementById(
-          "disableProgressCheckbox"
+          "disableProgressCheckbox",
         );
         const settingsDisableProgressCheckbox = document.getElementById(
-          "settings-disableProgressCheckbox"
+          "settings-disableProgressCheckbox",
         );
 
         if (mainDisableProgressCheckbox && settingsDisableProgressCheckbox) {
@@ -5904,13 +6718,13 @@
             mainDisableProgressCheckbox.checked;
         }
         const settingsDisablePlatinumCheckbox = document.getElementById(
-          "settings-disablePlatinumCheckbox"
+          "settings-disablePlatinumCheckbox",
         );
         if (settingsDisablePlatinumCheckbox) {
           // no main checkbox; leave as stored
         }
         const steamApiKeyInput = document.getElementById(
-          "settings-steamApiKeyInput"
+          "settings-steamApiKeyInput",
         );
         if (steamApiKeyInput) {
           steamApiKeyInput.value = "";
@@ -5922,7 +6736,7 @@
         // Copy values from settings menu to main UI
         const mainPresetDropdown = document.getElementById("presetDropdown");
         const settingsPresetDropdown = document.getElementById(
-          "settings-presetDropdown"
+          "settings-presetDropdown",
         );
 
         if (
@@ -5936,7 +6750,7 @@
         // Copy sound options
         const mainSoundSelect = document.getElementById("soundSelect");
         const settingsSoundSelect = document.getElementById(
-          "settings-soundSelect"
+          "settings-soundSelect",
         );
 
         if (
@@ -5951,7 +6765,7 @@
         const mainPositionDropdown =
           document.getElementById("positionDropdown");
         const settingsPositionDropdown = document.getElementById(
-          "settings-positionDropdown"
+          "settings-positionDropdown",
         );
 
         if (mainPositionDropdown && settingsPositionDropdown) {
@@ -5961,7 +6775,7 @@
         // Sync scale slider
         const mainScaleSlider = document.getElementById("scaleSlider");
         const settingsScaleSlider = document.getElementById(
-          "settings-scaleSlider"
+          "settings-scaleSlider",
         );
 
         if (mainScaleSlider && settingsScaleSlider) {
@@ -5972,10 +6786,10 @@
 
         // Sync disable progress checkbox
         const mainDisableProgressCheckbox = document.getElementById(
-          "disableProgressCheckbox"
+          "disableProgressCheckbox",
         );
         const settingsDisableProgressCheckbox = document.getElementById(
-          "settings-disableProgressCheckbox"
+          "settings-disableProgressCheckbox",
         );
 
         if (mainDisableProgressCheckbox && settingsDisableProgressCheckbox) {
@@ -5983,7 +6797,7 @@
             settingsDisableProgressCheckbox.checked;
         }
         const settingsDisablePlatinumCheckbox = document.getElementById(
-          "settings-disablePlatinumCheckbox"
+          "settings-disablePlatinumCheckbox",
         );
         if (settingsDisablePlatinumCheckbox) {
           settingsDisablePlatinumCheckbox.dispatchEvent(new Event("change"));
@@ -5994,7 +6808,7 @@
           } catch (err) {
             console.warn(
               "Failed to update config after syncing settings:",
-              err
+              err,
             );
           }
         }
@@ -6009,7 +6823,7 @@
         const settingsDuration = parseFloat(getVal("settings-durationSlider"));
         const settingsSoundVolume = parseInt(
           getVal("settings-soundVolumeSlider"),
-          10
+          10,
         );
         const overlayLabel = (byId("overlay-shortcut-btn")?.textContent || "")
           .trim()
@@ -6027,15 +6841,15 @@
           ...base,
           preset: pick(
             getVal("settings-presetDropdown") || getVal("presetDropdown"),
-            base.preset || "default"
+            base.preset || "default",
           ),
           position: pick(
             getVal("settings-positionDropdown") || getVal("positionDropdown"),
-            base.position || "center-bottom"
+            base.position || "center-bottom",
           ),
           sound: pick(
             getVal("settings-soundSelect") || getVal("soundSelect"),
-            base.sound || "mute"
+            base.sound || "mute",
           ),
           notificationScale: Number.isFinite(settingsScale)
             ? settingsScale
@@ -6045,7 +6859,7 @@
             : base.notificationDuration || 0,
           soundVolume: Number.isFinite(settingsSoundVolume)
             ? settingsSoundVolume
-            : base.soundVolume ?? 100,
+            : (base.soundVolume ?? 100),
           disableProgress: checkbox("settings-disableProgressCheckbox"),
           disablePlaytime: checkbox("settings-disablePlaytimeCheckbox"),
           disablePlatinum: checkbox("settings-disablePlatinumCheckbox"),
@@ -6053,14 +6867,14 @@
           startInTray: checkbox("settings-startInTrayCheckbox"),
           closeToTray: checkbox("settings-closeToTrayCheckbox"),
           showDashboardOnStart: checkbox(
-            "settings-showDashboardOnStartCheckbox"
+            "settings-showDashboardOnStartCheckbox",
           ),
           screenshotFolder: pick(
             getVal("settings-screenshotFolder").trim(),
-            base.screenshotFolder || ""
+            base.screenshotFolder || "",
           ),
           disableAchievementScreenshot: checkbox(
-            "settings-disableScreenshotCheckbox"
+            "settings-disableScreenshotCheckbox",
           ),
           windowZoomFactor: Number.isFinite(zoomValue)
             ? zoomValue
@@ -6071,17 +6885,17 @@
         snapshot.platinumPreset = pick(
           getVal("settings-platinumPresetDropdown") ||
             getVal("platinumPresetValue"),
-          base.platinumPreset || snapshot.preset
+          base.platinumPreset || snapshot.preset,
         );
         snapshot.platinumPosition = pick(
           getVal("settings-platinumPositionDropdown") ||
             getVal("platinumPositionValue"),
-          base.platinumPosition || snapshot.position
+          base.platinumPosition || snapshot.position,
         );
         snapshot.platinumSound = pick(
           getVal("settings-platinumSoundSelect") ||
             getVal("platinumSoundValue"),
-          base.platinumSound || snapshot.sound
+          base.platinumSound || snapshot.sound,
         );
 
         return snapshot;
@@ -6094,7 +6908,13 @@
           await window.api.savePreferences(payload);
           await refreshPreferencesCache();
         } catch (err) {
-          console.error("Failed to persist settings snapshot:", err);
+          console.error(
+            tUi(
+              "log.settingsSnapshotPersistFailed",
+              "Failed to persist settings snapshot:",
+            ),
+            err,
+          );
         }
       }
 
@@ -6109,16 +6929,18 @@
 
       // Overlay shortcut functionality
       const overlayShortcutBtn = document.getElementById(
-        "overlay-shortcut-btn"
+        "overlay-shortcut-btn",
       );
       let isListeningForShortcut = false;
       let pressedKeys = new Set();
       let shortcutTimeout;
       let currentKeyHandler = null;
+      const getPressKeysLabel = () =>
+        tUi("ui.shortcut.pressKeys", "Press keys...");
 
       overlayShortcutBtn.addEventListener("click", () => {
         if (
-          overlayShortcutBtn.textContent === "Press keys..." ||
+          overlayShortcutBtn.textContent === getPressKeysLabel() ||
           overlayShortcutBtn.classList.contains("listening")
         ) {
           cleanupShortcutRecording();
@@ -6126,7 +6948,7 @@
           return;
         }
 
-        overlayShortcutBtn.textContent = "Press keys...";
+        overlayShortcutBtn.textContent = getPressKeysLabel();
         overlayShortcutBtn.classList.add("listening");
         isListeningForShortcut = true;
         pressedKeys.clear();
@@ -6148,7 +6970,7 @@
             if (pressedKeys.has("Alt")) keys.push("Alt");
 
             const mainKeys = [...pressedKeys].filter(
-              (k) => !["Control", "Shift", "Alt", "Meta"].includes(k)
+              (k) => !["Control", "Shift", "Alt", "Meta"].includes(k),
             );
             if (mainKeys.length > 0) {
               const mainKey = mainKeys[0];
@@ -6156,7 +6978,10 @@
             }
 
             if (keys.length < 2) {
-              overlayShortcutBtn.textContent = "Invalid combo";
+              overlayShortcutBtn.textContent = tUi(
+                "ui.shortcut.invalidCombo",
+                "Invalid combo",
+              );
               setTimeout(() => restoreSavedShortcutLabel(), 1200);
             } else {
               const combo = keys.join("+");
@@ -6189,8 +7014,16 @@
         await loadPreferencesCached();
         const prefs = getCachedPreferences();
         overlayShortcutBtn.textContent =
-          prefs?.overlayShortcut || "Set Shortcut";
+          prefs?.overlayShortcut || tUi("overlay-shortcut-btn", "Set Shortcut");
       }
+      window.refreshShortcutLabel = () => {
+        if (
+          !overlayShortcutBtn ||
+          overlayShortcutBtn.classList.contains("listening")
+        )
+          return;
+        restoreSavedShortcutLabel();
+      };
 
       // ==== FOLDERS TAB – UI & IPC ====
       (function initFoldersTab() {
@@ -6204,7 +7037,13 @@
           if (window.api?.invoke) return window.api.invoke(channel, ...args);
           if (window.electron?.ipcRenderer?.invoke)
             return window.electron.ipcRenderer.invoke(channel, ...args);
-          console.warn("IPC invoke bridge not found for", channel);
+          console.warn(
+            tUi(
+              "log.ipcInvokeBridgeMissing",
+              "IPC invoke bridge not found for",
+            ),
+            channel,
+          );
           return null;
         }
 
@@ -6213,8 +7052,10 @@
 
           const arr = Array.isArray(folders) ? folders : [];
           if (arr.length === 0) {
-            listEl.innerHTML =
-              '<div style="padding:15px; color:#aaa;"><small>No watched folders yet.</small></div>';
+            listEl.innerHTML = `<div style="padding:15px; color:#aaa;"><small>${tUi(
+              "folders.empty",
+              "No watched folders yet.",
+            )}</small></div>`;
             return;
           }
 
@@ -6222,17 +7063,22 @@
             const folderPath = typeof f === "string" ? f : f?.path;
             const blocked = typeof f === "object" && !!f?.blocked;
             const isDefault = typeof f === "object" && !!f?.isDefault;
+            const exists = typeof f === "object" ? f?.exists !== false : true;
 
             const row = document.createElement("div");
             row.className = "wf-row";
             if (blocked) row.classList.add("wf-row--blocked");
+            if (!exists) row.classList.add("wf-row--missing");
             row.setAttribute("role", "listitem");
             row.dataset.folder = folderPath;
 
             const pathEl = document.createElement("div");
             pathEl.className = "wf-path";
             pathEl.title = folderPath;
-            if (blocked) pathEl.dataset.status = "Ignored";
+            if (blocked)
+              pathEl.dataset.status = tUi("folders.statusIgnored", "Ignored");
+            else if (!exists)
+              pathEl.dataset.status = tUi("folders.statusMissing", "Missing");
             else delete pathEl.dataset.status;
             pathEl.textContent = folderPath;
 
@@ -6244,7 +7090,9 @@
             btnBlock.className = blocked
               ? "icon-btn unblock"
               : "icon-btn block";
-            btnBlock.title = blocked ? "Resume watching" : "Ignore this folder";
+            btnBlock.title = blocked
+              ? tUi("tooltip.folderResume", "Resume watching")
+              : tUi("tooltip.folderIgnore", "Ignore this folder");
             btnBlock.setAttribute("aria-label", btnBlock.title);
             btnBlock.innerHTML = blocked
               ? '<i class="fa-solid fa-bell-slash"></i>' // ignore
@@ -6253,14 +7101,18 @@
               const channel = blocked ? "folders:unblock" : "folders:block";
               const res = await invoke(channel, folderPath);
               if (res?.ok) renderFoldersList(res.folders);
-              else alert(res?.error || "Failed to update folder");
+              else
+                alert(
+                  res?.error ||
+                    tUi("alert.folderUpdateFailed", "Failed to update folder"),
+                );
             });
 
             // EDIT (✎)
             const btnEdit = document.createElement("button");
             btnEdit.className = "icon-btn edit";
-            btnEdit.title = "Edit folder";
-            btnEdit.setAttribute("aria-label", "Edit folder");
+            btnEdit.title = tUi("tooltip.folderEdit", "Edit folder");
+            btnEdit.setAttribute("aria-label", btnEdit.title);
             btnEdit.innerHTML = '<i class="fa-regular fa-pen-to-square"></i>';
             btnEdit.addEventListener("click", async () => {
               let next = null;
@@ -6270,13 +7122,25 @@
               if (!next || next === folderPath) return;
               const rem = await invoke("folders:remove", folderPath);
               if (!rem?.ok) {
-                alert(rem?.error || "Failed to replace folder (remove step).");
+                alert(
+                  rem?.error ||
+                    tUi(
+                      "alert.folderReplaceRemoveFailed",
+                      "Failed to replace folder (remove step).",
+                    ),
+                );
                 return;
               }
 
               const add = await invoke("folders:add", next);
               if (!add?.ok) {
-                alert(add?.error || "Failed to replace folder (add step).");
+                alert(
+                  add?.error ||
+                    tUi(
+                      "alert.folderReplaceAddFailed",
+                      "Failed to replace folder (add step).",
+                    ),
+                );
                 await invoke("folders:add", folderPath);
                 return;
               }
@@ -6286,13 +7150,17 @@
             // REMOVE
             const btnRemove = document.createElement("button");
             btnRemove.className = "icon-btn remove";
-            btnRemove.title = "Remove folder";
-            btnRemove.setAttribute("aria-label", "Remove folder");
+            btnRemove.title = tUi("tooltip.folderRemove", "Remove folder");
+            btnRemove.setAttribute("aria-label", btnRemove.title);
             btnRemove.innerHTML = '<i class="fa-regular fa-trash-can"></i>';
             btnRemove.addEventListener("click", async () => {
               const res = await invoke("folders:remove", folderPath);
               if (res?.ok) renderFoldersList(res.folders);
-              else alert(res?.error || "Failed to remove folder");
+              else
+                alert(
+                  res?.error ||
+                    tUi("alert.folderRemoveFailed", "Failed to remove folder"),
+                );
             });
             if (isDefault) {
               btnRemove.style.display = "none";
@@ -6310,7 +7178,10 @@
             const res = await invoke("folders:list");
             renderFoldersList(res?.folders || []);
           } catch (e) {
-            console.warn("Failed to load folders:", e);
+            console.warn(
+              tUi("log.foldersLoadFailed", "Failed to load folders:"),
+              e,
+            );
             renderFoldersList([]);
           }
         }
@@ -6322,9 +7193,13 @@
             if (!dir) return;
             const res = await invoke("folders:add", dir);
             if (res?.ok) renderFoldersList(res.folders || []);
-            else alert(res?.error || "Failed to add folder");
+            else
+              alert(
+                res?.error ||
+                  tUi("alert.folderAddFailed", "Failed to add folder"),
+              );
           } catch (e) {
-            console.error("Add folder error:", e);
+            console.error(tUi("log.folderAddError", "Add folder error:"), e);
           }
         });
 
@@ -6334,10 +7209,16 @@
             if (res?.ok) {
               renderFoldersList(res.folders || []);
             } else {
-              alert(res?.error || "Failed to restart watchers");
+              alert(
+                res?.error ||
+                  tUi(
+                    "alert.watcherRestartFailed",
+                    "Failed to restart watchers",
+                  ),
+              );
             }
           } catch (e) {
-            console.error("Rescan error:", e);
+            console.error(tUi("log.folderRescanError", "Rescan error:"), e);
           }
         });
 
@@ -6347,6 +7228,7 @@
             setTimeout(loadFolders, 50);
           });
 
+        window.refreshFoldersList = loadFolders;
         loadFolders();
       })();
 
@@ -6419,12 +7301,19 @@
         const gridEl = document.getElementById("dashboardGrid");
         const btnToggle = document.getElementById("toggleDashboardBtn");
         const btnClose = document.getElementById("closeDashboard");
+        const dashboardContextMenu = document.getElementById(
+          "dashboardContextMenu",
+        );
+        let dashboardContextTarget = null;
+        let dashboardMenuIndex = 0;
+        window.__dashboardContextMenuOpen = false;
+        window.__dashboardContextMenuIgnoreClick = false;
 
         const fileUrl = (p) =>
           p ? `file:///${String(p).replace(/\\/g, "/")}` : "";
         const fallbackIcon = new URL(
           "./assets/achievements-logo.png",
-          window.location.href
+          window.location.href,
         ).toString();
 
         const scheduleIdle =
@@ -6455,7 +7344,7 @@
                     });
                 }
               },
-              { rootMargin: "80px" }
+              { rootMargin: "80px" },
             );
           } else {
             dashboardLazyObserver = {
@@ -6484,6 +7373,98 @@
           }
         }
 
+        async function handleDashboardBlacklistAction(
+          configName,
+          appid,
+          removeMode,
+        ) {
+          if (!appid) {
+            alert(
+              tUi(
+                "alert.missingAppIdConfig",
+                "Missing AppID for this configuration.",
+              ),
+            );
+            return;
+          }
+          logUiEvent("info", "ui:blacklist-dashboard:click", {
+            configName,
+            appid,
+            remove: removeMode,
+          });
+          const confirmed = await safeConfirm({
+            title: removeMode
+              ? tUi("confirm.blacklistRemove.title", "Remove from blacklist")
+              : tUi("confirm.blacklistIgnore.title", "Ignore game"),
+            message: removeMode
+              ? tUiFmt(
+                  "confirm.blacklistRemove.message",
+                  { name: configName },
+                  `Remove ${configName} from blacklist?`,
+                )
+              : tUiFmt(
+                  "confirm.blacklistIgnore.message",
+                  { name: configName },
+                  `Ignore ${configName} and stop tracking it?`,
+                ),
+          });
+          logUiEvent("info", "ui:blacklist-dashboard:confirm", {
+            configName,
+            appid,
+            remove: removeMode,
+            confirmed,
+          });
+          if (!confirmed) return;
+
+          await safeRefocus();
+
+          logUiEvent("info", "ui:blacklist-dashboard:ipc-start", {
+            configName,
+            appid,
+            remove: removeMode,
+          });
+          const response = await window.api.blacklistConfig({
+            configName,
+            appid,
+            remove: removeMode,
+          });
+          logUiEvent(
+            response?.success ? "info" : "warn",
+            "ui:blacklist-dashboard:ipc-result",
+            {
+              configName,
+              appid,
+              remove: removeMode,
+              success: response?.success === true,
+              error: response?.error || null,
+            },
+          );
+          if (!response?.success) {
+            alert(
+              response?.error ||
+                tUi(
+                  "alert.blacklistUpdateFailed",
+                  "Failed to update blacklist",
+                ),
+            );
+            return;
+          }
+
+          localStorage.removeItem(`${DASH_PROGRESS_PREFIX}${configName}`);
+          localStorage.removeItem(`${IMG_CACHE_PREFIX}${configName}`);
+          dashboardImageCache?.delete?.(appid);
+          if (Array.isArray(response.blacklist)) {
+            blacklistState.appids = new Set(response.blacklist);
+          } else {
+            await syncBlacklistList();
+          }
+
+          if (typeof reloadConfigsDropdown === "function") {
+            await reloadConfigsDropdown(true);
+          }
+          await buildDashboard();
+        }
+
         let __dashNav = { index: 0, cols: 1 };
         let __gpLoopId = null;
 
@@ -6492,7 +7473,7 @@
           if (!onlyVisible) return all;
           return all.filter(
             (c) =>
-              c.offsetParent !== null && getComputedStyle(c).display !== "none"
+              c.offsetParent !== null && getComputedStyle(c).display !== "none",
           );
         }
 
@@ -6516,7 +7497,7 @@
           el.focus({ preventScroll: true });
           el.scrollIntoView({ block: "nearest", inline: "nearest" });
           cards.forEach((c) =>
-            c.querySelector(".dash-play")?.classList.remove("force-show")
+            c.querySelector(".dash-play")?.classList.remove("force-show"),
           );
           el.querySelector(".dash-play")?.classList.add("force-show");
         }
@@ -6535,7 +7516,7 @@
             .filter(
               (card) =>
                 card.offsetParent !== null &&
-                getComputedStyle(card).display !== "none"
+                getComputedStyle(card).display !== "none",
             )
             .map((card) => ({ card, rect: card.getBoundingClientRect() }));
           if (!cards.length) return null;
@@ -6556,7 +7537,7 @@
           usable.sort((a, b) =>
             a.rect.top !== b.rect.top
               ? a.rect.top - b.rect.top
-              : a.rect.left - b.rect.left
+              : a.rect.left - b.rect.left,
           );
           const topEdge = usable[0].rect.top;
           const row = usable
@@ -6611,6 +7592,7 @@
           try {
             window.api?.setDashboardOpen?.(false);
           } catch {}
+          closeDashboardContextMenu();
           clearDashboardSearch();
           stopDashboardPoll();
           setBackgroundInert(false);
@@ -6674,7 +7656,10 @@
                 startDashboardPoll();
               }
             } catch (e) {
-              console.error("Dashboard poll error:", e);
+              console.error(
+                tUi("log.dashboardPollError", "Dashboard poll error:"),
+                e,
+              );
             } finally {
               __dashboardPollActive = false;
             }
@@ -6707,10 +7692,162 @@
           document.querySelectorAll(".dash-card").forEach((el) => {
             el.classList.toggle(
               "active",
-              el.getAttribute("data-name") === name
+              el.getAttribute("data-name") === name,
             );
           });
         }
+
+        function getDashboardContextCard() {
+          const focused = document.querySelector(
+            "#dashboardGrid .dash-card:focus",
+          );
+          const active = document.querySelector(
+            "#dashboardGrid .dash-card.active",
+          );
+          return (
+            focused ||
+            active ||
+            document.querySelector("#dashboardGrid .dash-card")
+          );
+        }
+
+        function getDashboardMenuItems() {
+          if (!dashboardContextMenu) return [];
+          return Array.from(
+            dashboardContextMenu.querySelectorAll(".dash-menu-item"),
+          ).filter((btn) => !btn.disabled && btn.offsetParent !== null);
+        }
+
+        function setMenuItemDisabled(btn, disabled) {
+          if (!btn) return;
+          btn.disabled = !!disabled;
+          btn.setAttribute("aria-disabled", disabled ? "true" : "false");
+          btn.classList.toggle("is-disabled", !!disabled);
+        }
+
+        function updateDashboardContextMenuLabels(target) {
+          if (!dashboardContextMenu || !target) return;
+          const ignoreBtn = dashboardContextMenu.querySelector(
+            '.dash-menu-item[data-action="ignore"]',
+          );
+          const regenBtn = dashboardContextMenu.querySelector(
+            '.dash-menu-item[data-action="regen"]',
+          );
+          const removeMode =
+            blacklistState.showBlacklisted && target.blacklisted;
+          if (ignoreBtn) {
+            ignoreBtn.textContent = removeMode
+              ? tUi("dashboardMenuRemoveBlacklist", "Remove from Blacklist")
+              : tUi("dashboardMenuIgnore", "Ignore Game");
+            ignoreBtn.title = ignoreBtn.textContent;
+          }
+          setMenuItemDisabled(ignoreBtn, !target.appid);
+          setMenuItemDisabled(regenBtn, !target.appid);
+        }
+
+        function focusDashboardMenuItem(index) {
+          const items = getDashboardMenuItems();
+          if (!items.length) return;
+          const max = items.length;
+          dashboardMenuIndex = ((index % max) + max) % max;
+          const item = items[dashboardMenuIndex];
+          if (item && typeof item.focus === "function") {
+            item.focus({ preventScroll: true });
+          }
+        }
+
+        function moveDashboardMenuFocus(delta) {
+          focusDashboardMenuItem(dashboardMenuIndex + delta);
+        }
+
+        async function activateDashboardMenuItem() {
+          const items = getDashboardMenuItems();
+          const item = items[dashboardMenuIndex];
+          if (item && typeof item.click === "function") {
+            item.click();
+          }
+        }
+
+        function closeDashboardContextMenu() {
+          if (!dashboardContextMenu) return;
+          const targetEl = dashboardContextTarget?.el || null;
+          dashboardContextMenu.classList.add("hidden");
+          dashboardContextMenu.setAttribute("aria-hidden", "true");
+          dashboardContextMenu.style.left = "";
+          dashboardContextMenu.style.top = "";
+          window.__dashboardContextMenuOpen = false;
+          dashboardContextTarget = null;
+          if (targetEl && window.__dashboardOpen) {
+            try {
+              targetEl.focus({ preventScroll: true });
+            } catch {}
+          }
+        }
+        window.closeDashboardContextMenu = closeDashboardContextMenu;
+
+        function positionDashboardContextMenu(x, y) {
+          if (!dashboardContextMenu) return;
+          const pad = 8;
+          dashboardContextMenu.style.left = "0px";
+          dashboardContextMenu.style.top = "0px";
+          const rect = dashboardContextMenu.getBoundingClientRect();
+          const maxLeft = Math.max(pad, window.innerWidth - rect.width - pad);
+          const maxTop = Math.max(pad, window.innerHeight - rect.height - pad);
+          const left = Math.min(Math.max(pad, x), maxLeft);
+          const top = Math.min(Math.max(pad, y), maxTop);
+          dashboardContextMenu.style.left = `${Math.round(left)}px`;
+          dashboardContextMenu.style.top = `${Math.round(top)}px`;
+        }
+
+        function openDashboardContextMenuForCard(card, pos) {
+          if (!dashboardContextMenu || !card) return;
+          const target = {
+            name: card.dataset.name || "",
+            displayName: card.dataset.display || card.dataset.name || "",
+            appid: card.dataset.appid || "",
+            platform: card.dataset.platform || "",
+            blacklisted: card.dataset.blacklisted === "1",
+            el: card,
+          };
+          if (!target.name) return;
+          dashboardContextTarget = target;
+          updateDashboardContextMenuLabels(target);
+          if (!target.appid) {
+            getConfigCached(target.name).then((cfg) => {
+              if (!window.__dashboardContextMenuOpen) return;
+              if (!cfg || !cfg.appid) return;
+              if (dashboardContextTarget?.name !== target.name) return;
+              dashboardContextTarget.appid = String(cfg.appid);
+              dashboardContextTarget.platform = cfg.platform || "";
+              dashboardContextTarget.blacklisted = isAppIdInBlacklist(
+                String(cfg.appid),
+              );
+              updateDashboardContextMenuLabels(dashboardContextTarget);
+            });
+          }
+          dashboardContextMenu.classList.remove("hidden");
+          dashboardContextMenu.setAttribute("aria-hidden", "false");
+          window.__dashboardContextMenuOpen = true;
+          if (pos && typeof pos.x === "number" && typeof pos.y === "number") {
+            positionDashboardContextMenu(pos.x, pos.y);
+          } else {
+            const rect = card.getBoundingClientRect();
+            positionDashboardContextMenu(rect.right - 8, rect.top + 8);
+          }
+          dashboardMenuIndex = 0;
+          focusDashboardMenuItem(0);
+        }
+
+        function openDashboardContextMenuFromFocus() {
+          if (!window.__dashboardOpen) return;
+          const card = getDashboardContextCard();
+          if (!card) return;
+          openDashboardContextMenuForCard(card);
+        }
+        window.openDashboardContextMenuFromFocus =
+          openDashboardContextMenuFromFocus;
+        window.moveDashboardContextMenuFocus = moveDashboardMenuFocus;
+        window.activateDashboardContextMenu = activateDashboardMenuItem;
 
         function openOptionsPanel() {
           const container = document.getElementById("buttonContainer");
@@ -6720,7 +7857,7 @@
           container.classList.remove("hidden");
           container.style.display = "flex";
 
-          toggle.textContent = "Hide Options";
+          toggle.textContent = tUi("ui.toggle.hideOptions", "Hide Options");
         }
 
         async function updateDashboardCounts(items, softStats = null) {
@@ -6736,7 +7873,7 @@
               } catch {
                 return false;
               }
-            })
+            }),
           );
           perfectEl.textContent = String(results.filter(Boolean).length);
         }
@@ -6908,7 +8045,7 @@
             card.setAttribute("role", "button");
             card.setAttribute(
               "aria-label",
-              `${cardData.displayName} – ${cardData.progress.pct}% complete`
+              `${cardData.displayName} – ${cardData.progress.pct}% complete`,
             );
             card.dataset.name = cardData.name;
             card.dataset.display = cardData.displayName;
@@ -6920,7 +8057,11 @@
 
             const pill = document.createElement("div");
             pill.className = "dash-progresspill";
-            pill.textContent = `${cardData.progress.pct}% Complete`;
+            pill.textContent = tUiFmt(
+              "dashboardCompletePct",
+              { pct: cardData.progress.pct },
+              `${cardData.progress.pct}% Complete`,
+            );
 
             const img = document.createElement("img");
             img.className = "dash-thumb";
@@ -6983,6 +8124,7 @@
             meta.data.blacklisted = cardBlacklisted;
             if (platform) {
               meta.data.platform = platform;
+              meta.element.dataset.platform = platform;
             }
             let imgSrc = null;
             if (appid) {
@@ -6992,7 +8134,7 @@
                 try {
                   const p = await window.api.checkLocalGameImage(
                     appid,
-                    platform || null
+                    platform || null,
                   );
                   imgSrc = p ? fileUrl(p) : null;
                 } catch {
@@ -7029,7 +8171,7 @@
 
             async function refreshDashboardImage(appid) {
               const cards = Array.from(
-                gridEl.querySelectorAll(`.dash-card[data-appid="${appid}"]`)
+                gridEl.querySelectorAll(`.dash-card[data-appid="${appid}"]`),
               );
               if (!cards.length) return;
 
@@ -7037,7 +8179,7 @@
               try {
                 const localPath = await window.api.checkLocalGameImage(
                   appid,
-                  platform || null
+                  platform || null,
                 );
                 if (localPath) imgSrc = fileUrl(localPath);
               } catch {
@@ -7071,8 +8213,8 @@
                   typeof payload === "object" && payload?.appid
                     ? String(payload.appid)
                     : /^\d+$/.test(String(payload))
-                    ? String(payload)
-                    : null;
+                      ? String(payload)
+                      : null;
                 if (!appid) return;
                 await refreshDashboardImage(appid);
               });
@@ -7082,11 +8224,15 @@
             const progress = await computeCardProgress(it.name);
             localStorage.setItem(
               DASH_PROGRESS_PREFIX + it.name,
-              JSON.stringify(progress)
+              JSON.stringify(progress),
             );
 
             meta.bar.style.width = `${progress.pct}%`;
-            meta.pill.textContent = `${progress.pct}% Complete`;
+            meta.pill.textContent = tUiFmt(
+              "dashboardCompletePct",
+              { pct: progress.pct },
+              `${progress.pct}% Complete`,
+            );
             meta.element.dataset.pct = String(progress.pct);
             meta.element.dataset.unlocked = String(progress.unlocked);
             meta.element.dataset.total = String(progress.total);
@@ -7123,8 +8269,10 @@
 
               const btn = document.createElement("button");
               btn.className = "dash-play";
-              btn.setAttribute("aria-label", "Play");
-              btn.title = exe ? "Play" : "No executable set";
+              btn.setAttribute("aria-label", tUi("dashboard.play", "Play"));
+              btn.title = exe
+                ? tUi("dashboard.play", "Play")
+                : tUi("dashboard.noExecutable", "No executable set");
               btn.innerHTML = '<i class="fas fa-play"></i>';
 
               if (!exe) {
@@ -7147,7 +8295,7 @@
                 "mousedown",
                 "mouseup",
               ].forEach((t) =>
-                btn.addEventListener(t, swallowIfDisabled, true)
+                btn.addEventListener(t, swallowIfDisabled, true),
               );
 
               btn.addEventListener("click", async (ev) => {
@@ -7181,7 +8329,11 @@
                   container.classList.remove("hidden");
                   container.style.display = "flex";
                 }
-                if (toggleBtn) toggleBtn.textContent = "Hide Options";
+                if (toggleBtn)
+                  toggleBtn.textContent = tUi(
+                    "ui.toggle.hideOptions",
+                    "Hide Options",
+                  );
 
                 if (exe) window.api.launchExecutable(exe, args);
               });
@@ -7197,11 +8349,22 @@
                 blacklistState.showBlacklisted && cardBlacklisted;
               blockBtn.setAttribute(
                 "aria-label",
-                removing ? "Remove from blacklist" : "Ignore game"
+                removing
+                  ? tUi(
+                      "dashboard.blacklistRemoveLabel",
+                      "Remove from blacklist",
+                    )
+                  : tUi("dashboard.blacklistIgnoreLabel", "Ignore game"),
               );
               blockBtn.title = removing
-                ? "Remove this game from blacklist"
-                : "Stop tracking this game";
+                ? tUi(
+                    "dashboard.blacklistRemoveTitle",
+                    "Remove this game from blacklist",
+                  )
+                : tUi(
+                    "dashboard.blacklistIgnoreTitle",
+                    "Stop tracking this game",
+                  );
               blockBtn.innerHTML = removing
                 ? '<i class="fa-solid fa-check"></i>'
                 : '<i class="fa-solid fa-ban"></i>';
@@ -7212,69 +8375,19 @@
                   if (!appidValue) return;
                   const removeMode =
                     blacklistState.showBlacklisted && cardBlacklisted;
-                  logUiEvent("info", "ui:blacklist-dashboard:click", {
-                    configName: cfgName,
-                    appid: appidValue,
-                    remove: removeMode,
-                  });
-                  const confirmed = await safeConfirm({
-                    title: removeMode ? "Remove from blacklist" : "Ignore game",
-                    message: removeMode
-                      ? `Remove ${cfgName} from blacklist?`
-                      : `Ignore ${cfgName} and stop tracking it?`,
-                  });
-                  logUiEvent("info", "ui:blacklist-dashboard:confirm", {
-                    configName: cfgName,
-                    appid: appidValue,
-                    remove: removeMode,
-                    confirmed,
-                  });
-                  if (!confirmed) return;
-
-                  await safeRefocus();
-
-                  logUiEvent("info", "ui:blacklist-dashboard:ipc-start", {
-                    configName: cfgName,
-                    appid: appidValue,
-                    remove: removeMode,
-                  });
-                  const response = await window.api.blacklistConfig({
-                    configName: cfgName,
-                    appid: appidValue,
-                    remove: removeMode,
-                  });
-                  logUiEvent(
-                    response?.success ? "info" : "warn",
-                    "ui:blacklist-dashboard:ipc-result",
-                    {
-                      configName: cfgName,
-                      appid: appidValue,
-                      remove: removeMode,
-                      success: response?.success === true,
-                      error: response?.error || null,
-                    }
+                  await handleDashboardBlacklistAction(
+                    cfgName,
+                    appidValue,
+                    removeMode,
                   );
-                  if (!response?.success) {
-                    alert(response?.error || "Failed to update blacklist");
-                    return;
-                  }
-
-                  localStorage.removeItem(`${DASH_PROGRESS_PREFIX}${cfgName}`);
-                  localStorage.removeItem(`${IMG_CACHE_PREFIX}${cfgName}`);
-                  dashboardImageCache?.delete?.(appidValue);
-                  if (Array.isArray(response.blacklist)) {
-                    blacklistState.appids = new Set(response.blacklist);
-                  } else {
-                    await syncBlacklistList();
-                  }
-
-                  if (typeof reloadConfigsDropdown === "function") {
-                    await reloadConfigsDropdown(true);
-                  }
-                  await buildDashboard();
                 } catch (err) {
                   logUiError("ui:blacklist-dashboard-failed", err);
-                  alert("Failed to update blacklist. See logs for details.");
+                  alert(
+                    tUi(
+                      "alert.blacklistUpdateFailedDetails",
+                      "Failed to update blacklist. See logs for details.",
+                    ),
+                  );
                 }
               });
 
@@ -7284,6 +8397,131 @@
           })();
           computeGridCols();
           const cards = getDashCards();
+        }
+
+        if (dashboardContextMenu && !window.__dashboardContextMenuWired) {
+          window.__dashboardContextMenuWired = true;
+          window.__dashboardContextMenuIgnoreClick = false;
+
+          dashboardContextMenu.addEventListener("click", async (e) => {
+            const btn = e.target.closest(".dash-menu-item");
+            if (!btn || btn.disabled) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const action = btn.dataset.action || "";
+            const target = dashboardContextTarget;
+            if (!target || !target.name) return;
+
+            closeDashboardContextMenu();
+            try {
+              if (action === "edit") {
+                await window.openEditConfigModalByName?.(target.name);
+                return;
+              }
+              if (action === "delete") {
+                await deleteConfigByName(target.name, target.displayName);
+                return;
+              }
+              if (action === "ignore") {
+                const cfg = await getConfigCached(target.name);
+                const appid = target.appid || cfg?.appid || "";
+                const isBlacklisted = appid
+                  ? isAppIdInBlacklist(String(appid))
+                  : false;
+                const removeMode =
+                  blacklistState.showBlacklisted && isBlacklisted;
+                await handleDashboardBlacklistAction(
+                  target.name,
+                  String(appid || ""),
+                  removeMode,
+                );
+                return;
+              }
+              if (action === "regen") {
+                const cfg = await getConfigCached(target.name);
+                const appid = target.appid || cfg?.appid || "";
+                const platform = target.platform || cfg?.platform || "auto";
+                if (!appid) {
+                  showNotification(
+                    tUi(
+                      "alert.missingAppIdConfigShort",
+                      "Missing AppID for this config.",
+                    ),
+                    "#f44336",
+                  );
+                  return;
+                }
+                pendingSchemaRefresh = {
+                  appid: String(appid).trim(),
+                  name: target.name,
+                };
+                const result = await window.api.regenerateSchema({
+                  name: target.name,
+                  appid,
+                  platform,
+                });
+                showNotification(
+                  result?.message || "Schema regeneration finished.",
+                  result?.success ? "#4CAF50" : "#f44336",
+                );
+                if (result?.success && configList?.value === target.name) {
+                  const lang =
+                    document.getElementById("languageSelect")?.value ||
+                    "english";
+                  try {
+                    await buildMainAchievementsTable(target.name, lang);
+                  } catch (err) {
+                    console.error(
+                      tUi(
+                        "log.refreshAchievementsFailed",
+                        "Refresh achievements table failed:",
+                      ),
+                      err,
+                    );
+                  }
+                }
+              }
+            } catch (err) {
+              console.error(
+                tUi(
+                  "log.dashboardMenuActionFailed",
+                  "Dashboard menu action failed:",
+                ),
+                err,
+              );
+            }
+          });
+
+          dashboardContextMenu.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          });
+
+          document.addEventListener(
+            "pointerdown",
+            (e) => {
+              if (!window.__dashboardContextMenuOpen) return;
+              if (e.target.closest("#dashboardContextMenu")) return;
+              window.__dashboardContextMenuIgnoreClick = true;
+              closeDashboardContextMenu();
+              setTimeout(() => {
+                window.__dashboardContextMenuIgnoreClick = false;
+              }, 0);
+            },
+            true,
+          );
+
+          gridEl.addEventListener("contextmenu", (e) => {
+            if (!window.__dashboardOpen) return;
+            const card = e.target.closest(".dash-card");
+            if (!card) return;
+            e.preventDefault();
+            e.stopPropagation();
+            openDashboardContextMenuForCard(card, {
+              x: e.clientX,
+              y: e.clientY,
+            });
+          });
         }
         try {
           window.buildDashboard = buildDashboard;
@@ -7346,14 +8584,17 @@
         }
 
         async function updateCardProgressUI(cardEl, cfgName) {
-          const { pct, unlocked, total, updated } = await computeCardProgress(
-            cfgName
-          );
+          const { pct, unlocked, total, updated } =
+            await computeCardProgress(cfgName);
           const bar = cardEl.querySelector(".dash-progressbar > span");
           const pill = cardEl.querySelector(".dash-progresspill");
           if (bar) bar.style.width = pct + "%";
           if (pill) {
-            pill.textContent = `${pct}% Complete`;
+            pill.textContent = tUiFmt(
+              "dashboardCompletePct",
+              { pct },
+              `${pct}% Complete`,
+            );
             pill.title = total
               ? `Unlocked ${unlocked} / ${total}`
               : "No achievements found";
@@ -7377,6 +8618,25 @@
           window.updateCardProgressUI = updateCardProgressUI;
         } catch {}
 
+        function clearDashboardSavedCache(cfgName) {
+          if (!cfgName) return;
+          dashboardSavedCache.delete(cfgName);
+        }
+        function clearDashboardSchemaCache(cfgName) {
+          if (!cfgName) return;
+          dashboardSchemaCache.delete(cfgName);
+        }
+        function clearDashboardCachesFor(cfgName) {
+          if (!cfgName) return;
+          clearDashboardSavedCache(cfgName);
+          clearDashboardSchemaCache(cfgName);
+        }
+        try {
+          window.__clearDashboardSavedCache = clearDashboardSavedCache;
+          window.__clearDashboardSchemaCache = clearDashboardSchemaCache;
+          window.__clearDashboardCachesFor = clearDashboardCachesFor;
+        } catch {}
+
         setupDashboardSearch(gridEl);
 
         function selectConfigInDropdown(name) {
@@ -7384,7 +8644,7 @@
           if (!sel) return false;
 
           const opt = Array.from(sel.options).find(
-            (o) => o.value === name || o.text.trim() === name
+            (o) => o.value === name || o.text.trim() === name,
           );
           if (opt) {
             sel.value = opt.value;
@@ -7403,7 +8663,7 @@
             document.querySelectorAll(".dash-card").forEach((el) => {
               el.classList.toggle(
                 "active",
-                el.getAttribute("data-name") === safeName
+                el.getAttribute("data-name") === safeName,
               );
             });
           }
@@ -7415,7 +8675,7 @@
                   const sel = document.getElementById("configList");
                   if (!sel) return false;
                   const opt = Array.from(sel.options).find(
-                    (o) => o.value === name || o.text.trim() === name
+                    (o) => o.value === name || o.text.trim() === name,
                   );
                   if (opt) {
                     sel.value = opt.value;
@@ -7440,7 +8700,8 @@
             container.classList.remove("hidden");
             container.style.display = "flex";
           }
-          if (toggle) toggle.textContent = "Hide Options";
+          if (toggle)
+            toggle.textContent = tUi("ui.toggle.hideOptions", "Hide Options");
 
           closeDashboard();
         }
@@ -7448,6 +8709,14 @@
         window.setActiveCard = setActiveCard;
         window.selectConfigInDropdown = selectConfigInDropdown;
         gridEl.onclick = (e) => {
+          if (
+            window.__dashboardContextMenuOpen ||
+            window.__dashboardContextMenuIgnoreClick
+          ) {
+            closeDashboardContextMenu();
+            window.__dashboardContextMenuIgnoreClick = false;
+            return;
+          }
           const card = e.target.closest(".dash-card");
           if (!card) return;
           openCardFromDashboard(card);
@@ -7507,16 +8776,26 @@
                 state === "asc" ? "↑" : state === "desc" ? "↓" : "·";
             if (title) btn.title = title;
           };
-          setBtn("sort-name", st.name, "Sort by name (A→Z / Z→A / Off)");
+          setBtn(
+            "sort-name",
+            st.name,
+            tUi("title.sort-name-cycle", "Sort by name (A-Z / Z-A / Off)"),
+          );
           setBtn(
             "sort-progress",
             st.progress,
-            "Sort by progress (low→high / high→low / Off)"
+            tUi(
+              "title.sort-progress-cycle",
+              "Sort by progress (low-high / high-low / Off)",
+            ),
           );
           setBtn(
             "sort-time",
             st.updated,
-            "Sort by last updated (oldest→newest / newest→oldest / Off)"
+            tUi(
+              "title.sort-time-cycle",
+              "Sort by last updated (oldest-newest / newest-oldest / Off)",
+            ),
           );
         }
 
@@ -7529,7 +8808,7 @@
           const activeEl = grid.querySelector(".dash-card.active");
           const keepName = (focusedEl || activeEl)?.dataset?.name || null;
           const cardStates = Array.from(
-            grid.querySelectorAll(".dash-card")
+            grid.querySelectorAll(".dash-card"),
           ).map((card) => ({
             card,
             display: card.style.display,
@@ -7590,7 +8869,7 @@
           const newlyFocused = window.focusFirstVisibleDashCard?.();
           if (!newlyFocused && keepName) {
             const keepCard = grid.querySelector(
-              `.dash-card[data-name="${CSS.escape(keepName)}"]`
+              `.dash-card[data-name="${CSS.escape(keepName)}"]`,
             );
             if (keepCard) {
               setActiveCard(keepName);
@@ -7598,7 +8877,7 @@
               try {
                 __dashNav.index = Math.max(
                   0,
-                  getDashCards(false).indexOf(keepCard)
+                  getDashCards(false).indexOf(keepCard),
                 );
               } catch {}
             }
@@ -7624,6 +8903,10 @@
         document.addEventListener("keydown", (e) => {
           if (window.__unifiedNavActive) return;
           if (e.key !== "Escape") return;
+          if (window.__dashboardContextMenuOpen) {
+            closeDashboardContextMenu();
+            return;
+          }
           const settingsOpen = !document
             .getElementById("settingsMenu")
             ?.classList.contains("hidden");
@@ -7632,9 +8915,18 @@
         });
 
         window.api?.on?.("auto-select-config", (safeName) =>
-          setActiveCard(safeName)
+          setActiveCard(safeName),
         );
         window.api?.on?.("refresh-achievements-table", () => {});
+        let bootNoticeShown = false;
+        window.api?.on?.("boot:complete", () => {
+          if (bootNoticeShown) return;
+          bootNoticeShown = true;
+          showNotification(
+            tUi("notify.bootComplete", "Boot Complete!"),
+            "#4CAF50",
+          );
+        });
         window.api?.on?.("dashboard:poll-pause", (state) => {
           if (state) {
             pauseDashboardPoll();
@@ -7709,20 +9001,20 @@
           const zoom = Math.max(__effectiveZoom || 1, 0.01);
           viewport.width = Math.min(
             viewport.width,
-            __displayWorkArea.width / zoom
+            __displayWorkArea.width / zoom,
           );
           viewport.height = Math.min(
             viewport.height,
-            __displayWorkArea.height / zoom
+            __displayWorkArea.height / zoom,
           );
         } else if (window.visualViewport) {
           viewport.width = Math.min(
             viewport.width,
-            window.visualViewport.width
+            window.visualViewport.width,
           );
           viewport.height = Math.min(
             viewport.height,
-            window.visualViewport.height
+            window.visualViewport.height,
           );
         }
 
@@ -7751,11 +9043,11 @@
         const { width: vw, height: vh } = getViewportDimensions();
         const baseW = Math.min(
           __isMaximized ? 1600 : 1400,
-          Math.max(860, (__isMaximized ? 0.995 : 0.98) * vw)
+          Math.max(860, (__isMaximized ? 0.995 : 0.98) * vw),
         );
         const baseH = Math.min(
           __isMaximized ? 1180 : 1080,
-          Math.max(560, (__isMaximized ? 0.97 : 0.92) * vh)
+          Math.max(560, (__isMaximized ? 0.97 : 0.92) * vh),
         );
 
         let factor = 1;
@@ -7852,9 +9144,15 @@
               await buildDashboard();
             }
           } catch (e) {
-            console.warn("Failed to refresh configs on configs:changed:", e);
+            console.warn(
+              tUi(
+                "log.refreshConfigsOnChangedFailed",
+                "Failed to refresh configs on configs:changed:",
+              ),
+              e,
+            );
           }
-        }
+        },
       );
 
       window.api?.on?.("zoom-factor-changed", (z) => {
@@ -7868,7 +9166,7 @@
         __effectiveZoom = effectiveZoom;
         document.body.dataset.zoom = String(Math.round(__userZoom * 100));
         document.body.dataset.effectiveZoom = String(
-          Math.round(__effectiveZoom * 100)
+          Math.round(__effectiveZoom * 100),
         );
         const scaleFactor =
           __effectiveZoom > 0 ? __userZoom / __effectiveZoom : 1;
@@ -7911,7 +9209,7 @@
           refreshDisplayWorkArea();
           applyDashSize();
           applyDashSizeThrottled();
-        }
+        },
       );
 
       const zoomDd = document.getElementById("app-zoom-dropdown");
@@ -7920,10 +9218,10 @@
           const z = parseFloat(e.target.value) || 1;
           __userZoom = z;
           document.body.dataset.zoom = String(
-            Math.round((__userZoom || 1) * 100)
+            Math.round((__userZoom || 1) * 100),
           );
           document.body.dataset.effectiveZoom = String(
-            Math.round((__userZoom || 1) * 100)
+            Math.round((__userZoom || 1) * 100),
           );
           applyDashSize();
           applyDashSizeThrottled();
@@ -8012,11 +9310,11 @@
             const leftBound = Math.max(
               frame.left,
               Math.max(l1?.right || frame.left, l2?.right || frame.left) +
-                safety
+                safety,
             );
             const rightBound = Math.min(
               frame.right,
-              p?.left != null ? p.left - safety : frame.right
+              p?.left != null ? p.left - safety : frame.right,
             );
 
             // Width symmetrical around center so a centered bar never intrudes into button zones
@@ -8060,7 +9358,8 @@
           : base;
       }
 
-      window.api?.on?.("achievements:file-updated", async (payload) => {
+      const pendingFileUpdateRetry = new Map();
+      async function handleAchievementsFileUpdated(payload, isRetry = false) {
         try {
           const { appid, configName } = payload || {};
           const cfg =
@@ -8087,6 +9386,21 @@
             ? achData.achievements
             : [];
           const savedMap = saved?.achievements || {};
+          if (cfg) {
+            window.__clearDashboardSavedCache?.(cfg);
+          }
+
+          if (list.length && Object.keys(savedMap).length === 0) {
+            const attempts = pendingFileUpdateRetry.get(cfg) || 0;
+            if (!isRetry && attempts < 3) {
+              pendingFileUpdateRetry.set(cfg, attempts + 1);
+              setTimeout(() => {
+                handleAchievementsFileUpdated(payload, true);
+              }, 350);
+            }
+            return;
+          }
+          if (cfg) pendingFileUpdateRetry.delete(cfg);
 
           let unlocked = 0;
           for (const a of list) if (savedMap?.[a.name]?.earned) unlocked++;
@@ -8115,7 +9429,7 @@
             const scale = parseFloat(
               prefs.notificationScale ||
                 document.getElementById("scaleSlider")?.value ||
-                1
+                1,
             );
             const lang = prefs.language || window.currentLang || "english";
             const newlyEarned = list.filter((achievement) => {
@@ -8125,11 +9439,11 @@
             for (const achievement of newlyEarned) {
               const displayName = getSafeLocalizedText(
                 achievement.displayName,
-                lang
+                lang,
               );
               const description = getSafeLocalizedText(
                 achievement.description,
-                lang
+                lang,
               );
               const icon =
                 achievement.icon ||
@@ -8176,16 +9490,43 @@
                 namesKey,
                 JSON.stringify([
                   ...new Set([...prevNames, ...newlyEarned.map((a) => a.name)]),
-                ])
+                ]),
               );
               await window.loadLocalCover?.(String(appid));
             }
           }
           localStorage.setItem(K, String(unlocked));
+          if (
+            window.__dashboardOpen &&
+            typeof window.updateCardProgressUI === "function"
+          ) {
+            const card = document.querySelector(
+              `.dash-card[data-name="${CSS.escape(cfg)}"]`,
+            );
+            if (card) {
+              try {
+                await window.updateCardProgressUI(card, cfg);
+              } catch {}
+            } else if (typeof buildDashboard === "function") {
+              try {
+                await buildDashboard();
+              } catch {}
+            }
+          }
         } catch (e) {
-          console.warn("achievements:file-updated handler failed:", e);
+          console.warn(
+            tUi(
+              "log.achievementsFileUpdatedFailed",
+              "achievements:file-updated handler failed:",
+            ),
+            e,
+          );
         }
-      });
+      }
+      window.api?.on?.(
+        "achievements:file-updated",
+        handleAchievementsFileUpdated,
+      );
 
       // GLOBAL NAV MANAGER (keyboard + gamepad)
 
@@ -8198,7 +9539,7 @@
             return Array.from(grid.querySelectorAll(".dash-card")).filter(
               (el) =>
                 el.offsetParent !== null &&
-                getComputedStyle(el).display !== "none"
+                getComputedStyle(el).display !== "none",
             );
           }
           function gridCols() {
@@ -8331,14 +9672,14 @@
           const candidates = [];
 
           const focusContainer = focused?.closest(
-            ".tab-content, .settings-tabs-content, [data-scroll-container='1'], #dashboardBody, .modal-content"
+            ".tab-content, .settings-tabs-content, [data-scroll-container='1'], #dashboardBody, .modal-content",
           );
           if (focusContainer) candidates.push(focusContainer);
 
           if (overlay === "settings") {
             candidates.push(
               document.querySelector(".settings-tabs-content") ||
-                document.querySelector(".settings-content")
+                document.querySelector(".settings-content"),
             );
           } else if (overlay === "dashboard") {
             candidates.push(document.getElementById("dashboardBody"));
@@ -8352,8 +9693,8 @@
             if (main) candidates.push(main);
             candidates.push(
               document.querySelector(
-                "[data-scroll-container='1'], .scroll-container"
-              )
+                "[data-scroll-container='1'], .scroll-container",
+              ),
             );
             candidates.push(document.scrollingElement);
             candidates.push(document.documentElement);
@@ -8472,7 +9813,7 @@
               if (!wasRSRecently()) return;
 
               const hoverCard = document.querySelector(
-                "#dashboardGrid .dash-card:hover"
+                "#dashboardGrid .dash-card:hover",
               );
               if (hoverCard) return;
 
@@ -8501,7 +9842,7 @@
               window.focusFirstVisibleDashCard?.();
             });
           },
-          { passive: true }
+          { passive: true },
         );
 
         (function installScrollSourceMarkers() {
@@ -8535,7 +9876,7 @@
             (o) =>
               o.disabled ||
               o.value === "" ||
-              /^select$/i.test((o.text || "").trim())
+              /^select$/i.test((o.text || "").trim()),
           );
           if (idx < 0) idx = 0;
           return idx;
@@ -8603,7 +9944,7 @@
             const target = prevIdx >= 0 ? prevIdx : fallback;
             select.selectedIndex = Math.max(
               0,
-              Math.min(select.options.length - 1, target)
+              Math.min(select.options.length - 1, target),
             );
           }
 
@@ -8667,6 +10008,9 @@
           const settings = byId("settingsMenu");
           const dashboard = byId("dashboardOverlay");
           const config = byId("configModal");
+          const confirm = byId("appConfirmModal");
+          if (confirm && !confirm.classList.contains("hidden"))
+            return "confirm";
           if (settings && !settings.classList.contains("hidden"))
             return "settings";
           if (dashboard && dashboard.classList.contains("open"))
@@ -8678,7 +10022,7 @@
         window.focusablesIn = function focusablesIn(root) {
           if (!root) return [];
           const nodes = root.querySelectorAll(
-            'button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])'
+            'button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])',
           );
           return Array.from(nodes).filter((el) => {
             if (el.disabled) return false;
@@ -8772,7 +10116,7 @@
               .focusablesIn(activePanel)
               .filter((el) => !el.closest(".settings-tabs"))
               .filter(
-                (el) => !el.classList.contains("settings-close-button")
+                (el) => !el.classList.contains("settings-close-button"),
               )[0];
             (firstFocusable || activePanel)?.focus({ preventScroll: true });
           }
@@ -8793,7 +10137,7 @@
           if (!list.length) return;
           const cur = document.activeElement;
           let idx = list.findIndex(
-            (el) => el === cur || (cur && el.contains(cur))
+            (el) => el === cur || (cur && el.contains(cur)),
           );
           if (idx === -1) idx = delta > 0 ? -1 : 0;
           const next = list[(idx + delta + list.length) % list.length];
@@ -8813,14 +10157,14 @@
             const max = parseFloat(el.max || "100") || 100;
             const next = Math.max(
               min,
-              Math.min(max, Number(el.value) + step * dir)
+              Math.min(max, Number(el.value) + step * dir),
             );
             el.value = String(next);
             el.dispatchEvent(new Event("input", { bubbles: true }));
           } else if (el.tagName === "SELECT") {
             const i = Math.min(
               el.options.length - 1,
-              Math.max(0, el.selectedIndex + dir)
+              Math.max(0, el.selectedIndex + dir),
             );
             if (i !== el.selectedIndex) {
               el.selectedIndex = i;
@@ -8871,6 +10215,7 @@
           OPTIONS: "OPTIONS",
           CONFIG: "CONFIG",
           PLAY: "PLAY",
+          MENU: "MENU",
           SEARCH: "SEARCH",
         };
 
@@ -8974,7 +10319,7 @@
           if (t.tagName === "SELECT") {
             t.selectedIndex = Math.min(
               t.options.length - 1,
-              Math.max(0, t.selectedIndex + dir)
+              Math.max(0, t.selectedIndex + dir),
             );
             t.dispatchEvent(new Event("change"));
           } else if (t.type === "range") {
@@ -8983,7 +10328,7 @@
             const max = parseFloat(t.max || "100") || 100;
             const next = Math.max(
               min,
-              Math.min(max, Number(t.value) + step * dir)
+              Math.min(max, Number(t.value) + step * dir),
             );
             t.value = String(next);
             t.dispatchEvent(new Event("input"));
@@ -9018,6 +10363,70 @@
           }
 
           const focused = document.activeElement;
+          if (overlay === "dashboard" && window.__dashboardContextMenuOpen) {
+            if (action === A.BACK || action === A.MENU) {
+              window.closeDashboardContextMenu?.();
+              return;
+            }
+            if (action === A.CONFIRM) {
+              window.activateDashboardContextMenu?.();
+              return;
+            }
+            if (action === A.UP || action === A.LEFT) {
+              window.moveDashboardContextMenuFocus?.(-1);
+              return;
+            }
+            if (action === A.DOWN || action === A.RIGHT) {
+              window.moveDashboardContextMenuFocus?.(1);
+              return;
+            }
+          }
+          if (overlay === "confirm") {
+            if (action === A.BACK) {
+              closeAppConfirm(false);
+              return;
+            }
+            if (action === A.CONFIRM) {
+              const ok = document.getElementById("appConfirmOkBtn");
+              const cancel = document.getElementById("appConfirmCancelBtn");
+              const active = document.activeElement;
+              if (active === cancel) {
+                closeAppConfirm(false);
+                return;
+              }
+              if (active === ok) {
+                closeAppConfirm(true);
+                return;
+              }
+              if (
+                active &&
+                confirmModal &&
+                confirmModal.contains(active) &&
+                typeof active.click === "function"
+              ) {
+                active.click();
+                return;
+              }
+              closeAppConfirm(true);
+              return;
+            }
+            if (
+              action === A.LEFT ||
+              action === A.RIGHT ||
+              action === A.UP ||
+              action === A.DOWN
+            ) {
+              const ok = document.getElementById("appConfirmOkBtn");
+              const cancel = document.getElementById("appConfirmCancelBtn");
+              const active = document.activeElement;
+              if (active === ok && cancel) {
+                cancel.focus({ preventScroll: true });
+              } else if (ok) {
+                ok.focus({ preventScroll: true });
+              }
+              return;
+            }
+          }
           if (
             focused &&
             focused.tagName === "SELECT" &&
@@ -9027,7 +10436,7 @@
             const nextIndex = nextSelectableIndex(
               focused,
               focused.selectedIndex,
-              dir
+              dir,
             );
             if (nextIndex !== focused.selectedIndex) {
               focused.selectedIndex = nextIndex;
@@ -9076,6 +10485,12 @@
           if (action === A.OPTIONS) return toggleOptions();
           if (action === A.CONFIG) return openConfig();
           if (action === A.PLAY) return tryPlay();
+          if (action === A.MENU) {
+            if (overlay === "dashboard") {
+              return window.openDashboardContextMenuFromFocus?.();
+            }
+            return;
+          }
 
           if (overlay === "settings") {
             const mode = (window.__settingsMode ?? __settingsMode) || "tabs";
@@ -9193,7 +10608,7 @@
             (e.key === "Enter" && (e.ctrlKey || e.shiftKey)) ||
             e.key.toLowerCase() === "p";
           const recording = byId("overlay-shortcut-btn")?.classList?.contains(
-            "listening"
+            "listening",
           );
           const overlayNow = getActiveOverlaySafe();
           const allowSettingsNavKey =
@@ -9225,6 +10640,25 @@
             return;
           }
           if (recording && !special) return;
+
+          if (overlayNow === "dashboard" && window.__dashboardContextMenuOpen) {
+            if (["ArrowUp", "ArrowLeft"].includes(e.key)) {
+              e.preventDefault();
+              return route(A.UP);
+            }
+            if (["ArrowDown", "ArrowRight"].includes(e.key)) {
+              e.preventDefault();
+              return route(A.DOWN);
+            }
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              return route(A.CONFIRM);
+            }
+            if (e.key === "Escape" || e.key === "Backspace") {
+              e.preventDefault();
+              return route(A.BACK);
+            }
+          }
 
           // --- Select dropdown open/close (Main) ---
           try {
@@ -9269,6 +10703,13 @@
           if (e.key === "F3") {
             e.preventDefault();
             return route(A.OPTIONS);
+          }
+          if (
+            overlayNow === "dashboard" &&
+            (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10"))
+          ) {
+            e.preventDefault();
+            return route(A.MENU);
           }
           if (
             !isTypingTarget(e.target) &&
@@ -9363,7 +10804,7 @@
             : [];
           const pad = pads[0];
           const recording = byId("overlay-shortcut-btn")?.classList?.contains(
-            "listening"
+            "listening",
           );
           const windowActive =
             typeof document.hasFocus === "function"
@@ -9389,6 +10830,8 @@
             const D = !!pad.buttons?.[13]?.pressed;
             const L = !!pad.buttons?.[14]?.pressed;
             const R = !!pad.buttons?.[15]?.pressed;
+            const TPbtn = !!pad.buttons?.[17]?.pressed; //Touchopad button
+            const XBbtn = !!pad.buttons?.[16]?.pressed; //Guide/Xbox button
             const lx = pad.axes?.[0] || 0;
             const ly = pad.axes?.[1] || 0;
             const rx = pad.axes?.[2] || 0; // Right Stick X
@@ -9410,13 +10853,19 @@
             // Global shortcuts
             const overlay = getActiveOverlaySafe?.() || "main";
             if (edge("SEL", SEL)) route(A.SETTINGS);
-            if (edge("Y", Ybtn)) route(A.DASHBOARD);
+            if (edge("TPbtn", TPbtn)) route(A.DASHBOARD);
+            if (edge("GUIDE", XBbtn)) route(A.DASHBOARD);
             if (edge("B", Bbtn)) route(A.BACK);
             if (edge("X", Xbtn)) {
               if (overlay === "main") {
                 route(A.OPTIONS);
               } else if (overlay === "dashboard") {
                 route(A.SEARCH);
+              }
+            }
+            if (edge("Y", Ybtn)) {
+              if (overlay === "dashboard") {
+                route(A.MENU);
               }
             }
             if (edge("START", START)) route(A.PLAY);
@@ -9459,7 +10908,7 @@
             document.removeEventListener(
               "keydown",
               window.__globalKeyHandler,
-              true
+              true,
             );
           }
           document.addEventListener("keydown", onKeyDown, {

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" class="tray-menu-html">
   <head>
     <meta charset="UTF-8" />
@@ -9,15 +9,32 @@
   </head>
   <body class="tray-menu-body">
     <div class="tray-menu">
-      <button class="tray-menu__item" data-action="show">Show</button>
-      <button class="tray-menu__item" data-action="settings">Settings</button>
       <button
+        id="trayMenuShow"
+        class="tray-menu__item"
+        data-action="show"
+        data-i18n="trayMenuShow"
+      >
+        Show
+      </button>
+      <button
+        id="trayMenuSettings"
+        class="tray-menu__item"
+        data-action="settings"
+        data-i18n="trayMenuSettings"
+      >
+        Settings
+      </button>
+      <button
+        id="trayMenuQuit"
         class="tray-menu__item tray-menu__item--danger"
         data-action="quit"
+        data-i18n="trayMenuQuit"
       >
         Quit
       </button>
     </div>
+    <script src="utils/i18n-ui.js"></script>
     <script src="tray-menu.js"></script>
   </body>
 </html>

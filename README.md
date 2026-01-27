@@ -175,6 +175,47 @@ Creates a standalone `.exe` installer in the `dist/` folder.
 
 **Note**: Auto-configuration uses the Steam Web API when a key is provided in Settings. Without a key, it falls back to SteamDB/SteamHunters (English only).
 
+#### Xenia-Canary Support
+
+1. Open Xenia and create a User Profile.
+2. Use **Watched Folders** add the 'Xenia Location'\Content/xxxxxx/xxxx/xxxx/xxxxxx' folder which is created after the Account is created in Xenia.
+3. Start and play the game.
+4. The app will:
+   - read the file Xenia created,
+   - fetch game name, schema and images.
+   - generate configs automatically.
+   - when new achievement is unlocked display the notifications.
+
+#### RPCS3 Support
+
+1. Use **Watched Folders** add the 'RPCS3 Location\dev_hdd0\home\xxxxxxx\trophy' folder which is created after the RPCS3 is configured.
+2. Start and play the game.
+3. The app will:
+   - read the file RPCS3 created,
+   - fetch game name, schema and images.
+   - generate configs automatically.
+   - when new achievement is unlocked display the notifications.
+
+#### ShadPS4 Support
+
+1. Use **Watched Folders** add the 'C:\Users\YourName\AppData\Roaming\shadPS4\game_data' folder which is created after the ShadPS4 is configured.
+2. Start and play the game.
+3. The app will:
+   - read the file ShadPS4 created,
+   - fetch game name, schema and images.
+   - generate configs automatically.
+   - when new achievement is unlocked display the notifications.
+
+#### Steam Official Support
+
+1. Use **Watched Folders** add the 'C:\Program Files (x86)\Steam\appcache\stats' folder.
+2. Start and play the game via Steam.
+3. The app will:
+   - read the file Steam created,
+   - fetch game name, schema and images.
+   - generate configs automatically.
+   - when new achievement is unlocked display the notifications.
+
 ### Dashboard
 
 - Press the "Show Dashboard" button to access the game grid
@@ -206,17 +247,41 @@ Creates a standalone `.exe` installer in the `dist/` folder.
 
 ### Keyboard & Controller Navigation
 
-- **Keyboard shortcuts**
-  - `Esc` / `Backspace` backs out of the current overlay or clears the selected config.
-  - `F1` / `Ctrl+O` opens Settings; `F2` / `Ctrl+D` toggles the Dashboard; `F3` Show/Hide the Options panel.
-  - `Ctrl+F` focuses dashboard search, `P` or `Ctrl/Shift + Enter` launch the currently selected game.
-  - Arrow keys, `Home`, `End`, and `Enter` drive focus inside lists, dashboard cards, and settings panels.
-  - `PageUp` / `PageDown` perform full-page scrolling; `Alt+1/2/3` change dashboard sorting while it is open.
-- **Controller support**
-  - D-pad or left stick moves focus; `A` confirms, `B` backs out, `Y` opens the Dashboard, `X` Show/Hide Options/search on Dashboard.
-  - `Select/Back` toggles Settings, `Start/Options` launches the active game.
-  - `LB`/`RB` cycle settings tabs, `LB`/`RB`/`R3` cycle dashboard sort modes when the dashboard overlay is active.
-  - Right stick provides smooth scrolling; triggers respect repeat delays so hold-to-scroll feels natural.
+- **Global**
+  - Settings: `F1` / `Ctrl+O`; Controller: Xbox View, PlayStation Share.
+  - Dashboard: `F2` / `Ctrl+D`; Controller: Xbox Button, PlayStation Touchpad or PS.
+  - Show/Hide Options panel (Dashboard): Context Menu key or `Shift+F10`; Controller: Xbox Y, PlayStation ⃤⃤.
+  - Show/Hide Options panel (Main): `F3`; Controller: Xbox X, PlayStation ☐.
+  - Back/Close: `Esc` / `Backspace`; Controller: Xbox B, PlayStation ◯.
+  - Play (launch): `P` / `Ctrl+Enter` / `Shift+Enter`; Controller: Xbox Menu, PlayStation Options.
+  - Confirm/Activate: `Enter` / `Space`; Controller: Xbox A, PlayStation ✕.
+  - Page scroll: `PageUp` / `PageDown`; Controller: Right Stick (RS).
+  - Move focus: Arrow keys; Controller: D-pad or Left Stick (LS).
+- **Dashboard**
+  - Grid navigation: Arrow keys, `Home`, `End`, `PageUp`, `PageDown`; Controller: D-pad or LS.
+  - Search: `Ctrl+F`; Controller: Xbox X, PlayStation ☐.
+  - In search: `Enter` / A / ✕ opens first visible card; Down Arrow moves focus to first card; `Esc` / B / ◯ closes Dashboard.
+  - Open game (select card): `Enter`; Controller: A / ✕.
+  - Show/Hide Options panel (Dashboard): Context Menu key or `Shift+F10`; Controller: Xbox Y, PlayStation ⃤⃤.
+  - Play from card: Click Play; `P` / `Ctrl+Enter` / `Shift+Enter`; Controller: Menu / Options (if executable).
+  - Sort cycles: `Alt+1` (Name), `Alt+2` (Progress), `Alt+3` (Last Updated); Controller: L3 / RB / LB (Xbox), L3 / R1 / L1 (PlayStation).
+- **Settings panel**
+  - Open/Close: `F1` / `Ctrl+O`; Controller: View / Share.
+  - Tabs mode: Up/Down move; `Enter` select; `Esc` close; Controller: D-pad or RS move; A / ✕ select; B / ◯ close.
+  - Section mode: Up/Down focus; Left/Right adjust; `Enter` activate; `Esc` back to Tabs; Controller: D-pad or LS focus; A / ✕ activate; B / ◯ back.
+  - Cycle tabs: Controller LB/RB (Xbox) or L1/R1 (PlayStation).
+- **Main screen**
+  - Toggle Options: `F3`; Controller: Xbox X, PlayStation ☐.
+  - Create New Config: `Ctrl+N`.
+  - Move: Up/Down; Controller: D-pad or LS.
+  - Play: `P` / `Ctrl+Enter` / `Shift+Enter`; Controller: Menu / Options.
+- **Drop-downs**
+  - Open: `Enter`.
+  - While open: Up/Down/Left/Right navigate; `Enter` confirm; `Esc` / `Backspace` cancel; Controller: D-pad navigate; A / ✕ confirm; B / ◯ cancel.
+  - While closed: Left/Right cycles options; Controller: D-pad Left/Right.
+- **Notes**
+  - Right Stick scrolling uses smooth scrolling on the active scrollable area.
+  - Back is contextual: Settings Section -> Tabs; Settings Tabs -> Close; Dashboard -> Close; Config modal -> Close; Main with a selected config -> Clear selection/back.
 
 ### Game Compatibility
 
@@ -227,8 +292,7 @@ Creates a standalone `.exe` installer in the `dist/` folder.
 
 ### Videos
 
-https://youtu.be/fsqoKiMGLkw
-https://youtu.be/nOoiU5lPopM
+https://youtu.be/fsqoKiMGLkw | https://youtu.be/nOoiU5lPopM | https://youtu.be/KwRUo53VTho
 
 ## 👤 Author
 

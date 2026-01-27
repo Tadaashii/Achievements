@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -226,7 +226,7 @@
   <body>
     <div class="overlay-container">
       <div class="overlay-header">
-        <h2>Achievements</h2>
+        <h2 id="overlayTitle">Achievements</h2>
         <div id="achievement-count" class="stats-item">
           <i class="fas fa-trophy"></i>
           <span class="value">0/0</span>
@@ -236,7 +236,7 @@
       <div class="overlay-stats">
         <div class="stats-item">
           <i class="fas fa-chart-simple"></i>
-          <span>Completion:</span>
+          <span id="overlayCompletionLabel">Completion:</span>
           <span id="completion-percentage" class="value">0%</span>
         </div>
         <div class="progress-bar">
@@ -246,7 +246,7 @@
 
       <div id="empty-state" class="empty-state">
         <i class="fas fa-gamepad"></i>
-        <div class="empty-state-message">
+        <div id="overlayEmptyMessage" class="empty-state-message">
           Select a game configuration to view achievements
         </div>
       </div>
@@ -254,9 +254,15 @@
       <ul id="achievements-list" class="achievements-list"></ul>
     </div>
 
+    <script src="utils/i18n-ui.js"></script>
     <script>
       let overlayLang = "english";
+      let overlayUiLang = "english";
       let overlayPrefs = null;
+      const tUi = (key, fallback) =>
+        window.i18nUi && typeof window.i18nUi.getString === "function"
+          ? window.i18nUi.getString(key, fallback)
+          : fallback;
 
       async function loadOverlayPrefs() {
         if (overlayPrefs) return overlayPrefs;
@@ -306,20 +312,33 @@
         tryNext();
       }
 
+      async function applyOverlayLanguage() {
+        const prefs = await loadOverlayPrefs();
+        const lang = prefs?.uiLanguage || prefs?.language || "english";
+        overlayUiLang = String(lang || "english");
+        if (
+          window.i18nUi &&
+          typeof window.i18nUi.setUiLanguage === "function"
+        ) {
+          await window.i18nUi.setUiLanguage(overlayUiLang);
+        }
+      }
+
       function getSafeLocalizedText(input, lang = "english") {
-        if (!input) return "Hidden";
-        if (typeof input === "string") return input.trim() || "Hidden";
+        const hiddenFallback = tUi("overlay.hiddenFallback", "Hidden");
+        if (!input) return hiddenFallback;
+        if (typeof input === "string") return input.trim() || hiddenFallback;
         if (typeof input === "object") {
           return (
             input[lang] ||
             input.english ||
             Object.values(input).find(
-              (v) => typeof v === "string" && v.trim() !== ""
+              (v) => typeof v === "string" && v.trim() !== "",
             ) ||
-            "Hidden"
+            hiddenFallback
           );
         }
-        return "Hidden";
+        return hiddenFallback;
       }
 
       function normalizeEarnedTime(raw) {
@@ -331,9 +350,11 @@
 
       function formatTimestamp(timestamp) {
         const ms = normalizeEarnedTime(timestamp);
-        if (!ms) return "N/A";
+        if (!ms) return tUi("overlay.notAvailable", "N/A");
         const d = new Date(ms);
-        return isNaN(d) ? "N/A" : d.toLocaleString();
+        return isNaN(d)
+          ? tUi("overlay.notAvailable", "N/A")
+          : d.toLocaleString();
       }
 
       function computeAchievementsHash(achievements, saved, lang) {
@@ -376,9 +397,8 @@
         document
           .getElementById("achievement-count")
           .querySelector(".value").textContent = `${unlocked}/${total}`;
-        document.getElementById(
-          "completion-percentage"
-        ).textContent = `${percentage}%`;
+        document.getElementById("completion-percentage").textContent =
+          `${percentage}%`;
       }
 
       async function loadAchievements(configName) {
@@ -395,12 +415,11 @@
         pendingConfigName = null;
 
         try {
-          const achievementsDataObj = await window.api.loadAchievementData(
-            configName
-          );
-          const savedAchievementsObj = await window.api.loadSavedAchievements(
-            configName
-          );
+          await applyOverlayLanguage();
+          const achievementsDataObj =
+            await window.api.loadAchievementData(configName);
+          const savedAchievementsObj =
+            await window.api.loadSavedAchievements(configName);
           const lang = overlayLang;
           const prefs = await loadOverlayPrefs();
 
@@ -416,7 +435,7 @@
           const newHash = computeAchievementsHash(
             achievementsDataObj.achievements,
             savedAchievementsObj,
-            lang
+            lang,
           );
           if (pendingConfigName && pendingConfigName !== configName) return;
 
@@ -454,36 +473,42 @@
             return bUnlocked - aUnlocked;
           });
 
-            achievements.forEach((achievement) => {
-              const displayName = getSafeLocalizedText(
-                achievement.displayName,
-                lang
-              );
+          achievements.forEach((achievement) => {
+            const displayName = getSafeLocalizedText(
+              achievement.displayName,
+              lang,
+            );
             const description = getSafeLocalizedText(
               achievement.description,
-              lang
+              lang,
             );
             const iconGray = achievement.icon_gray || achievement.icongray;
             const icon = achievement.icon || iconGray;
             const isHidden = Number(achievement.hidden) === 1;
 
-              let statusHTML = `<div class="status-locked"><i class="fas fa-lock"></i> Locked</div>`;
-              let earnedTimeHTML = "";
-              let progressHTML = "";
-              const saved =
-                savedAchievementsObj?.achievements?.[achievement.name];
-              const isUnlocked = !!saved?.earned;
-              const rel = isUnlocked ? icon : iconGray;
-              const showHidden = prefs?.showHiddenDescription === true;
-              const descText =
-                isHidden && !isUnlocked && !showHidden
-                  ? "Hidden"
-                  : description;
+            let statusHTML = `<div class="status-locked"><i class="fas fa-lock"></i> ${tUi(
+              "overlay.statusLocked",
+              "Locked",
+            )}</div>`;
+            let earnedTimeHTML = "";
+            let progressHTML = "";
+            const saved =
+              savedAchievementsObj?.achievements?.[achievement.name];
+            const isUnlocked = !!saved?.earned;
+            const rel = isUnlocked ? icon : iconGray;
+            const showHidden = prefs?.showHiddenDescription === true;
+            const descText =
+              isHidden && !isUnlocked && !showHidden
+                ? tUi("overlay.hiddenFallback", "Hidden")
+                : description;
 
-              if (saved?.earned) {
-                statusHTML = `<div class="status-unlocked"><i class="fas fa-unlock"></i> Unlocked</div>`;
-                earnedTimeHTML = `<div class="achievement-time">${formatTimestamp(
-                  saved.earned_time
+            if (saved?.earned) {
+              statusHTML = `<div class="status-unlocked"><i class="fas fa-unlock"></i> ${tUi(
+                "overlay.statusUnlocked",
+                "Unlocked",
+              )}</div>`;
+              earnedTimeHTML = `<div class="achievement-time">${formatTimestamp(
+                saved.earned_time,
               )}</div>`;
             }
 
@@ -494,11 +519,11 @@
             ) {
               const progressPercentage = Math.min(
                 100,
-                Math.round((saved.progress / saved.max_progress) * 100)
+                Math.round((saved.progress / saved.max_progress) * 100),
               );
               progressHTML = `
                     <div class="achievement-progress">
-                    Progress: ${saved.progress} / ${saved.max_progress}
+                    ${tUi("overlay.progressLabel", "Progress")}: ${saved.progress} / ${saved.max_progress}
                     <div class="progress-bar" style="margin-top: 4px; height: 4px;">
                         <div class="progress-fill" style="width: ${progressPercentage}%;"></div>
                     </div>
@@ -535,8 +560,32 @@
         }
       }
 
-      window.api.onSetLanguage((lang) => {
-        overlayLang = lang;
+      window.api.onSetLanguage((payload) => {
+        let uiLanguageChanged = false;
+        if (payload && typeof payload === "object") {
+          if (payload.language) {
+            overlayLang = payload.language;
+          }
+          if (payload.uiLanguage) {
+            overlayUiLang = String(payload.uiLanguage || "english");
+            uiLanguageChanged = true;
+            overlayPrefs = {
+              ...(overlayPrefs || {}),
+              uiLanguage: overlayUiLang,
+            };
+            if (
+              window.i18nUi &&
+              typeof window.i18nUi.setUiLanguage === "function"
+            ) {
+              window.i18nUi.setUiLanguage(overlayUiLang);
+            }
+          }
+        } else {
+          overlayLang = payload;
+        }
+        if (uiLanguageChanged) {
+          currentDataHash = null;
+        }
         if (currentConfigName) {
           loadAchievements(currentConfigName);
         }

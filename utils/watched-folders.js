@@ -5,10 +5,41 @@ const path = require("path");
 const chokidar = require("chokidar");
 const { createLogger } = require("./logger");
 const { normalizePlatform } = require("./config-platform-migrator");
+const { parseGpdFile, buildSnapshotFromGpd } = require("./xenia-gpd");
+const {
+  generateConfigFromGpd,
+  updateSchemaFromGpd,
+} = require("./xenia-config-generator");
+const {
+  parseTrophySetDir,
+  buildSnapshotFromTrophy,
+} = require("./rpcs3-trophy");
+const {
+  generateConfigFromTrophyDir,
+  updateSchemaFromTrophy,
+} = require("./rpcs3-config-generator");
+const {
+  generateConfigFromPs4Dir,
+  updateSchemaFromPs4,
+  buildSnapshotFromPs4,
+} = require("./shadps4-config-generator");
+const { generateConfigFromAppcacheBin } = require("./steam-appcache-generator");
+const {
+  parseKVBinary: parseSteamKv,
+  extractUserStats,
+  buildSnapshotFromAppcache,
+  pickLatestUserBin,
+} = require("./steam-appcache");
+const { parsePs4TrophySetDir } = require("./shadps4-trophy");
+const { sanitizeConfigName } = require("./playtime-store");
 
 const watcherLogger = createLogger("watcher");
 function isAppIdName(name) {
   return /^[0-9a-fA-F]+$/.test(String(name || ""));
+}
+function isRpcs3TempFolderName(name) {
+  const value = String(name || "").toLowerCase();
+  return /(?:\$|\uFF04)temp(?:\$|\uFF04)/.test(value);
 }
 const {
   loadAchievementsFromSaveFile,
@@ -31,16 +62,82 @@ function coercePath(input) {
 }
 
 function waitForFileExists(fp, tries = 50, delay = 60) {
-    return new Promise((resolve) => {
-      const tick = (n) => {
-        try {
-          if (fs.existsSync(fp)) return resolve(true);
-        } catch {}
+  return new Promise((resolve) => {
+    const tick = (n) => {
+      try {
+        if (fs.existsSync(fp)) return resolve(true);
+      } catch {}
       if (n <= 0) return resolve(false);
       setTimeout(() => tick(n - 1), delay);
     };
     tick(tries);
   });
+}
+
+function resolveXeniaImageId(parsedGpd, achKey) {
+  if (!parsedGpd?.achievements?.length) return null;
+  const id = Number(achKey);
+  if (!Number.isFinite(id)) return null;
+  const hit = parsedGpd.achievements.find((a) => a.achievementId === id);
+  return hit ? hit.imageId : null;
+}
+
+async function waitForXeniaAchievementIcon(meta, achKey, imageId, parsedGpd) {
+  if (!meta?.config_path) return false;
+  if (imageId === undefined || imageId === null) return false;
+  const iconPath = path.join(meta.config_path, "img", `${imageId}.png`);
+  if (fs.existsSync(iconPath)) return true;
+
+  const gpdPath = resolveGpdPathForMeta(meta);
+  if (!gpdPath || !fs.existsSync(gpdPath)) return false;
+
+  watcherLogger.info("xenia:notify:wait-icon", {
+    appid: String(meta?.appid || ""),
+    config: meta?.name || null,
+    achievement: String(achKey),
+    imageId: String(imageId),
+    iconPath,
+  });
+
+  const maxAttempts = 120;
+  const delayMs = 100;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    let parsed = null;
+    if (attempt === 0 && parsedGpd) {
+      parsed = parsedGpd;
+    } else {
+      try {
+        parsed = parseGpdFile(gpdPath);
+      } catch {
+        parsed = null;
+      }
+    }
+    if (parsed) {
+      try {
+        updateSchemaFromGpd(meta.config_path, parsed);
+      } catch {}
+    }
+    if (fs.existsSync(iconPath)) {
+      watcherLogger.info("xenia:notify:icon-ready", {
+        appid: String(meta?.appid || ""),
+        config: meta?.name || null,
+        achievement: String(achKey),
+        imageId: String(imageId),
+        attempt: attempt + 1,
+      });
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+
+  watcherLogger.warn("xenia:notify:icon-timeout", {
+    appid: String(meta?.appid || ""),
+    config: meta?.name || null,
+    achievement: String(achKey),
+    imageId: String(imageId),
+    iconPath,
+  });
+  return false;
 }
 
 const DEFAULT_WATCH_ROOTS = (() => {
@@ -77,7 +174,7 @@ const DEFAULT_WATCH_SET = new Set(
     } catch {
       return p;
     }
-  })
+  }),
 );
 
 module.exports = function makeWatchedFolders({
@@ -110,6 +207,9 @@ module.exports = function makeWatchedFolders({
   const pendingSavePathIndex = new Map(); // appid -> Set(path)
   const appidSaveWatchers = new Map(); // appid -> Map(configName, watcher)
   const pendingInitialNotify = new Set(); // config names needing one-shot notify after seed
+  const missingRoots = new Set(); // watched folders missing on disk
+  const pendingSteamOfficial = new Map(); // appid -> { statsDir, firstSeen }
+  let missingRootTimer = null;
   const persistPreferences =
     typeof updatePreferences === "function" ? updatePreferences : null;
   const justUnblocked = new Set(); // appids recently removed from blacklist
@@ -162,7 +262,8 @@ module.exports = function makeWatchedFolders({
     }
     const name = meta?.name;
     if (!name) return;
-    const appidKey = normalizeAppIdValue(meta?.appid) || String(meta?.appid || "");
+    const appidKey =
+      normalizeAppIdValue(meta?.appid) || String(meta?.appid || "");
     if (appidKey && suppressAutoSelect.has(appidKey)) {
       watcherLogger.info("auto-select:skip-suppressed-app", {
         config: name,
@@ -171,7 +272,9 @@ module.exports = function makeWatchedFolders({
       return;
     }
     if (suppressAutoSelectByConfig.has(name)) {
-      watcherLogger.info("auto-select:skip-suppressed-config", { config: name });
+      watcherLogger.info("auto-select:skip-suppressed-config", {
+        config: name,
+      });
       return;
     }
     if (autoSelectEmitted.has(name)) {
@@ -214,10 +317,7 @@ module.exports = function makeWatchedFolders({
     } catch {}
     // Allow re-emit later if UI did not pick it up yet
     setTimeout(() => {
-      if (
-        pendingAutoSelect.has(name) &&
-        !isConfigActive?.(name)
-      ) {
+      if (pendingAutoSelect.has(name) && !isConfigActive?.(name)) {
         autoSelectEmitted.delete(name);
         pendingAutoSelect.delete(name);
       }
@@ -231,7 +331,8 @@ module.exports = function makeWatchedFolders({
       watcherLogger.info("auto-select:enqueue-skip-timer", { config: name });
       return;
     }
-    const appidKey = normalizeAppIdValue(meta.appid) || String(meta.appid || "");
+    const appidKey =
+      normalizeAppIdValue(meta.appid) || String(meta.appid || "");
     if (appidKey && suppressAutoSelect.has(appidKey)) {
       watcherLogger.info("auto-select:enqueue-skip-suppressed-app", {
         config: name,
@@ -400,7 +501,7 @@ module.exports = function makeWatchedFolders({
                   normalizedSavePath: task.normalizedPath || "",
                   __savePathOverride: task.__savePathOverride || null,
                   __emu: task.__emu || null,
-                }
+                },
               );
               if (created) generated.add(String(task.appid));
             } catch {
@@ -426,8 +527,7 @@ module.exports = function makeWatchedFolders({
       return {};
     }
   }
-  function getWatchedFolders(options = {}) {
-    const { includeMeta = false } = options;
+  function collectWatchedFolderEntries() {
     const prefs = readPrefsSafe();
     const userFolders = Array.isArray(prefs.watchedFolders)
       ? prefs.watchedFolders
@@ -445,7 +545,6 @@ module.exports = function makeWatchedFolders({
           return false;
         }
       })();
-      if (!exists) return;
       seen.set(real, {
         path: real,
         blocked: blocked.has(real),
@@ -453,10 +552,28 @@ module.exports = function makeWatchedFolders({
         isDefault: DEFAULT_WATCH_SET.has(real),
       });
     });
-    const collect = Array.from(seen.values());
+    return Array.from(seen.values());
+  }
+
+  function updateMissingRoots(entries) {
+    missingRoots.clear();
+    for (const entry of entries || []) {
+      if (!entry?.path || entry.blocked || entry.exists) continue;
+      missingRoots.add(entry.path);
+    }
+    if (missingRoots.size) startMissingRootPoller();
+    else stopMissingRootPoller();
+  }
+
+  function getWatchedFolders(options = {}) {
+    const { includeMeta = false } = options;
+    const collect = collectWatchedFolderEntries();
+    updateMissingRoots(collect);
 
     if (includeMeta) return collect;
-    return collect.filter((entry) => !entry.blocked).map((entry) => entry.path);
+    return collect
+      .filter((entry) => entry.exists && !entry.blocked)
+      .map((entry) => entry.path);
   }
 
   function saveWatchedFolders(list) {
@@ -478,7 +595,7 @@ module.exports = function makeWatchedFolders({
       const cur = readPrefsSafe();
       fs.writeFileSync(
         preferencesPath,
-        JSON.stringify({ ...cur, watchedFolders: uniq }, null, 2)
+        JSON.stringify({ ...cur, watchedFolders: uniq }, null, 2),
       );
       return uniq;
     } catch (e) {
@@ -499,7 +616,9 @@ module.exports = function makeWatchedFolders({
     const current = getUserWatchedFoldersRaw().map(normalizePrefPath);
     if (!current.includes(oldNorm)) return false;
     const next = Array.from(
-      new Set(current.map((p) => (p === oldNorm ? newNorm : p)).filter(Boolean))
+      new Set(
+        current.map((p) => (p === oldNorm ? newNorm : p)).filter(Boolean),
+      ),
     );
     try {
       if (persistPreferences) {
@@ -508,7 +627,7 @@ module.exports = function makeWatchedFolders({
         const prefs = readPrefsSafe();
         fs.writeFileSync(
           preferencesPath,
-          JSON.stringify({ ...prefs, watchedFolders: next }, null, 2)
+          JSON.stringify({ ...prefs, watchedFolders: next }, null, 2),
         );
       }
       stopFolderWatcher(oldNorm);
@@ -553,6 +672,59 @@ module.exports = function makeWatchedFolders({
     }
   };
 
+  function stopMissingRootPoller() {
+    if (!missingRootTimer) return;
+    clearInterval(missingRootTimer);
+    missingRootTimer = null;
+  }
+
+  function startMissingRootPoller() {
+    if (missingRootTimer) return;
+    missingRootTimer = setInterval(() => {
+      try {
+        pollMissingRoots();
+      } catch {}
+    }, 4000);
+  }
+
+  function markMissingRoot(root) {
+    const normalized = normalizePrefPath(root);
+    if (!normalized) return;
+    const blocked = getBlockedFoldersSet();
+    if (blocked.has(normalized)) return;
+    missingRoots.add(normalized);
+    startMissingRootPoller();
+  }
+
+  function pollMissingRoots() {
+    const entries = collectWatchedFolderEntries();
+    const nextMissing = new Set();
+    const newlyAvailable = [];
+
+    for (const entry of entries) {
+      if (!entry?.path || entry.blocked) continue;
+      if (!entry.exists) {
+        nextMissing.add(entry.path);
+      } else if (missingRoots.has(entry.path)) {
+        newlyAvailable.push(entry.path);
+      }
+    }
+
+    missingRoots.clear();
+    for (const p of nextMissing) missingRoots.add(p);
+
+    if (!missingRoots.size) stopMissingRootPoller();
+
+    for (const root of newlyAvailable) {
+      try {
+        startFolderWatcher(root, { initialScan: false });
+      } catch {}
+      try {
+        scanRootOnce(root, { suppressInitialNotify: true });
+      } catch {}
+    }
+  }
+
   function escapeRegex(str) {
     return String(str || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
@@ -576,10 +748,13 @@ module.exports = function makeWatchedFolders({
     const escapedId = escapeRegex(appid);
     if (appid) {
       suffixes.push(
-        new RegExp(`${sepPattern}remote${sepPattern}${escapedId}$`, "i")
+        new RegExp(`${sepPattern}remote${sepPattern}${escapedId}$`, "i"),
       );
       suffixes.push(
-        new RegExp(`${sepPattern}steam_settings${sepPattern}${escapedId}$`, "i")
+        new RegExp(
+          `${sepPattern}steam_settings${sepPattern}${escapedId}$`,
+          "i",
+        ),
       );
       suffixes.push(new RegExp(`${sepPattern}${escapedId}$`, "i"));
     }
@@ -594,6 +769,279 @@ module.exports = function makeWatchedFolders({
     }
     return trimmed.replace(new RegExp(`${sepPattern}$`), "");
   };
+
+  function isXeniaMeta(meta) {
+    return normalizePlatform(meta?.platform) === "xenia";
+  }
+
+  function isRpcs3Meta(meta) {
+    return normalizePlatform(meta?.platform) === "rpcs3";
+  }
+  function isSteamOfficialMeta(meta) {
+    return normalizePlatform(meta?.platform) === "steam-official";
+  }
+
+  function isPs4Meta(meta) {
+    return normalizePlatform(meta?.platform) === "shadps4";
+  }
+
+  function parseSteamOfficialBinInfo(filePath) {
+    if (!filePath) return null;
+    const base = path.basename(filePath);
+    const schemaMatch = base.match(/^UserGameStatsSchema_(\d+)\.bin$/i);
+    if (schemaMatch) {
+      const appid = schemaMatch[1];
+      return {
+        appid,
+        kind: "schema",
+        statsDir: path.dirname(filePath),
+        schemaBinPath: filePath,
+        userBinPath: null,
+      };
+    }
+    const userMatch = base.match(/^UserGameStats_.+_(\d+)\.bin$/i);
+    if (userMatch) {
+      const appid = userMatch[1];
+      return {
+        appid,
+        kind: "user",
+        statsDir: path.dirname(filePath),
+        schemaBinPath: path.join(
+          path.dirname(filePath),
+          `UserGameStatsSchema_${appid}.bin`,
+        ),
+        userBinPath: filePath,
+      };
+    }
+    return null;
+  }
+
+  function getSteamOfficialMetaByAppId(appid) {
+    const metas = getConfigMetas(appid);
+    return metas.find((meta) => isSteamOfficialMeta(meta)) || null;
+  }
+
+  function hasSteamOfficialSchema(appid) {
+    const meta = getSteamOfficialMetaByAppId(appid);
+    if (meta) {
+      const schemaPath = resolveAchievementsSchemaPath(meta);
+      if (schemaPath && fs.existsSync(schemaPath)) return true;
+    }
+    const fallback = path.join(
+      configsDir,
+      "schema",
+      "steam-official",
+      String(appid),
+      "achievements.json",
+    );
+    return fs.existsSync(fallback);
+  }
+
+  function shouldSkipSteamOfficialGeneration(appid) {
+    const meta = getSteamOfficialMetaByAppId(appid);
+    return !!meta && hasSteamOfficialSchema(appid);
+  }
+
+  function resolveGpdPathForMeta(meta) {
+    if (!meta) return "";
+    const direct = typeof meta.gpd_path === "string" ? meta.gpd_path : "";
+    if (direct && fs.existsSync(direct)) return direct;
+    const base = meta.save_path || "";
+    const appid = String(meta.appid || "").trim();
+    if (base && appid) {
+      const candidate = path.join(base, `${appid}.gpd`);
+      if (fs.existsSync(candidate)) return candidate;
+    }
+    if (base) {
+      try {
+        const files = fs.readdirSync(base);
+        const found = files.find((f) => f.toLowerCase().endsWith(".gpd"));
+        if (found) return path.join(base, found);
+      } catch {}
+    }
+    return base && appid ? path.join(base, `${appid}.gpd`) : "";
+  }
+
+  function resolveRpcs3TrophyDirForMeta(meta) {
+    if (!meta) return "";
+    const direct =
+      typeof meta.trophy_path === "string"
+        ? meta.trophy_path
+        : typeof meta.trophy_dir === "string"
+          ? meta.trophy_dir
+          : "";
+    if (direct && fs.existsSync(direct)) return direct;
+    const base = meta.save_path || "";
+    if (base && fs.existsSync(base)) return base;
+    return direct || base || "";
+  }
+
+  function resolvePs4TrophyDirForMeta(meta) {
+    if (!meta) return "";
+    const direct =
+      typeof meta.trophy_path === "string"
+        ? meta.trophy_path
+        : typeof meta.save_path === "string"
+          ? meta.save_path
+          : "";
+    if (direct && fs.existsSync(direct)) return direct;
+    return direct || "";
+  }
+
+  function resolveTropusrPathForMeta(meta) {
+    const trophyDir = resolveRpcs3TrophyDirForMeta(meta);
+    if (!trophyDir) return "";
+    const direct = path.join(trophyDir, "TROPUSR.DAT");
+    if (fs.existsSync(direct)) return direct;
+    try {
+      const files = fs.readdirSync(trophyDir);
+      const found = files.find((f) => f.toLowerCase() === "tropusr.dat");
+      if (found) return path.join(trophyDir, found);
+    } catch {}
+    return direct;
+  }
+
+  async function handleSteamOfficialBinEvent(info) {
+    if (!info?.appid) return null;
+    const appid = String(info.appid);
+    const statsDir = info.statsDir || "";
+    if (shouldSkipSteamOfficialGeneration(appid)) {
+      pendingSteamOfficial.delete(appid);
+      watcherLogger.info("steam-official:skip-existing", { appid });
+      return { skipped: true, appid };
+    }
+
+    const schemaBinPath = info.schemaBinPath || "";
+    if (!schemaBinPath || !fs.existsSync(schemaBinPath)) {
+      if (!pendingSteamOfficial.has(appid)) {
+        pendingSteamOfficial.set(appid, {
+          statsDir,
+          firstSeen: Date.now(),
+        });
+        watcherLogger.info("steam-official:pending-schema", {
+          appid,
+          statsDir,
+        });
+      }
+      return { pending: true, appid };
+    }
+
+    const result = await generateConfigFromAppcacheBin(
+      statsDir,
+      schemaBinPath,
+      configsDir,
+    );
+    if (!result) return null;
+    pendingSteamOfficial.delete(appid);
+    indexExistingConfigsSync();
+    knownAppIds.add(appid);
+    attachSaveWatcherForAppId(appid, { suppressInitialNotify: false });
+    broadcastAll("configs:changed");
+    broadcastAll("refresh-achievements-table");
+    return result;
+  }
+
+  async function discoverGpdFilesUnder(root, maxDepth = 4) {
+    const results = [];
+    async function walk(dir, depth = 0) {
+      if (depth > maxDepth) return;
+      let entries;
+      try {
+        entries = await fsp.readdir(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const ent of entries) {
+        const full = path.join(dir, ent.name);
+        if (ent.isFile() && ent.name.toLowerCase().endsWith(".gpd")) {
+          results.push(full);
+        } else if (ent.isDirectory()) {
+          await walk(full, depth + 1);
+        }
+      }
+    }
+    await walk(root, 0);
+    return results;
+  }
+
+  async function discoverRpcs3TrophyDirsUnder(root, maxDepth = 4) {
+    const results = [];
+    async function walk(dir, depth = 0) {
+      if (depth > maxDepth) return;
+      const baseName = path.basename(dir || "").toLowerCase();
+      if (isRpcs3TempFolderName(baseName)) return;
+      let entries;
+      try {
+        entries = await fsp.readdir(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      let hasConf = false;
+      let hasUsr = false;
+      for (const ent of entries) {
+        if (!ent.isFile()) continue;
+        const name = ent.name.toLowerCase();
+        if (name === "tropconf.sfm") hasConf = true;
+        if (name === "tropusr.dat") hasUsr = true;
+      }
+      if (hasConf && hasUsr) {
+        results.push(dir);
+        return;
+      }
+      for (const ent of entries) {
+        if (ent.isDirectory()) {
+          await walk(path.join(dir, ent.name), depth + 1);
+        }
+      }
+    }
+    await walk(root, 0);
+    return results;
+  }
+
+  async function discoverPs4TrophyDirsUnder(root, maxDepth = 4) {
+    const results = [];
+    async function walk(dir, depth = 0) {
+      if (depth > maxDepth) return;
+      let entries;
+      try {
+        entries = await fsp.readdir(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      let hasTrop = false;
+      let hasIcons = false;
+      let hasXml = false;
+      for (const ent of entries) {
+        const name = ent.name.toLowerCase();
+        if (ent.isDirectory() && name === "trophyfiles") {
+          const t0 = path.join(dir, ent.name, "trophy00");
+          const xml = path.join(t0, "Xml", "TROP.XML");
+          if (fs.existsSync(xml)) {
+            results.push(path.join(t0));
+            return;
+          }
+        }
+        if (ent.isFile() && name === "trop.xml") {
+          hasTrop = true;
+        } else if (ent.isDirectory() && name === "xml") {
+          hasXml = true;
+        } else if (ent.isDirectory() && name === "icons") {
+          hasIcons = true;
+        }
+      }
+      if (hasTrop && hasXml) {
+        results.push(dir);
+        return;
+      }
+      for (const ent of entries) {
+        if (ent.isDirectory()) {
+          await walk(path.join(dir, ent.name), depth + 1);
+        }
+      }
+    }
+    await walk(root, 0);
+    return results;
+  }
 
   function recordExistingSavePath(appid, dir) {
     if (!dir) return;
@@ -642,13 +1090,13 @@ module.exports = function makeWatchedFolders({
             return dir;
           }
         })
-        .filter(Boolean)
+        .filter(Boolean),
     );
   }
 
   function saveBlockedFolders(list) {
     const uniq = Array.from(
-      new Set((list || []).filter(Boolean).map(normalizePrefPath))
+      new Set((list || []).filter(Boolean).map(normalizePrefPath)),
     );
     try {
       if (persistPreferences) {
@@ -661,7 +1109,7 @@ module.exports = function makeWatchedFolders({
       const prefs = readPrefsSafe();
       fs.writeFileSync(
         preferencesPath,
-        JSON.stringify({ ...prefs, blockedWatchedFolders: uniq }, null, 2)
+        JSON.stringify({ ...prefs, blockedWatchedFolders: uniq }, null, 2),
       );
       return new Set(uniq);
     } catch (err) {
@@ -737,15 +1185,21 @@ module.exports = function makeWatchedFolders({
           const data = JSON.parse(raw);
 
           const appid = String(
-            data?.appid || data?.appId || data?.steamAppId || ""
+            data?.appid || data?.appId || data?.steamAppId || "",
           ).trim();
+          const platform = normalizePlatform(data?.platform) || "steam";
+          const isValidId =
+            appid &&
+            (platform === "rpcs3" ||
+              platform === "shadps4" ||
+              /^[0-9a-fA-F]+$/.test(appid) ||
+              /^CUSA\d+/i.test(appid));
 
-          if (appid && /^[0-9a-fA-F]+$/.test(appid)) {
+          if (isValidId) {
             existingConfigIds.add(appid);
-            const platform = normalizePlatform(data?.platform) || "steam";
             const normalizedSavePath = normalizeObservedPath(
               data?.save_path || data?.config_path || "",
-              appid
+              appid,
             );
             const meta = {
               name: data?.name || path.basename(f, ".json"),
@@ -774,7 +1228,7 @@ module.exports = function makeWatchedFolders({
             }
             const normalizedConfigPath = normalizeObservedPath(
               data?.config_path || "",
-              appid
+              appid,
             );
             if (normalizedConfigPath) {
               recordExistingSavePath(appid, normalizedConfigPath);
@@ -787,7 +1241,14 @@ module.exports = function makeWatchedFolders({
     } catch {}
   }
 
-  const lastSnapshot = new Map(); // appid -> { [achName]: { earned, progress, max_progress, earned_time } }
+  // Snapshot cache keyed by config name + platform (no save path to keep behavior simple)
+  const lastSnapshot = new Map();
+
+  function makeSnapshotKey(meta, appid) {
+    const name = sanitizeConfigName(meta?.name || "") || String(appid || "");
+    const platform = normalizePlatform(meta?.platform) || "steam";
+    return [name, platform].join("::");
+  }
 
   function readJsonSafe(fp) {
     try {
@@ -805,7 +1266,7 @@ module.exports = function makeWatchedFolders({
       const p2 = path.join(
         meta.config_path,
         String(meta.appid),
-        "achievements.json"
+        "achievements.json",
       );
       if (fs.existsSync(p2)) return p2;
     }
@@ -824,6 +1285,65 @@ module.exports = function makeWatchedFolders({
     const out = new Set();
     if (!meta?.save_path) return [];
 
+    if (isXeniaMeta(meta)) {
+      out.add(meta.save_path);
+      const gpdPath = resolveGpdPathForMeta(meta);
+      if (gpdPath) out.add(gpdPath);
+      return Array.from(out);
+    }
+
+    if (isRpcs3Meta(meta)) {
+      const trophyDir = resolveRpcs3TrophyDirForMeta(meta);
+      if (trophyDir) out.add(trophyDir);
+      const usrPath = resolveTropusrPathForMeta(meta);
+      if (usrPath) out.add(usrPath);
+      return Array.from(out);
+    }
+    if (isSteamOfficialMeta(meta)) {
+      if (meta.save_path) out.add(meta.save_path);
+      if (meta.appid) {
+        out.add(
+          path.join(meta.save_path, `UserGameStatsSchema_${meta.appid}.bin`),
+        );
+        out.add(
+          path.join(meta.save_path, `UserGameStats_*_${meta.appid}.bin`),
+        );
+      }
+      return Array.from(out);
+    }
+
+    if (isPs4Meta(meta)) {
+      const trophyDir = resolvePs4TrophyDirForMeta(meta);
+      if (trophyDir) {
+        out.add(trophyDir);
+        out.add(path.join(trophyDir, "Xml"));
+        // watch specific files
+        out.add(path.join(trophyDir, "Xml", "TROP.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_00.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_01.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_02.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_03.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_04.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_05.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_06.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_07.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_08.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_09.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_10.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_11.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_12.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_13.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_14.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_15.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_16.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_17.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_18.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_19.XML"));
+        out.add(path.join(trophyDir, "Xml", "TROP_20.XML"));
+      }
+      return Array.from(out);
+    }
+
     out.add(meta.save_path);
 
     // JSON
@@ -834,16 +1354,16 @@ module.exports = function makeWatchedFolders({
         meta.save_path,
         "steam_settings",
         String(meta.appid),
-        "achievements.json"
-      )
+        "achievements.json",
+      ),
     );
     out.add(
       path.join(
         meta.save_path,
         "remote",
         String(meta.appid),
-        "achievements.json"
-      )
+        "achievements.json",
+      ),
     );
     // INI
     out.add(path.join(meta.save_path, "achievements.ini"));
@@ -854,8 +1374,8 @@ module.exports = function makeWatchedFolders({
         meta.save_path,
         String(meta.appid),
         "SteamData",
-        "user_stats.ini"
-      )
+        "user_stats.ini",
+      ),
     );
     out.add(path.join(meta.save_path, "Stats", "achievements.ini"));
     out.add(path.join(meta.save_path, String(meta.appid), "achievements.ini"));
@@ -887,15 +1407,31 @@ module.exports = function makeWatchedFolders({
     } = opts || {};
     if (!filePath) return;
     const base = path.basename(filePath).toLowerCase();
-    if (
-      ![
-        "achievements.json",
-        "achievements.ini",
-        "stats.bin",
-        "user_stats.ini",
-      ].includes(base)
-    )
-      return;
+    const isXenia = isXeniaMeta(meta);
+    const isRpcs3 = isRpcs3Meta(meta);
+    const isPs4 = isPs4Meta(meta);
+    const isSteamOfficial = isSteamOfficialMeta(meta);
+    if (isXenia) {
+      if (!base.endsWith(".gpd")) return;
+    } else if (isRpcs3) {
+      if (base !== "tropusr.dat") return;
+    } else if (isPs4) {
+      if (!base.endsWith(".xml")) return;
+    } else if (isSteamOfficial) {
+      if (!base.endsWith(".bin") || !base.startsWith("usergamestats_")) return;
+      const appidStr = String(meta?.appid || appid || "").toLowerCase();
+      if (appidStr && !base.endsWith(`_${appidStr}.bin`)) return;
+    } else {
+      if (
+        ![
+          "achievements.json",
+          "achievements.ini",
+          "stats.bin",
+          "user_stats.ini",
+        ].includes(base)
+      )
+        return;
+    }
 
     const now = Date.now();
     const last = fileHitCooldown.get(filePath) || 0;
@@ -912,22 +1448,114 @@ module.exports = function makeWatchedFolders({
     const cfgPath = path.join(configsDir, `${meta.name}.json`);
     await waitForFileExists(cfgPath);
 
-    let shouldSeed =
-      typeof onSeedCache === "function" && !lastSnapshot.has(appid);
+    const snapKey = makeSnapshotKey(meta, appid);
+    let shouldSeed = typeof onSeedCache === "function" && !lastSnapshot.has(snapKey);
     // Tenoke: dacă fișierul apare după boot (ev add), nu seed-uit pentru a permite notificări
     if (shouldSeed && meta.__tenoke && isAddEvent && !bootMode) {
       shouldSeed = false;
     }
     const isActiveConfig = !!isConfigActive?.(meta.name);
 
-    const prev = forceEmptyPrev ? {} : lastSnapshot.get(appid) || {};
-    const cur = loadAchievementsFromSaveFile(path.dirname(filePath), prev, {
-      configMeta: meta,
-      fullSchemaPath: resolveAchievementsSchemaPath(meta),
-    });
+    const prev = forceEmptyPrev ? {} : lastSnapshot.get(snapKey) || {};
+    let cur = null;
+    let parsedGpd = null;
+    let parsedTrophy = null;
+    let parsedSteam = null;
+    const fileBase = path.basename(filePath || "").toLowerCase();
+    if (isXenia) {
+      try {
+        parsedGpd = parseGpdFile(filePath);
+        parsedGpd.appid = String(meta?.appid || appid || "");
+        cur = buildSnapshotFromGpd(parsedGpd);
+      } catch {
+        cur = prev;
+      }
+    } else if (isRpcs3) {
+      const trophyDir =
+        resolveRpcs3TrophyDirForMeta(meta) || path.dirname(filePath);
+      try {
+        parsedTrophy = parseTrophySetDir(trophyDir);
+        parsedTrophy.appid = String(meta?.appid || appid || "");
+        cur = buildSnapshotFromTrophy(parsedTrophy);
+      } catch {
+        cur = prev;
+      }
+    } else if (isSteamOfficial) {
+      try {
+        const schemaPath = resolveAchievementsSchemaPath(meta);
+        const schemaArr =
+          schemaPath && fs.existsSync(schemaPath)
+            ? readJsonSafe(schemaPath)
+            : null;
+        const entries = Array.isArray(schemaArr)
+          ? schemaArr
+              .map((e) => ({
+                api: e?.name || e?.api,
+                statId: e?.statId,
+                bit: e?.bit,
+              }))
+              .filter(
+                (e) =>
+                  e.api &&
+                  Number.isInteger(e.statId) &&
+                  Number.isInteger(e.bit),
+              )
+          : [];
+        const statsDir = meta.save_path || path.dirname(filePath);
+        let userBin = filePath;
+        const base = path.basename(userBin || "").toLowerCase();
+        if (!base.startsWith("usergamestats_") || !base.endsWith(".bin")) {
+          userBin = pickLatestUserBin(statsDir, meta.appid || appid);
+        }
+        if (entries.length && userBin && fs.existsSync(userBin)) {
+          const kv = parseSteamKv(fs.readFileSync(userBin));
+          const userStats = extractUserStats(kv.data);
+          parsedSteam = userStats;
+          cur = buildSnapshotFromAppcache(entries, userStats);
+        } else {
+          cur = prev;
+        }
+      } catch {
+        cur = prev;
+      }
+    } else if (isPs4) {
+      const trophyDir =
+        resolvePs4TrophyDirForMeta(meta) || path.dirname(filePath);
+      try {
+        const parsedPs4 = parsePs4TrophySetDir(trophyDir);
+        parsedPs4.appid = String(meta?.appid || appid || "");
+        cur = buildSnapshotFromPs4(parsedPs4, prev);
+      } catch {
+        cur = prev;
+      }
+    } else {
+      cur = loadAchievementsFromSaveFile(path.dirname(filePath), prev, {
+        configMeta: meta,
+        fullSchemaPath: resolveAchievementsSchemaPath(meta),
+      });
+    }
     if (!cur) return false;
     if (cur === prev) return retry ? false : "__retry__";
-    lastSnapshot.set(appid, cur);
+    lastSnapshot.set(snapKey, cur);
+
+    if (parsedGpd && meta?.config_path) {
+      try {
+        updateSchemaFromGpd(meta.config_path, parsedGpd);
+      } catch {}
+    }
+    if (parsedTrophy && meta?.config_path) {
+      try {
+        updateSchemaFromTrophy(meta.config_path, parsedTrophy);
+      } catch {}
+    }
+    if (isPs4 && meta?.config_path) {
+      try {
+        const parsedPs4 = parsePs4TrophySetDir(
+          resolvePs4TrophyDirForMeta(meta) || path.dirname(filePath),
+        );
+        updateSchemaFromPs4(meta.config_path, parsedPs4);
+      } catch {}
+    }
 
     if (suppressAutoSelect.has(String(appid))) {
       // Drop suppression once we detect a change after unblocking
@@ -945,6 +1573,8 @@ module.exports = function makeWatchedFolders({
           onSeedCache({
             appid: String(appid),
             configName: meta.name,
+            platform: meta?.platform || null,
+            savePath: meta?.save_path || null,
             snapshot: cur,
           });
         } catch {}
@@ -1030,6 +1660,8 @@ module.exports = function makeWatchedFolders({
         onSeedCache({
           appid: String(appid),
           configName: meta.name,
+          platform: meta?.platform || null,
+          savePath: meta?.save_path || null,
           snapshot: cur,
         });
       } catch {}
@@ -1065,15 +1697,11 @@ module.exports = function makeWatchedFolders({
       const oldProgress = Number(oldVal?.progress);
       const oldMax = Number(oldVal?.max_progress);
       const hasProgressValues =
-        Number.isFinite(nowProgress) &&
-        Number.isFinite(nowMax) &&
-        nowMax > 0;
+        Number.isFinite(nowProgress) && Number.isFinite(nowMax) && nowMax > 0;
       const progressChanged =
         !nowVal.earned &&
         hasProgressValues &&
-        (!oldVal ||
-          nowProgress !== oldProgress ||
-          nowMax !== oldMax);
+        (!oldVal || nowProgress !== oldProgress || nowMax !== oldMax);
       if (initial) {
         watcherLogger.info("initial-notify:entry-check", {
           appid: String(appid),
@@ -1089,6 +1717,9 @@ module.exports = function makeWatchedFolders({
         });
       }
       if (!becameEarned && !progressChanged) continue;
+      if (becameEarned && isRpcs3) {
+        if (!nowVal.earned_time) nowVal.earned_time = Date.now();
+      }
       if (!initial && isActiveConfig && !forceEmptyPrev && !prevWasEmpty)
         continue;
       touched = true;
@@ -1102,6 +1733,27 @@ module.exports = function makeWatchedFolders({
           config: meta?.name || null,
           achievement: achKey,
         });
+        if (isXenia) {
+          let imageId =
+            cfgEntry?.imageId !== undefined && cfgEntry?.imageId !== null
+              ? cfgEntry.imageId
+              : resolveXeniaImageId(parsedGpd, achKey);
+          if (imageId === undefined || imageId === null) {
+            watcherLogger.warn("xenia:notify:no-image-id", {
+              appid: String(meta?.appid || appid || ""),
+              config: meta?.name || null,
+              achievement: String(achKey),
+            });
+            continue;
+          }
+          const ready = await waitForXeniaAchievementIcon(
+            meta,
+            achKey,
+            imageId,
+            parsedGpd,
+          );
+          if (!ready) continue;
+        }
         onEarned({
           displayName: cfgEntry
             ? getSafeLocalizedText(cfgEntry.displayName, lang)
@@ -1111,6 +1763,7 @@ module.exports = function makeWatchedFolders({
             : "",
           icon: cfgEntry?.icon || "",
           icon_gray: cfgEntry?.icon_gray || cfgEntry?.icongray || "",
+          platform: meta?.platform || "",
           config_path: meta.config_path || null,
           preset: null,
           position: null,
@@ -1150,6 +1803,8 @@ module.exports = function makeWatchedFolders({
         onSeedCache({
           appid: String(appid),
           configName: meta.name,
+          platform: meta?.platform || null,
+          savePath: meta?.save_path || null,
           snapshot: cur,
         });
       } catch {}
@@ -1163,7 +1818,7 @@ module.exports = function makeWatchedFolders({
     const metas = getConfigMetas(appid);
     if (!metas.length) return;
     metas.forEach((meta) =>
-      attachWatcherForMeta(meta, { suppressInitialNotify })
+      attachWatcherForMeta(meta, { suppressInitialNotify }),
     );
   }
 
@@ -1226,10 +1881,7 @@ module.exports = function makeWatchedFolders({
       return null;
     };
 
-    if (
-      meta.__tenoke === true ||
-      tenokeIds.has(String(meta.appid || ""))
-    ) {
+    if (meta.__tenoke === true || tenokeIds.has(String(meta.appid || ""))) {
       const found = searchTenokeStats();
       if (found && typeof found.then === "function") {
         found
@@ -1259,19 +1911,23 @@ module.exports = function makeWatchedFolders({
               // Trigger one evaluation when we discover the file
               if (!startedInBoot) {
                 try {
-              const evalResult = await evaluateFile(appid, meta, fp, {
-                initial: false,
-                retry: false,
-                forceEmptyPrev: true,
-              });
-              if (!bootMode && evalResult && !justUnblocked.has(String(appid))) {
-                const tenokeReady =
-                  meta.__tenoke !== true ||
-                  tenokeRelinkedConfigs.has(meta.name);
-                if (tenokeReady) enqueueAutoSelect(meta);
+                  const evalResult = await evaluateFile(appid, meta, fp, {
+                    initial: false,
+                    retry: false,
+                    forceEmptyPrev: true,
+                  });
+                  if (
+                    !bootMode &&
+                    evalResult &&
+                    !justUnblocked.has(String(appid))
+                  ) {
+                    const tenokeReady =
+                      meta.__tenoke !== true ||
+                      tenokeRelinkedConfigs.has(meta.name);
+                    if (tenokeReady) enqueueAutoSelect(meta);
+                  }
+                } catch {}
               }
-            } catch {}
-          }
               // Re-arm watcher on the updated path once
               if (!tenokeRelinked && !tenokeRelinkedConfigs.has(meta.name)) {
                 tenokeRelinked = true;
@@ -1293,6 +1949,7 @@ module.exports = function makeWatchedFolders({
     }
 
     const locateAndPersistSavePath = () => {
+      const isXenia = isXeniaMeta(meta);
       const names = [
         "achievements.ini",
         "achievements.json",
@@ -1307,7 +1964,11 @@ module.exports = function makeWatchedFolders({
         try {
           const entries = fs.readdirSync(dir, { withFileTypes: true });
           for (const ent of entries) {
-            if (ent.isFile() && targetLc.includes(ent.name.toLowerCase())) {
+            if (
+              ent.isFile() &&
+              ((isXenia && ent.name.toLowerCase().endsWith(".gpd")) ||
+                (!isXenia && targetLc.includes(ent.name.toLowerCase())))
+            ) {
               return path.join(dir, ent.name);
             }
           }
@@ -1353,21 +2014,42 @@ module.exports = function makeWatchedFolders({
       savePath: meta.save_path,
     });
 
-    const watcher = chokidar.watch(targets, {
+    const watcherOptions = {
       persistent: true,
       ignoreInitial: true,
       awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
       depth: 6,
       ignorePermissionErrors: true,
-    });
+    };
+    if (isRpcs3Meta(meta)) {
+      watcherOptions.usePolling = true;
+      watcherOptions.interval = 1000;
+      watcherOptions.binaryInterval = 1000;
+    }
+    const watcher = chokidar.watch(targets, watcherOptions);
 
     const onHit = async (ev, filePath, retryFlag = false) => {
       if (!filePath) return;
-      const parts = filePath.split(path.sep).map((p) => p.toLowerCase());
-      const detected = [...parts]
-        .reverse()
-        .find((p) => /^[0-9a-fA-F]+$/.test(p));
-      if (detected && detected !== appid.toLowerCase()) return;
+      let resolvedPath = filePath;
+      if (isRpcs3Meta(meta)) {
+        const trophyDir = resolveRpcs3TrophyDirForMeta(meta);
+        if (trophyDir) {
+          const normFile = path.normalize(filePath).toLowerCase();
+          const normDir = path.normalize(trophyDir).toLowerCase();
+          if (normFile === normDir) {
+            const usrPath = resolveTropusrPathForMeta(meta);
+            if (usrPath) resolvedPath = usrPath;
+          } else if (!normFile.startsWith(normDir + path.sep)) {
+            return;
+          }
+        }
+      } else {
+        const parts = filePath.split(path.sep).map((p) => p.toLowerCase());
+        const detected = [...parts]
+          .reverse()
+          .find((p) => /^[0-9a-fA-F]+$/.test(p));
+        if (detected && detected !== appid.toLowerCase()) return;
+      }
       const initial = ev === "add" && bootMode;
       const isTenoke = meta.__tenoke === true || tenokeIds.has(String(appid));
 
@@ -1409,7 +2091,7 @@ module.exports = function makeWatchedFolders({
 
       let result = false;
       try {
-        result = await evaluateFile(appid, meta, filePath, {
+        result = await evaluateFile(appid, meta, resolvedPath, {
           initial,
           retry: retryFlag,
           forceEmptyPrev: isTenoke && ev === "add",
@@ -1460,7 +2142,7 @@ module.exports = function makeWatchedFolders({
       .on("add", (fp) => onHit("add", fp))
       .on("change", (fp) => onHit("change", fp))
       .on("error", (err) =>
-        notifyWarn(`save watcher [${appid}] error: ${err.message}`)
+        notifyWarn(`save watcher [${appid}] error: ${err.message}`),
       );
 
     bucket.set(meta.name, watcher);
@@ -1513,17 +2195,71 @@ module.exports = function makeWatchedFolders({
       seenCandidates.add(key);
       candidates.push(c);
     }
+    if (isXeniaMeta(meta)) {
+      const gpdPath = resolveGpdPathForMeta(meta);
+      if (gpdPath) {
+        const key = path.normalize(gpdPath);
+        if (!seenCandidates.has(key)) {
+          seenCandidates.add(key);
+          candidates.unshift(gpdPath);
+        }
+      }
+    } else if (isRpcs3Meta(meta)) {
+      const usrPath = resolveTropusrPathForMeta(meta);
+      const trophyDir = resolveRpcs3TrophyDirForMeta(meta);
+      for (const p of [usrPath, trophyDir]) {
+        if (!p) continue;
+        const key = path.normalize(p);
+        if (!seenCandidates.has(key)) {
+          seenCandidates.add(key);
+          candidates.unshift(p);
+        }
+      }
+    } else if (isSteamOfficialMeta(meta)) {
+      const statsDir = meta.save_path || "";
+      const userBin = statsDir
+        ? pickLatestUserBin(statsDir, meta.appid || id)
+        : "";
+      if (userBin) {
+        const key = path.normalize(userBin);
+        if (!seenCandidates.has(key)) {
+          seenCandidates.add(key);
+          candidates.unshift(userBin);
+        }
+      }
+    } else if (isPs4Meta(meta)) {
+      const trophyDir = resolvePs4TrophyDirForMeta(meta);
+      const xmlMain = trophyDir ? path.join(trophyDir, "Xml", "TROP.XML") : "";
+      for (const p of [xmlMain, trophyDir]) {
+        if (!p) continue;
+        const key = path.normalize(p);
+        if (!seenCandidates.has(key)) {
+          seenCandidates.add(key);
+          candidates.unshift(p);
+        }
+      }
+    }
+    if (isRpcs3Meta(meta)) {
+      const usrPath = resolveTropusrPathForMeta(meta);
+      if (usrPath) {
+        const key = path.normalize(usrPath);
+        if (!seenCandidates.has(key)) {
+          seenCandidates.add(key);
+          candidates.unshift(usrPath);
+        }
+      }
+    }
 
     seedInitialSnapshot(id, meta, candidates, true, {
       suppressInitialNotify: suppressInitialNotify || bootMode,
     });
     if (pendingInitialNotify.has(meta.name)) {
-        const existingTarget = candidates.find((c) => c && fs.existsSync(c));
-        pendingInitialNotify.delete(meta.name);
-        if (existingTarget) {
-          const fromUnblock = justUnblocked.has(id);
-          setTimeout(() => {
-            (async () => {
+      const existingTarget = candidates.find((c) => c && fs.existsSync(c));
+      pendingInitialNotify.delete(meta.name);
+      if (existingTarget) {
+        const fromUnblock = justUnblocked.has(id);
+        setTimeout(() => {
+          (async () => {
             watcherLogger.info("initial-notify:attempt", {
               appid: id,
               config: meta.name,
@@ -1537,7 +2273,12 @@ module.exports = function makeWatchedFolders({
                   retry: retryFlag,
                   forceEmptyPrev: fromUnblock ? false : true,
                 };
-                const result = await evaluateFile(id, meta, existingTarget, evalOpts);
+                const result = await evaluateFile(
+                  id,
+                  meta,
+                  existingTarget,
+                  evalOpts,
+                );
                 lastResult = result;
                 watcherLogger.info("initial-notify:result", {
                   appid: id,
@@ -1908,7 +2649,7 @@ module.exports = function makeWatchedFolders({
         const result = await generateConfigForAppId(
           appid,
           configsDir,
-          genOptions
+          genOptions,
         );
         existingConfigIds.add(appid);
         knownAppIds.add(appid);
@@ -1925,7 +2666,7 @@ module.exports = function makeWatchedFolders({
                 : null);
             const fallback = path.join(
               configsDir,
-              `${sanitizeConfigName(appid)}.json`
+              `${sanitizeConfigName(appid)}.json`,
             );
             const target =
               cfgFile && fs.existsSync(cfgFile) ? cfgFile : fallback;
@@ -1975,7 +2716,7 @@ module.exports = function makeWatchedFolders({
     meta,
     candidates,
     initialFlag = true,
-    opts = {}
+    opts = {},
   ) {
     appid = String(appid);
     const configName = meta?.name || appid;
@@ -1989,14 +2730,15 @@ module.exports = function makeWatchedFolders({
       justUnblocked.has(appid);
 
     // If coming from un-blacklist, preload snapshot from cache to avoid replaying notifications
-    if (fromUnblock && !lastSnapshot.has(appid)) {
+    const snapKey = makeSnapshotKey(meta, appid);
+    if (fromUnblock && !lastSnapshot.has(snapKey)) {
       try {
         const cached =
           typeof getCachedSnapshot === "function"
             ? getCachedSnapshot(meta?.name || appid)
             : null;
         if (cached && typeof cached === "object") {
-          lastSnapshot.set(appid, cached);
+          lastSnapshot.set(snapKey, cached);
           watcherLogger.info("unblock:seed-from-cache", {
             appid,
             config: meta?.name || appid,
@@ -2009,18 +2751,110 @@ module.exports = function makeWatchedFolders({
     for (const fp of candidates) {
       if (!fp || !fs.existsSync(fp)) continue;
       try {
-        const snapshot = loadAchievementsFromSaveFile(
-          path.dirname(fp),
-          lastSnapshot.get(appid) || {},
-          {
-            configMeta: meta,
-            fullSchemaPath: resolveAchievementsSchemaPath(meta),
+        const snapKey = makeSnapshotKey(meta, appid);
+        let snapshot = null;
+        if (isXeniaMeta(meta) && fp.toLowerCase().endsWith(".gpd")) {
+          const parsed = parseGpdFile(fp);
+          snapshot = buildSnapshotFromGpd(parsed);
+        } else if (isRpcs3Meta(meta)) {
+          let trophyDir = "";
+          try {
+            const stat = fs.statSync(fp);
+            trophyDir = stat.isDirectory() ? fp : path.dirname(fp);
+          } catch {
+            trophyDir = path.dirname(fp);
           }
-        );
+          if (trophyDir) {
+            const parsed = parseTrophySetDir(trophyDir);
+            snapshot = buildSnapshotFromTrophy(parsed);
+          }
+        } else if (isSteamOfficialMeta(meta)) {
+          try {
+            const schemaPath = resolveAchievementsSchemaPath(meta);
+            const schemaArr =
+              schemaPath && fs.existsSync(schemaPath) ? readJsonSafe(schemaPath) : null;
+            const entries = Array.isArray(schemaArr)
+              ? schemaArr
+                  .map((e) => ({
+                    api: e?.name || e?.api,
+                    statId: e?.statId,
+                    bit: e?.bit,
+                  }))
+                  .filter(
+                    (e) =>
+                      e.api &&
+                      Number.isInteger(e.statId) &&
+                      Number.isInteger(e.bit),
+                  )
+              : [];
+            const statsDir = meta.save_path || path.dirname(fp);
+            let userBin = fp;
+            const base = path.basename(userBin || "").toLowerCase();
+            if (!base.startsWith("usergamestats_") || !base.endsWith(".bin")) {
+              userBin = pickLatestUserBin(statsDir, meta.appid || appid);
+            }
+            if (entries.length && userBin && fs.existsSync(userBin)) {
+              const kv = parseSteamKv(fs.readFileSync(userBin));
+              const userStats = extractUserStats(kv.data);
+              snapshot = buildSnapshotFromAppcache(entries, userStats);
+            }
+          } catch {}
+        } else if (isPs4Meta(meta)) {
+          let trophyDir = meta?.save_path || "";
+          try {
+            const stat = fs.statSync(fp);
+            if (stat.isDirectory()) {
+              trophyDir = fp;
+            } else {
+              // TROP.XML lives under <trophyDir>/Xml
+              trophyDir = path.dirname(path.dirname(fp));
+            }
+          } catch {
+            trophyDir = meta?.save_path || path.dirname(path.dirname(fp));
+          }
+          if (trophyDir) {
+            try {
+              const parsed = parsePs4TrophySetDir(trophyDir);
+              parsed.appid = String(meta?.appid || parsed.appid || "");
+              snapshot = buildSnapshotFromPs4(
+                parsed,
+                lastSnapshot.get(snapKey) || {},
+              );
+            } catch (err) {
+              watcherLogger.warn("ps4:seed:parse-failed", {
+                appid,
+                config: meta?.name || appid,
+                file: fp,
+                trophyDir,
+                error: err?.message || String(err),
+              });
+            }
+          }
+        } else {
+          snapshot = loadAchievementsFromSaveFile(
+            path.dirname(fp),
+            lastSnapshot.get(snapKey) || {},
+            {
+              configMeta: meta,
+              fullSchemaPath: resolveAchievementsSchemaPath(meta),
+            },
+          );
+        }
         if (!snapshot) continue;
 
-        lastSnapshot.set(appid, snapshot);
+        lastSnapshot.set(snapKey, snapshot);
         const configName = meta?.name || appid;
+        if (typeof onSeedCache === "function") {
+          try {
+            onSeedCache({
+              appid,
+              configName,
+              platform: meta?.platform || null,
+              savePath: meta?.save_path || null,
+              snapshot,
+            });
+          } catch {}
+        }
         if (initialFlag && !suppressInitialNotify) {
           pendingInitialNotify.add(configName);
           seededInitialConfigs.add(configName);
@@ -2040,24 +2874,15 @@ module.exports = function makeWatchedFolders({
           });
         }
         seeded = true;
-
-        if (initialFlag && typeof onSeedCache === "function") {
-          try {
-            onSeedCache({
-              appid,
-              configName: meta?.name || appid,
-              snapshot,
-            });
-          } catch {}
-        }
         break;
       } catch {}
     }
 
     if (!seeded && typeof getCachedSnapshot === "function") {
+      const snapKey = makeSnapshotKey(meta, appid);
       const cached = getCachedSnapshot(meta?.name || appid);
       if (cached && typeof cached === "object") {
-        lastSnapshot.set(appid, cached);
+        lastSnapshot.set(snapKey, cached);
       }
     }
   }
@@ -2073,30 +2898,249 @@ module.exports = function makeWatchedFolders({
 
       const generationTasks = [];
       const brandNewIds = [];
+      const xeniaAppIds = new Set();
+
+      const gpdFiles = await discoverGpdFilesUnder(scanBase, 6);
+      if (gpdFiles.length) {
+        const schemaRoot = path.join(configsDir, "schema");
+        for (const gpdPath of gpdFiles) {
+          const appid = path.basename(gpdPath, path.extname(gpdPath));
+          if (!appid || blacklist.has(appid) || xeniaAppIds.has(appid)) {
+            continue;
+          }
+          try {
+            const result = generateConfigFromGpd(gpdPath, configsDir, {
+              schemaRoot,
+            });
+            if (!result || result.skipped) {
+              continue;
+            }
+            if (
+              (result.created || result.schemaUpdated) &&
+              bootMode &&
+              typeof onSeedCache === "function"
+            ) {
+              const snapshot = result.snapshot;
+              if (snapshot && Object.keys(snapshot).length) {
+                try {
+          onSeedCache({
+            appid: String(result.appid),
+            configName: result.name || String(result.appid),
+            platform: result.platform || meta?.platform || null,
+            savePath: result.save_path || null,
+            snapshot,
+          });
+                } catch {}
+              }
+            }
+            xeniaAppIds.add(String(result.appid));
+            knownAppIds.add(String(result.appid));
+          } catch (err) {
+            notifyWarn(`Xenia GPD parse failed "${gpdPath}": ${err.message}`);
+          }
+        }
+        if (xeniaAppIds.size) {
+          indexExistingConfigsSync();
+          for (const id of xeniaAppIds) {
+            attachSaveWatcherForAppId(id, { suppressInitialNotify });
+          }
+          broadcastAll("configs:changed");
+          broadcastAll("refresh-achievements-table");
+        }
+        // GPD roots are handled by Xenia flow only (avoid auto-config conflicts).
+        return;
+      }
+
+      const trophyDirs = await discoverRpcs3TrophyDirsUnder(scanBase, 6);
+        if (trophyDirs.length) {
+          const schemaRoot = path.join(configsDir, "schema");
+          const rpcs3AppIds = new Set();
+          let rpcs3Changed = false;
+          for (const trophyDir of trophyDirs) {
+            const appid = path.basename(trophyDir);
+            if (!appid || blacklist.has(appid) || rpcs3AppIds.has(appid)) {
+              continue;
+            }
+          try {
+            const result = await generateConfigFromTrophyDir(
+              trophyDir,
+              configsDir,
+              {
+                schemaRoot,
+              },
+            );
+            if (!result || result.skipped) {
+              continue;
+            }
+            if (result.created || result.schemaUpdated) rpcs3Changed = true;
+            if (bootMode && typeof onSeedCache === "function") {
+              const snapshot = result.snapshot;
+              if (snapshot && Object.keys(snapshot).length) {
+                try {
+                onSeedCache({
+                  appid: String(result.appid),
+                  configName: result.name || String(result.appid),
+                  platform: result.platform || null,
+                  savePath: result.save_path || null,
+                  snapshot,
+                });
+                } catch {}
+              }
+            }
+            rpcs3AppIds.add(String(result.appid));
+            knownAppIds.add(String(result.appid));
+          } catch (err) {
+            notifyWarn(
+              `RPCS3 trophy parse failed "${trophyDir}": ${err.message}`,
+            );
+          }
+        }
+        if (rpcs3AppIds.size) {
+          indexExistingConfigsSync();
+          for (const id of rpcs3AppIds) {
+            attachSaveWatcherForAppId(id, { suppressInitialNotify });
+          }
+          if (rpcs3Changed) {
+            broadcastAll("configs:changed");
+            broadcastAll("refresh-achievements-table");
+          }
+        }
+        // Trophy roots are handled by RPCS3 flow only (avoid auto-config conflicts).
+        return;
+      }
+
+      const ps4Dirs = await discoverPs4TrophyDirsUnder(scanBase, 6);
+      if (ps4Dirs.length) {
+        const schemaRoot = path.join(configsDir, "schema");
+        const ps4AppIds = new Set();
+        let ps4Changed = false;
+        for (const trophyDir of ps4Dirs) {
+          const appid = path.basename(path.dirname(trophyDir));
+          if (!appid || blacklist.has(appid) || ps4AppIds.has(appid)) continue;
+          try {
+            const result = await generateConfigFromPs4Dir(
+              trophyDir,
+              configsDir,
+              {
+                schemaRoot,
+              },
+            );
+            if (!result || result.skipped) continue;
+            if (result.created || result.schemaUpdated) ps4Changed = true;
+            if (
+              (result.created || result.schemaUpdated) &&
+              bootMode &&
+              typeof onSeedCache === "function"
+            ) {
+              const snapshot = result.snapshot;
+              if (snapshot && Object.keys(snapshot).length) {
+                try {
+                onSeedCache({
+                  appid: String(result.appid),
+                  configName: result.name || String(result.appid),
+                  platform: result.platform || null,
+                  savePath: result.save_path || null,
+                  snapshot,
+                });
+                } catch {}
+              }
+            }
+            ps4AppIds.add(String(result.appid));
+            knownAppIds.add(String(result.appid));
+          } catch (err) {
+            notifyWarn(
+              `PS4 trophy parse failed "${trophyDir}": ${err.message}`,
+            );
+          }
+        }
+        if (ps4AppIds.size) {
+          indexExistingConfigsSync();
+          for (const id of ps4AppIds) {
+            attachSaveWatcherForAppId(id, { suppressInitialNotify });
+          }
+          if (ps4Changed) {
+            broadcastAll("configs:changed");
+            broadcastAll("refresh-achievements-table");
+          }
+        }
+        return;
+      }
+
+      // Steam official appcache (UserGameStatsSchema_*.bin)
+      try {
+        const entries = await fsp.readdir(scanBase);
+        const schemaBins = entries.filter((f) =>
+          /^UserGameStatsSchema_\d+\.bin$/i.test(f),
+        );
+        if (schemaBins.length) {
+          const steamIds = new Set();
+          let steamChanged = false;
+          for (const bin of schemaBins) {
+            const result = await generateConfigFromAppcacheBin(
+              scanBase,
+              path.join(scanBase, bin),
+              configsDir,
+            );
+            if (!result || result.skipped) continue;
+            const appid = String(result.appid);
+            if (blacklist.has(appid)) continue;
+            steamIds.add(appid);
+            knownAppIds.add(appid);
+            if (result.created || result.schemaUpdated) steamChanged = true;
+            if (
+              bootMode &&
+              (result.created || result.schemaUpdated) &&
+              typeof onSeedCache === "function"
+            ) {
+              const snapshot = result.snapshot;
+              if (snapshot && Object.keys(snapshot).length) {
+                try {
+                onSeedCache({
+                  appid,
+                  configName: result.name || appid,
+                  platform: result.platform || null,
+                  savePath: result.save_path || null,
+                  snapshot,
+                });
+                } catch {}
+              }
+            }
+          }
+          if (steamIds.size) {
+            indexExistingConfigsSync();
+            for (const id of steamIds) {
+              attachSaveWatcherForAppId(id, { suppressInitialNotify });
+            }
+            if (steamChanged) {
+              broadcastAll("configs:changed");
+              broadcastAll("refresh-achievements-table");
+            }
+          }
+          // handled; avoid falling into generic numeric scan to prevent double-generate
+          return;
+        }
+      } catch {}
 
       // Prefer GOG .info detection: if found, ignore other numeric folders under this root
       const gogInfoFound = await findGogInfoAppId(scanBase, 6).catch(
-        () => null
+        () => null,
       );
       if (gogInfoFound) {
-          const gogId = String(gogInfoFound.appid || "").trim();
-          if (gogId && !blacklist.has(gogId)) {
-            const shippingDir = await findShippingExeDir(scanBase, 6);
-            const saveRoot = shippingDir || gogInfoFound.baseDir || scanBase;
-            const normalizedPath = normalizeObservedPath(
-            saveRoot,
-            gogId
-            );
-            generationTasks.push({
-              appid: gogId,
-              forcePlatform: "gog",
-              appDir: gogInfoFound.baseDir || scanBase,
-              normalizedPath,
-              __savePathOverride: saveRoot,
-              __gogName: gogInfoFound.name || null,
-            });
-            if (normalizedPath) markPendingSavePath(gogId, normalizedPath);
-          }
+        const gogId = String(gogInfoFound.appid || "").trim();
+        if (gogId && !blacklist.has(gogId)) {
+          const shippingDir = await findShippingExeDir(scanBase, 6);
+          const saveRoot = shippingDir || gogInfoFound.baseDir || scanBase;
+          const normalizedPath = normalizeObservedPath(saveRoot, gogId);
+          generationTasks.push({
+            appid: gogId,
+            forcePlatform: "gog",
+            appDir: gogInfoFound.baseDir || scanBase,
+            normalizedPath,
+            __savePathOverride: saveRoot,
+            __gogName: gogInfoFound.name || null,
+          });
+          if (normalizedPath) markPendingSavePath(gogId, normalizedPath);
+        }
       }
 
       // If no GOG .info, fall back to generic numeric discovery
@@ -2157,10 +3201,10 @@ module.exports = function makeWatchedFolders({
       if (generationTasks.length === 0) {
         tenokeFound = await findTenokeAppId(scanBase, 6).catch(() => null);
         const gogInfoFound = await findGogInfoAppId(scanBase, 6).catch(
-          () => null
+          () => null,
         );
         const universeFound = await findUniverseLanAppId(scanBase, 6).catch(
-          () => null
+          () => null,
         );
         if (!tenokeFound && !gogInfoFound && !universeFound) {
           for (const id of discovered) {
@@ -2186,7 +3230,7 @@ module.exports = function makeWatchedFolders({
             });
             markPendingSavePath(
               tenokeId,
-              normalizeObservedPath(saveRoot, tenokeId)
+              normalizeObservedPath(saveRoot, tenokeId),
             );
           }
         }
@@ -2203,10 +3247,7 @@ module.exports = function makeWatchedFolders({
               __savePathOverride: saveRoot,
               __gogName: gogInfoFound.name || null,
             });
-            markPendingSavePath(
-              gogId,
-              normalizeObservedPath(saveRoot, gogId)
-            );
+            markPendingSavePath(gogId, normalizeObservedPath(saveRoot, gogId));
           }
         } else if (universeFound) {
           const uniId = String(universeFound.appid || "").trim();
@@ -2220,10 +3261,7 @@ module.exports = function makeWatchedFolders({
               normalizedPath: normalizeObservedPath(saveRoot, uniId),
               __savePathOverride: saveRoot,
             });
-            markPendingSavePath(
-              uniId,
-              normalizeObservedPath(saveRoot, uniId)
-            );
+            markPendingSavePath(uniId, normalizeObservedPath(saveRoot, uniId));
           }
         }
       }
@@ -2245,7 +3283,7 @@ module.exports = function makeWatchedFolders({
                 normalizedSavePath: task.normalizedPath || "",
                 __savePathOverride: task.__savePathOverride || null,
                 __emu: task.__emu || null,
-              }
+              },
             );
             if (created) generatedIds.add(String(task.appid));
           }
@@ -2292,13 +3330,13 @@ module.exports = function makeWatchedFolders({
                   m.save_path || "",
                   "steam_settings",
                   String(id),
-                  "achievements.json"
+                  "achievements.json",
                 ),
                 path.join(
                   m.save_path || "",
                   "remote",
                   String(id),
-                  "achievements.json"
+                  "achievements.json",
                 ),
                 rootDir ? path.join(rootDir, "achievements.ini") : null,
                 rootDir
@@ -2327,7 +3365,7 @@ module.exports = function makeWatchedFolders({
       } else {
         if (bootMode) {
           notifyWarn(
-            "generateConfigForAppId missing - skip heavy generateGameConfigs() at boot"
+            "generateConfigForAppId missing - skip heavy generateGameConfigs() at boot",
           );
         } else {
           if (brandNewIds.length === 0) {
@@ -2354,7 +3392,10 @@ module.exports = function makeWatchedFolders({
     const { initialScan = true } = opts;
     const root = normalizeRoot(coercePath(inputRoot));
     if (folderWatchers.has(root)) return;
-    if (!fs.existsSync(root)) return;
+    if (!fs.existsSync(root)) {
+      markMissingRoot(root);
+      return;
+    }
 
     const watcher = chokidar.watch(root, {
       persistent: true,
@@ -2373,6 +3414,11 @@ module.exports = function makeWatchedFolders({
         if (activeRoots.has(root)) return;
         activeRoots.add(root);
         try {
+          if (!fs.existsSync(root)) {
+            markMissingRoot(root);
+            stopFolderWatcher(root);
+            return;
+          }
           await scanRootOnce(root);
         } catch (e) {
           notifyWarn(`Watch rescan failed for "${root}": ${e.message}`);
@@ -2399,8 +3445,21 @@ module.exports = function makeWatchedFolders({
 
       .on("add", async (filePath) => {
         if (rescanInProgress.value) return;
+        const steamInfo = parseSteamOfficialBinInfo(filePath);
+        const isSteamSchemaBin = !!steamInfo && steamInfo.kind === "schema";
+        const isSteamUserBin = !!steamInfo && steamInfo.kind === "user";
         const base = path.basename(filePath).toLowerCase();
+        const isGpd = base.endsWith(".gpd");
+        const isTropusr = base === "tropusr.dat";
+        const isTropconf = base === "tropconf.sfm";
+        const isRpcs3File = isTropusr || isTropconf;
+        const isPs4Xml = base.startsWith("trop") && base.endsWith(".xml");
         if (
+          !isGpd &&
+          !isRpcs3File &&
+          !isPs4Xml &&
+          !isSteamSchemaBin &&
+          !isSteamUserBin &&
           ![
             "achievements.json",
             "achievements.ini",
@@ -2412,15 +3471,123 @@ module.exports = function makeWatchedFolders({
 
         const parts = filePath.split(path.sep);
         let appid = null;
-        for (let i = parts.length - 1; i >= 0; i--) {
-          if (/^[0-9a-fA-F]+$/.test(parts[i])) {
-            appid = parts[i];
-            break;
+        if (isSteamSchemaBin || isSteamUserBin) {
+          appid = steamInfo?.appid || null;
+        } else if (isGpd) {
+          appid = path.basename(filePath, path.extname(filePath));
+        } else if (isRpcs3File) {
+          appid = path.basename(path.dirname(filePath));
+        } else if (isPs4Xml) {
+          // PS4: appid is CUSA folder name, parent of TrophyFiles/trophy00
+          for (let i = parts.length - 1; i >= 1; i--) {
+            if (/^cusa[0-9]+$/i.test(parts[i])) {
+              appid = parts[i];
+              break;
+            }
+          }
+        } else {
+          for (let i = parts.length - 1; i >= 0; i--) {
+            if (/^[0-9a-fA-F]+$/.test(parts[i])) {
+              appid = parts[i];
+              break;
+            }
           }
         }
         if (!appid) return;
 
+        if (isSteamSchemaBin || isSteamUserBin) {
+          try {
+            await handleSteamOfficialBinEvent(steamInfo);
+          } catch (err) {
+            notifyWarn(
+              `Steam official parse failed "${filePath}": ${err.message}`,
+            );
+          }
+        }
+
         let meta = pickMetaForPath(appid, filePath);
+        if (!meta && isGpd) {
+          try {
+            const result = generateConfigFromGpd(filePath, configsDir, {
+              schemaRoot: path.join(configsDir, "schema"),
+            });
+            if (!result || result.skipped) {
+              return;
+            }
+            indexExistingConfigsSync();
+            meta = pickMetaForPath(result.appid, filePath);
+            if (meta) {
+              attachSaveWatcherForAppId(String(meta.appid), {
+                suppressInitialNotify: false,
+              });
+              broadcastAll("configs:changed");
+              broadcastAll("refresh-achievements-table");
+            }
+          } catch (err) {
+            notifyWarn(`Xenia GPD parse failed "${filePath}": ${err.message}`);
+          }
+        }
+        if (!meta && isPs4Xml) {
+          const trophyDir = path.dirname(path.dirname(path.dirname(filePath))); // .../TrophyFiles/trophy00/Xml/file
+          try {
+            const result = await generateConfigFromPs4Dir(
+              trophyDir,
+              configsDir,
+              {
+                schemaRoot: path.join(configsDir, "schema"),
+              },
+            );
+            if (!result || result.skipped) {
+              return;
+            }
+            indexExistingConfigsSync();
+            meta = pickMetaForPath(result.appid, filePath);
+            if (meta) {
+              attachSaveWatcherForAppId(String(meta.appid), {
+                suppressInitialNotify: false,
+              });
+              broadcastAll("configs:changed");
+              broadcastAll("refresh-achievements-table");
+            }
+          } catch (err) {
+            notifyWarn(`PS4 trophy parse failed "${trophyDir}": ${err.message}`);
+          }
+        }
+        if (!meta && isRpcs3File) {
+          const trophyDir = path.dirname(filePath);
+          const baseName = path.basename(trophyDir || "").toLowerCase();
+          if (isRpcs3TempFolderName(baseName)) return;
+          const confPath = path.join(trophyDir, "TROPCONF.SFM");
+          const usrPath = path.join(trophyDir, "TROPUSR.DAT");
+          if (!fs.existsSync(confPath) || !fs.existsSync(usrPath)) {
+            return;
+          }
+          try {
+            const result = await generateConfigFromTrophyDir(
+              trophyDir,
+              configsDir,
+              {
+                schemaRoot: path.join(configsDir, "schema"),
+              },
+            );
+            if (!result || result.skipped) {
+              return;
+            }
+            indexExistingConfigsSync();
+            meta = pickMetaForPath(result.appid, filePath);
+            if (meta) {
+              attachSaveWatcherForAppId(String(meta.appid), {
+                suppressInitialNotify: false,
+              });
+              broadcastAll("configs:changed");
+              broadcastAll("refresh-achievements-table");
+            }
+          } catch (err) {
+            notifyWarn(
+              `RPCS3 trophy parse failed "${trophyDir}": ${err.message}`,
+            );
+          }
+        }
         if (!meta) {
           indexExistingConfigsSync();
           meta = pickMetaForPath(appid, filePath);
@@ -2473,8 +3640,21 @@ module.exports = function makeWatchedFolders({
 
       .on("change", async (filePath) => {
         if (rescanInProgress.value) return;
+        const steamInfo = parseSteamOfficialBinInfo(filePath);
+        const isSteamSchemaBin = !!steamInfo && steamInfo.kind === "schema";
+        const isSteamUserBin = !!steamInfo && steamInfo.kind === "user";
         const base = path.basename(filePath).toLowerCase();
+        const isGpd = base.endsWith(".gpd");
+        const isTropusr = base === "tropusr.dat";
+        const isTropconf = base === "tropconf.sfm";
+        const isRpcs3File = isTropusr || isTropconf;
+        const isPs4Xml = base.startsWith("trop") && base.endsWith(".xml");
         if (
+          !isGpd &&
+          !isRpcs3File &&
+          !isPs4Xml &&
+          !isSteamSchemaBin &&
+          !isSteamUserBin &&
           ![
             "achievements.json",
             "achievements.ini",
@@ -2486,15 +3666,122 @@ module.exports = function makeWatchedFolders({
 
         const parts = filePath.split(path.sep);
         let appid = null;
-        for (let i = parts.length - 1; i >= 0; i--) {
-          if (/^[0-9a-fA-F]+$/.test(parts[i])) {
-            appid = parts[i];
-            break;
+        if (isSteamSchemaBin || isSteamUserBin) {
+          appid = steamInfo?.appid || null;
+        } else if (isGpd) {
+          appid = path.basename(filePath, path.extname(filePath));
+        } else if (isRpcs3File) {
+          appid = path.basename(path.dirname(filePath));
+        } else if (isPs4Xml) {
+          for (let i = parts.length - 1; i >= 1; i--) {
+            if (/^cusa[0-9]+$/i.test(parts[i])) {
+              appid = parts[i];
+              break;
+            }
+          }
+        } else {
+          for (let i = parts.length - 1; i >= 0; i--) {
+            if (/^[0-9a-fA-F]+$/.test(parts[i])) {
+              appid = parts[i];
+              break;
+            }
           }
         }
         if (!appid) return;
 
+        if (isSteamSchemaBin || isSteamUserBin) {
+          try {
+            await handleSteamOfficialBinEvent(steamInfo);
+          } catch (err) {
+            notifyWarn(
+              `Steam official parse failed "${filePath}": ${err.message}`,
+            );
+          }
+        }
+
         let meta = pickMetaForPath(appid, filePath);
+        if (!meta && isGpd) {
+          try {
+            const result = generateConfigFromGpd(filePath, configsDir, {
+              schemaRoot: path.join(configsDir, "schema"),
+            });
+            if (!result || result.skipped) {
+              return;
+            }
+            indexExistingConfigsSync();
+            meta = pickMetaForPath(result.appid, filePath);
+            if (meta) {
+              attachSaveWatcherForAppId(String(meta.appid), {
+                suppressInitialNotify: false,
+              });
+              broadcastAll("configs:changed");
+              broadcastAll("refresh-achievements-table");
+            }
+          } catch (err) {
+            notifyWarn(`Xenia GPD parse failed "${filePath}": ${err.message}`);
+          }
+        }
+        if (!meta && isPs4Xml) {
+          const trophyDir = path.dirname(path.dirname(path.dirname(filePath))); // .../TrophyFiles/trophy00/Xml/file
+          try {
+            const result = await generateConfigFromPs4Dir(
+              trophyDir,
+              configsDir,
+              {
+                schemaRoot: path.join(configsDir, "schema"),
+              },
+            );
+            if (!result || result.skipped) {
+              return;
+            }
+            indexExistingConfigsSync();
+            meta = pickMetaForPath(result.appid, filePath);
+            if (meta) {
+              attachSaveWatcherForAppId(String(meta.appid), {
+                suppressInitialNotify: false,
+              });
+              broadcastAll("configs:changed");
+              broadcastAll("refresh-achievements-table");
+            }
+          } catch (err) {
+            notifyWarn(`PS4 trophy parse failed "${trophyDir}": ${err.message}`);
+          }
+        }
+        if (!meta && isRpcs3File) {
+          const trophyDir = path.dirname(filePath);
+          const baseName = path.basename(trophyDir || "").toLowerCase();
+          if (isRpcs3TempFolderName(baseName)) return;
+          const confPath = path.join(trophyDir, "TROPCONF.SFM");
+          const usrPath = path.join(trophyDir, "TROPUSR.DAT");
+          if (!fs.existsSync(confPath) || !fs.existsSync(usrPath)) {
+            return;
+          }
+          try {
+            const result = await generateConfigFromTrophyDir(
+              trophyDir,
+              configsDir,
+              {
+                schemaRoot: path.join(configsDir, "schema"),
+              },
+            );
+            if (!result || result.skipped) {
+              return;
+            }
+            indexExistingConfigsSync();
+            meta = pickMetaForPath(result.appid, filePath);
+            if (meta) {
+              attachSaveWatcherForAppId(String(meta.appid), {
+                suppressInitialNotify: false,
+              });
+              broadcastAll("configs:changed");
+              broadcastAll("refresh-achievements-table");
+            }
+          } catch (err) {
+            notifyWarn(
+              `RPCS3 trophy parse failed "${trophyDir}": ${err.message}`,
+            );
+          }
+        }
         if (!meta) {
           indexExistingConfigsSync();
           meta = pickMetaForPath(appid, filePath);
@@ -2521,6 +3808,25 @@ module.exports = function makeWatchedFolders({
                 configName: meta?.name || null,
               });
             } catch {}
+            const tenokeReady =
+              meta.__tenoke !== true || tenokeRelinkedConfigs.has(meta.name);
+            if (
+              !bootMode &&
+              tenokeReady &&
+              !justUnblocked.has(String(appid)) &&
+              !suppressAutoSelect.has(String(appid))
+            ) {
+              setTimeout(() => enqueueAutoSelect(meta), 0);
+            } else {
+              watcherLogger.info("auto-select:skip-conditions", {
+                config: meta?.name || null,
+                appid: String(appid),
+                bootMode,
+                tenokeReady,
+                justUnblocked: justUnblocked.has(String(appid)),
+                suppressAutoSelect: suppressAutoSelect.has(String(appid)),
+              });
+            }
           }
         };
         await runEval();
@@ -2535,9 +3841,42 @@ module.exports = function makeWatchedFolders({
         if (rescanInProgress.value) return;
 
         const base = path.basename(dir);
-        if (!isAppIdName(base)) return;
+        const looksPs4 =
+          /^cusa\d+/i.test(base) || base.toLowerCase() === "trophy00";
+        const looksRpcs3 = /^npwr\d+/i.test(base);
+        if (!isAppIdName(base) && !looksPs4 && !looksRpcs3) return;
+
+        // PS4/RPCS3: lăsăm scanarea dedicată să se ocupe (evităm generateConfigForAppId care cere appid numeric)
+        if (looksPs4 || looksRpcs3) {
+          schedule();
+          return;
+        }
 
         if (typeof generateConfigForAppId === "function") {
+          const gpdCandidate = path.join(dir, `${base}.gpd`);
+          const gpdPath = fs.existsSync(gpdCandidate)
+            ? gpdCandidate
+            : (await discoverGpdFilesUnder(dir, 2)).find(Boolean);
+          if (gpdPath) {
+            try {
+              const result = generateConfigFromGpd(gpdPath, configsDir, {
+                schemaRoot: path.join(configsDir, "schema"),
+              });
+              if (!result || result.skipped) {
+                return;
+              }
+              indexExistingConfigsSync();
+              broadcastAll("refresh-achievements-table");
+              const metas = getConfigMetas(String(result.appid));
+              if (metas.length) {
+                attachSaveWatcherForAppId(String(result.appid));
+              }
+              broadcastAll("configs:changed");
+              return;
+            } catch (e) {
+              notifyWarn(`Xenia GPD parse failed "${gpdPath}": ${e.message}`);
+            }
+          }
           try {
             const needsSteamVariant =
               hasPlatformVariant(base, "uplay") &&
@@ -2610,7 +3949,7 @@ module.exports = function makeWatchedFolders({
         } catch {
           return Promise.resolve();
         }
-      })
+      }),
     );
 
     indexExistingConfigsSync();
@@ -2692,7 +4031,7 @@ module.exports = function makeWatchedFolders({
       // Remove only the target while preserving blocked/ignored entries.
       const currentRaw = getUserWatchedFoldersRaw();
       const next = currentRaw.filter(
-        (entry) => normalizePrefPath(entry) !== target
+        (entry) => normalizePrefPath(entry) !== target,
       );
       saveWatchedFolders(next);
 
@@ -2805,6 +4144,9 @@ module.exports = function makeWatchedFolders({
       global.bootDone = true;
     } catch {}
     bootMode = false;
+    try {
+      broadcastAll("boot:complete", { bootMode });
+    } catch {}
     watcherLogger.info("boot:complete", { bootMode });
   });
 

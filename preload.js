@@ -9,6 +9,8 @@ let overlayDataHandler = null;
 contextBridge.exposeInMainWorld("api", {
   // Config management
   saveConfig: (config) => ipcRenderer.invoke("saveConfig", config),
+  regenerateSchema: (payload) =>
+    ipcRenderer.invoke("schema:regenerate", payload),
   loadConfigs: () => ipcRenderer.invoke("loadConfigs"),
   selectFolder: () => ipcRenderer.invoke("selectFolder"),
   deleteConfig: (configName) => ipcRenderer.invoke("delete-config", configName),
@@ -189,6 +191,7 @@ contextBridge.exposeInMainWorld("electron", {
         "show-notification",
         "zoom-factor-changed",
         "request-current-config",
+        "tray:language-changed",
       ];
       if (validChannels.includes(channel)) {
         ipcRenderer.on(channel, (event, ...args) => func(...args));
