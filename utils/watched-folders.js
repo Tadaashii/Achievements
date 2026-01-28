@@ -1300,14 +1300,12 @@ module.exports = function makeWatchedFolders({
       return Array.from(out);
     }
     if (isSteamOfficialMeta(meta)) {
-      if (meta.save_path) out.add(meta.save_path);
-      if (meta.appid) {
+      if (meta.save_path && meta.appid) {
         out.add(
           path.join(meta.save_path, `UserGameStatsSchema_${meta.appid}.bin`),
         );
-        out.add(
-          path.join(meta.save_path, `UserGameStats_*_${meta.appid}.bin`),
-        );
+        const latestUserBin = pickLatestUserBin(meta.save_path, meta.appid);
+        if (latestUserBin) out.add(latestUserBin);
       }
       return Array.from(out);
     }
@@ -1315,31 +1313,7 @@ module.exports = function makeWatchedFolders({
     if (isPs4Meta(meta)) {
       const trophyDir = resolvePs4TrophyDirForMeta(meta);
       if (trophyDir) {
-        out.add(trophyDir);
-        out.add(path.join(trophyDir, "Xml"));
-        // watch specific files
         out.add(path.join(trophyDir, "Xml", "TROP.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_00.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_01.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_02.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_03.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_04.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_05.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_06.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_07.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_08.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_09.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_10.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_11.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_12.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_13.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_14.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_15.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_16.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_17.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_18.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_19.XML"));
-        out.add(path.join(trophyDir, "Xml", "TROP_20.XML"));
       }
       return Array.from(out);
     }
@@ -1416,7 +1390,7 @@ module.exports = function makeWatchedFolders({
     } else if (isRpcs3) {
       if (base !== "tropusr.dat") return;
     } else if (isPs4) {
-      if (!base.endsWith(".xml")) return;
+      if (base !== "trop.xml") return;
     } else if (isSteamOfficial) {
       if (!base.endsWith(".bin") || !base.startsWith("usergamestats_")) return;
       const appidStr = String(meta?.appid || appid || "").toLowerCase();
@@ -3453,7 +3427,7 @@ module.exports = function makeWatchedFolders({
         const isTropusr = base === "tropusr.dat";
         const isTropconf = base === "tropconf.sfm";
         const isRpcs3File = isTropusr || isTropconf;
-        const isPs4Xml = base.startsWith("trop") && base.endsWith(".xml");
+        const isPs4Xml = base === "trop.xml";
         if (
           !isGpd &&
           !isRpcs3File &&
@@ -3648,7 +3622,7 @@ module.exports = function makeWatchedFolders({
         const isTropusr = base === "tropusr.dat";
         const isTropconf = base === "tropconf.sfm";
         const isRpcs3File = isTropusr || isTropconf;
-        const isPs4Xml = base.startsWith("trop") && base.endsWith(".xml");
+        const isPs4Xml = base === "trop.xml";
         if (
           !isGpd &&
           !isRpcs3File &&

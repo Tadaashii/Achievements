@@ -1201,8 +1201,25 @@ function sendConsoleMessageToUI(message, color) {
     msg.startsWith("steam-achievements:request") ||
     msg.startsWith("steam-achievements:success");
   if (suppress) return;
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("notify", { message, color });
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const wc = mainWindow.webContents;
+  if (!wc || wc.isDestroyed?.() || wc.isCrashed?.()) return;
+  // Rate-limit UI notifications to avoid renderer OOM on log storms.
+  const now = Date.now();
+  if (!sendConsoleMessageToUI._bucket) {
+    sendConsoleMessageToUI._bucket = { ts: now, count: 0 };
+  }
+  const bucket = sendConsoleMessageToUI._bucket;
+  if (now - bucket.ts > 2000) {
+    bucket.ts = now;
+    bucket.count = 0;
+  }
+  bucket.count += 1;
+  if (bucket.count > 15) return;
+  try {
+    wc.send("notify", { message: msg, color });
+  } catch {
+    // avoid recursive console error loops
   }
 }
 
@@ -4121,6 +4138,8 @@ function processNextProgressNotification() {
 let currentAchievementsFilePath = null;
 let achievementsWatcher = null;
 let extraAchievementFiles = new Set();
+let achievementMonitorToken = 0;
+let achievementMonitorTimer = null;
 
 if (!fs.existsSync(cacheDir)) {
   fs.mkdirSync(cacheDir, { recursive: true });
@@ -4397,6 +4416,11 @@ function findAchievementFileDeepForAppId(saveBase, appid, maxDepth = 2) {
 
 function monitorAchievementsFile(filePath) {
   if (!filePath) {
+    achievementMonitorToken += 1;
+    if (achievementMonitorTimer) {
+      clearTimeout(achievementMonitorTimer);
+      achievementMonitorTimer = null;
+    }
     if (extraAchievementFiles.size) {
       for (const fp of extraAchievementFiles) {
         try {
@@ -4413,9 +4437,22 @@ function monitorAchievementsFile(filePath) {
     return;
   }
 
-  if (currentAchievementsFilePath === filePath && achievementsWatcher) {
+  const samePathActive =
+    currentAchievementsFilePath === filePath && achievementsWatcher;
+  if (samePathActive && fs.existsSync(filePath)) {
+    if (achievementMonitorTimer) {
+      clearTimeout(achievementMonitorTimer);
+      achievementMonitorTimer = null;
+    }
     return;
   }
+
+  achievementMonitorToken += 1;
+  if (achievementMonitorTimer) {
+    clearTimeout(achievementMonitorTimer);
+    achievementMonitorTimer = null;
+  }
+  const monitorToken = achievementMonitorToken;
 
   if (achievementsWatcher && currentAchievementsFilePath) {
     fs.unwatchFile(currentAchievementsFilePath, achievementsWatcher);
@@ -4836,6 +4873,7 @@ function monitorAchievementsFile(filePath) {
   };
   achievementsWatcher = () => processSnapshot(false);
   const checkFileLoop = () => {
+    if (monitorToken !== achievementMonitorToken) return;
     if (fs.existsSync(filePath)) {
       processSnapshot(false);
 
@@ -4852,6 +4890,7 @@ function monitorAchievementsFile(filePath) {
         fs.unwatchFile(filePath);
       } catch {}
       fs.watchFile(filePath, { interval: 1000 }, achievementsWatcher);
+      achievementMonitorTimer = null;
     } else {
       const baseDir = path.dirname(filePath);
       const tenokePath = path.join(baseDir, "SteamData", "user_stats.ini");
@@ -4903,7 +4942,7 @@ function monitorAchievementsFile(filePath) {
       }
 
       // Retry discovery later in case the save file appears after config load
-      setTimeout(checkFileLoop, 1000);
+      achievementMonitorTimer = setTimeout(checkFileLoop, 1000);
     }
   };
 
@@ -5047,32 +5086,7 @@ ipcMain.on(
       const trophyDir = config.save_path || "";
       const xmlRoot = path.join(trophyDir, "Xml");
       const xmlMain = path.join(xmlRoot, "TROP.XML");
-      const xmlFiles = [
-        xmlMain,
-        path.join(xmlRoot, "TROP_00.XML"),
-        path.join(xmlRoot, "TROP_01.XML"),
-        path.join(xmlRoot, "TROP_02.XML"),
-        path.join(xmlRoot, "TROP_03.XML"),
-        path.join(xmlRoot, "TROP_04.XML"),
-        path.join(xmlRoot, "TROP_05.XML"),
-        path.join(xmlRoot, "TROP_06.XML"),
-        path.join(xmlRoot, "TROP_07.XML"),
-        path.join(xmlRoot, "TROP_08.XML"),
-        path.join(xmlRoot, "TROP_09.XML"),
-        path.join(xmlRoot, "TROP_10.XML"),
-        path.join(xmlRoot, "TROP_11.XML"),
-        path.join(xmlRoot, "TROP_12.XML"),
-        path.join(xmlRoot, "TROP_13.XML"),
-        path.join(xmlRoot, "TROP_14.XML"),
-        path.join(xmlRoot, "TROP_15.XML"),
-        path.join(xmlRoot, "TROP_16.XML"),
-        path.join(xmlRoot, "TROP_17.XML"),
-        path.join(xmlRoot, "TROP_18.XML"),
-        path.join(xmlRoot, "TROP_19.XML"),
-        path.join(xmlRoot, "TROP_20.XML"),
-      ].filter((p) => fs.existsSync(p));
-      achievementsFilePath = xmlFiles.length ? xmlFiles[0] : null;
-      const monitorList = xmlFiles.length ? xmlFiles : null;
+      achievementsFilePath = fs.existsSync(xmlMain) ? xmlMain : null;
       if (!achievementsFilePath) {
         monitorAchievementsFile(null);
         achievementsFilePath = null;
@@ -5093,15 +5107,6 @@ ipcMain.on(
         pendingMissingAchievementFiles.delete(configName);
       }
       monitorAchievementsFile(achievementsFilePath);
-      if (monitorList && achievementsWatcher) {
-        for (const extra of monitorList.slice(1)) {
-          try {
-            fs.unwatchFile(extra);
-            fs.watchFile(extra, { interval: 500 }, achievementsWatcher);
-            extraAchievementFiles.add(extra);
-          } catch {}
-        }
-      }
       if (overlayWindow && !overlayWindow.isDestroyed()) {
         overlayWindow.webContents.send("load-overlay-data", selectedConfig);
         overlayWindow.webContents.send("set-language", {
@@ -5139,26 +5144,6 @@ ipcMain.on(
         pendingMissingAchievementFiles.delete(configName);
       }
       monitorAchievementsFile(achievementsFilePath);
-      if (achievementsWatcher && statsDir && appid) {
-        try {
-          const extras = fs
-            .readdirSync(statsDir)
-            .filter(
-              (f) =>
-                /^usergamestats_.*_[0-9]+\.bin$/i.test(f) &&
-                f.toLowerCase().endsWith(`_${appid.toLowerCase()}.bin`),
-            )
-            .map((f) => path.join(statsDir, f))
-            .filter((p) => p !== achievementsFilePath);
-          for (const extra of extras) {
-            try {
-              fs.unwatchFile(extra);
-              fs.watchFile(extra, { interval: 500 }, achievementsWatcher);
-              extraAchievementFiles.add(extra);
-            } catch {}
-          }
-        } catch {}
-      }
       if (overlayWindow && !overlayWindow.isDestroyed()) {
         overlayWindow.webContents.send("load-overlay-data", selectedConfig);
         overlayWindow.webContents.send("set-language", {
