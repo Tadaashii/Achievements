@@ -422,5 +422,7 @@
   "ui.toggle.hideOptions": "Ascunde optiuni",
   "ui.toggle.showOptions": "Arata optiuni",
   "main.message.schemaPs4Rescan": "Schemele PS4 sunt generate din fișierele de trofee. Rescanează folderul în schimb.",
-  "main.message.schemaSteamOfficialRescan": "Schemele Steam (Official) sunt generate din appcache. Rescanează folderul în schimb."
+  "main.message.schemaSteamOfficialRescan": "Schemele Steam (Official) sunt generate din appcache. Rescanează folderul în schimb.",
+  "boot.loading.title": "Pornire…",
+  "boot.loading.sub": "Se pregătește cache-ul realizărilor"
 }

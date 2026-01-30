@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "Skema pencapaian selesai.",
   "main.achgen.schema.empty": "Skema pencapaian dilewati. Tidak ada pencapaian ditemukan.",
   "main.message.schemaPs4Rescan": "Skema PS4 dibuat dari file trofi. Pindai ulang folder sebagai gantinya.",
-  "main.message.schemaSteamOfficialRescan": "Skema Steam (Official) dibuat dari statistik appcache. Pindai ulang folder statistik sebagai gantinya."
+  "main.message.schemaSteamOfficialRescan": "Skema Steam (Official) dibuat dari statistik appcache. Pindai ulang folder statistik sebagai gantinya.",
+  "boot.loading.title": "Memulai…",
+  "boot.loading.sub": "Menyiapkan cache pencapaian"
 }

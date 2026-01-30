@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "Schemat osiagniec gotowy.",
   "main.achgen.schema.empty": "Pominieto schemat osiagniec. Nie znaleziono osiagniec.",
   "main.message.schemaPs4Rescan": "Schematy PS4 są generowane z plików trofeów. Zamiast tego przeskanuj folder ponownie.",
-  "main.message.schemaSteamOfficialRescan": "Schematy Steam (Official) są generowane ze statystyk appcache. Zamiast tego przeskanuj ponownie folder ze statystykami."
+  "main.message.schemaSteamOfficialRescan": "Schematy Steam (Official) są generowane ze statystyk appcache. Zamiast tego przeskanuj ponownie folder ze statystykami.",
+  "boot.loading.title": "Uruchamianie…",
+  "boot.loading.sub": "Przygotowywanie pamięci podręcznej osiągnięć"
 }

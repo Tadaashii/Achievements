@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "To schima epitevgmaton oloklirothike.",
   "main.achgen.schema.empty": "Paraleipsi schimatos epitevgmaton. Den vrethikan epitevgmata.",
   "main.message.schemaPs4Rescan": "Τα σχήματα PS4 δημιουργούνται από αρχεία τροπαίων. Κάντε επανασάρωση του φακέλου.",
-  "main.message.schemaSteamOfficialRescan": "Τα σχήματα Steam (Official) δημιουργούνται από τα στατιστικά appcache. Κάντε επανασάρωση του φακέλου στατιστικών."
+  "main.message.schemaSteamOfficialRescan": "Τα σχήματα Steam (Official) δημιουργούνται από τα στατιστικά appcache. Κάντε επανασάρωση του φακέλου στατιστικών.",
+  "boot.loading.title": "Εκκίνηση…",
+  "boot.loading.sub": "Προετοιμασία της προσωρινής μνήμης επιτευγμάτων"
 }

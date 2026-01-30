@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "Schema de conquistas concluido.",
   "main.achgen.schema.empty": "Schema de conquistas ignorado. Nenhuma conquista encontrada.",
   "main.message.schemaPs4Rescan": "Os esquemas do PS4 são gerados a partir dos arquivos de troféus. Em vez disso, faça um novo scan da pasta.",
-  "main.message.schemaSteamOfficialRescan": "Os esquemas do Steam (Official) são gerados a partir das estatísticas do appcache. Em vez disso, faça um novo scan da pasta de estatísticas."
+  "main.message.schemaSteamOfficialRescan": "Os esquemas do Steam (Official) são gerados a partir das estatísticas do appcache. Em vez disso, faça um novo scan da pasta de estatísticas.",
+  "boot.loading.title": "Iniciando…",
+  "boot.loading.sub": "Preparando o cache de conquistas"
 }

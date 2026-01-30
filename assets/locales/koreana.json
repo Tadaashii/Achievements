@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "업적 스키마 완료.",
   "main.achgen.schema.empty": "업적 스키마를 건너뜁니다. 업적을 찾지 못했습니다.",
   "main.message.schemaPs4Rescan": "PS4 스키마는 트로피 파일에서 생성됩니다. 대신 폴더를 다시 스캔하세요.",
-  "main.message.schemaSteamOfficialRescan": "Steam (Official) 스키마는 appcache 통계에서 생성됩니다. 대신 통계 폴더를 다시 스캔하세요."
+  "main.message.schemaSteamOfficialRescan": "Steam (Official) 스키마는 appcache 통계에서 생성됩니다. 대신 통계 폴더를 다시 스캔하세요.",
+  "boot.loading.title": "시작 중…",
+  "boot.loading.sub": "도전 과제 캐시를 준비하는 중"
 }

@@ -18,6 +18,10 @@ const { chromium } = require("playwright");
 const { execFileSync } = require("child_process");
 const fs = require("fs/promises");
 const crypto = require("crypto");
+if (typeof global.File === "undefined") {
+  global.File = class File {};
+}
+const cheerio = require("cheerio");
 const { createLogger } = require("./logger");
 const {
   EXOPHASE_LANG_KEYS,
@@ -408,6 +412,23 @@ async function download(url, dest, ms = 20000) {
   } finally {
     clearTimeout(t);
   }
+}
+
+async function mapWithConcurrency(items, limit, handler) {
+  const results = new Array(items.length);
+  let index = 0;
+  const workers = new Array(Math.max(1, limit)).fill(0).map(async () => {
+    while (index < items.length) {
+      const i = index++;
+      try {
+        results[i] = await handler(items[i], i);
+      } catch (err) {
+        results[i] = err;
+      }
+    }
+  });
+  await Promise.all(workers);
+  return results;
 }
 
 /* ---------- GOG helpers ---------- */
@@ -1204,10 +1225,108 @@ async function fetchAchievementsLang(appid, key, lang) {
 }
 
 /* ---------- Scraping SteamDB ---------- */
-async function scrapeSteamDB(appid) {
-  const url = `https://steamdb.info/app/${appid}/stats/`;
-  log(`[${appid}] open`, url);
+function extractSteamDbFromHtml(html, baseUrl, appid) {
+  const $ = cheerio.load(html || "");
+  const rows = [];
+  const seen = new Set();
 
+  const list = $('[id^="achievement-"]');
+  list.each((_, el) => {
+    const $el = $(el);
+    const id = String($el.attr("id") || "");
+    if (!id || !id.startsWith("achievement-")) return;
+
+    const apiName =
+      safeText(
+        $el
+          .find(
+            "div.achievement_inner > div > div.achievement_right > div.achievement_api",
+          )
+          .first()
+          .text(),
+      ) || id.replace(/^achievement-/, "");
+
+    const nameEN = safeText(
+      $el
+        .find(
+          "div.achievement_inner > div > div:nth-child(1) > div.achievement_name",
+        )
+        .first()
+        .text(),
+    );
+    const descEN0 = safeText(
+      $el
+        .find(
+          "div.achievement_inner > div > div:nth-child(1) > div.achievement_desc",
+        )
+        .first()
+        .text(),
+    );
+    const { hidden, clean: descEN } = normalizeHidden(descEN0);
+
+    const iconImg = $el.find("div.achievement_inner > img").first();
+    let iconUrl =
+      iconImg.attr("src") ||
+      iconImg.attr("data-src") ||
+      iconImg.attr("data-original") ||
+      takeFromSrcset(iconImg.attr("srcset")) ||
+      takeFromSrcset(iconImg.attr("data-srcset")) ||
+      "";
+    if (!iconUrl) {
+      const picImg = $el.find(".achievement_inner picture img").first();
+      iconUrl =
+        picImg.attr("src") ||
+        picImg.attr("data-src") ||
+        takeFromSrcset(picImg.attr("srcset")) ||
+        takeFromSrcset(picImg.attr("data-srcset")) ||
+        "";
+      if (!iconUrl) {
+        const source = $el
+          .find(
+            "div.achievement_inner > img ~ source, picture div.achievement_inner > img source, picture .achievement_inner img source",
+          )
+          .first();
+        iconUrl =
+          takeFromSrcset(source.attr("srcset")) ||
+          takeFromSrcset(source.attr("data-srcset")) ||
+          "";
+      }
+    }
+    iconUrl = toAbs(baseUrl, iconUrl);
+
+    const grayImg = $el.find("div.achievement_checkmark > img").first();
+    let iconGrayUrl =
+      grayImg.attr("src") ||
+      grayImg.attr("data-src") ||
+      grayImg.attr("data-original") ||
+      takeFromSrcset(grayImg.attr("srcset")) ||
+      takeFromSrcset(grayImg.attr("data-srcset")) ||
+      "";
+    if (!iconGrayUrl) {
+      const dataName = grayImg.attr("data-name");
+      if (dataName) {
+        iconGrayUrl = `https://cdn.fastly.steamstatic.com/steamcommunity/public/images/apps/${appid}/${dataName}`;
+      }
+    }
+    iconGrayUrl = toAbs(baseUrl, iconGrayUrl);
+
+    const key = apiName || nameEN;
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+
+    rows.push({ apiName, nameEN, descEN, hidden, iconUrl, iconGrayUrl });
+  });
+
+  const title =
+    safeText($('[id="main"] .pagehead-title h1').first().text()) ||
+    safeText($("h1").first().text()) ||
+    safeText($("title").text()) ||
+    "";
+
+  return { rows, title };
+}
+
+async function createSteamScrapeSession() {
   const browser = await launchChromiumSafe({
     headless: !headed,
     args: ["--disable-blink-features=AutomationControlled"],
@@ -1226,6 +1345,32 @@ async function scrapeSteamDB(appid) {
 
   const page = await ctx.newPage();
   page.setDefaultTimeout(15000);
+
+  return {
+    browser,
+    ctx,
+    page,
+    close: async () => {
+      try {
+        await page.close();
+      } catch {}
+      try {
+        await ctx.close();
+      } catch {}
+      try {
+        await browser.close();
+      } catch {}
+    },
+  };
+}
+
+async function scrapeSteamDB(appid, sharedSession = null) {
+  const url = `https://steamdb.info/app/${appid}/stats/`;
+  log(`[${appid}] open`, url);
+
+  const session = sharedSession || (await createSteamScrapeSession());
+  const ownsSession = !sharedSession;
+  const { page } = session;
   await page.goto(url, { waitUntil: "domcontentloaded" });
 
   const list = page.locator('[id^="achievement-"]');
@@ -1235,148 +1380,158 @@ async function scrapeSteamDB(appid) {
     .catch(() => {});
   const count = await list.count();
   if (!count) {
-    await browser.close();
+    if (ownsSession) {
+      await session.close();
+    }
     throw new Error("No achievements found");
   }
   log(`[${appid}] achievements: ${count}`);
-  const gameTitle = safeText(
-    await page
-      .locator("h1")
-      .first()
-      .textContent()
-      .catch(() => ""),
-  );
 
   for (let i = 0; i < count; i++) {
-    await list
-      .nth(i)
-      .scrollIntoViewIfNeeded()
-      .catch(() => {});
+    const item = list.nth(i);
+    await item.scrollIntoViewIfNeeded().catch(() => {});
+    await item.hover().catch(() => {});
     await sleep(12);
   }
 
-  async function extractImgUrl(el, sel, baseUrl) {
-    const img = el.locator(sel).first();
-    if ((await img.count()) === 0) return "";
-    let url = await img.getAttribute("src").catch(() => null);
-    if (!url) {
-      const [ds, dor, ss, dss] = await Promise.all([
-        img.getAttribute("data-src").catch(() => null),
-        img.getAttribute("data-original").catch(() => null),
-        img.getAttribute("srcset").catch(() => null),
-        img.getAttribute("data-srcset").catch(() => null),
-      ]);
-      url = ds || dor || takeFromSrcset(ss) || takeFromSrcset(dss) || "";
-    }
-    if (!url) {
-      const source = el
-        .locator(`${sel} ~ source, picture ${sel} source`)
-        .first();
-      if (await source.count()) {
-        const s1 = await source.getAttribute("srcset").catch(() => null);
-        const s2 = await source.getAttribute("data-srcset").catch(() => null);
-        url = takeFromSrcset(s1) || takeFromSrcset(s2) || "";
+  // HTML-first extraction (faster), DOM fallback if needed
+  let html = "";
+  try {
+    html = await page.content();
+  } catch {}
+  let extracted = { rows: [], title: "" };
+  if (html) {
+    extracted = extractSteamDbFromHtml(html, url, appid);
+  }
+
+  let rows = extracted.rows || [];
+  let gameTitle = extracted.title || "";
+
+  if (!rows.length) {
+    async function extractImgUrl(el, sel, baseUrl) {
+      const img = el.locator(sel).first();
+      if ((await img.count()) === 0) return "";
+      let url = await img.getAttribute("src").catch(() => null);
+      if (!url) {
+        const [ds, dor, ss, dss] = await Promise.all([
+          img.getAttribute("data-src").catch(() => null),
+          img.getAttribute("data-original").catch(() => null),
+          img.getAttribute("srcset").catch(() => null),
+          img.getAttribute("data-srcset").catch(() => null),
+        ]);
+        url = ds || dor || takeFromSrcset(ss) || takeFromSrcset(dss) || "";
       }
+      if (!url) {
+        const source = el
+          .locator(`${sel} ~ source, picture ${sel} source`)
+          .first();
+        if (await source.count()) {
+          const s1 = await source.getAttribute("srcset").catch(() => null);
+          const s2 = await source.getAttribute("data-srcset").catch(() => null);
+          url = takeFromSrcset(s1) || takeFromSrcset(s2) || "";
+        }
+      }
+      return toAbs(baseUrl, url);
     }
-    return toAbs(baseUrl, url);
-  }
-  async function extractGrayUrl(el, baseUrl) {
-    await el.hover().catch(() => {});
-    const img = el.locator("div.achievement_checkmark > img").first();
-    await img.waitFor({ state: "attached" }).catch(() => {});
-    let url = await img.getAttribute("src").catch(() => null);
-    if (!url) {
-      const [ds, dor, ss, dss] = await Promise.all([
-        img.getAttribute("data-src").catch(() => null),
-        img.getAttribute("data-original").catch(() => null),
-        img.getAttribute("srcset").catch(() => null),
-        img.getAttribute("data-srcset").catch(() => null),
-      ]);
-      url = ds || dor || takeFromSrcset(ss) || takeFromSrcset(dss) || "";
+    async function extractGrayUrl(el, baseUrl) {
+      await el.hover().catch(() => {});
+      const img = el.locator("div.achievement_checkmark > img").first();
+      await img.waitFor({ state: "attached" }).catch(() => {});
+      let url = await img.getAttribute("src").catch(() => null);
+      if (!url) {
+        const [ds, dor, ss, dss] = await Promise.all([
+          img.getAttribute("data-src").catch(() => null),
+          img.getAttribute("data-original").catch(() => null),
+          img.getAttribute("srcset").catch(() => null),
+          img.getAttribute("data-srcset").catch(() => null),
+        ]);
+        url = ds || dor || takeFromSrcset(ss) || takeFromSrcset(dss) || "";
+      }
+      if (!url) {
+        const dataName = await img.getAttribute("data-name").catch(() => null);
+        if (dataName)
+          url = `https://cdn.fastly.steamstatic.com/steamcommunity/public/images/apps/${appid}/${dataName}`;
+      }
+      if (!url)
+        url = await img
+          .evaluate((n) => (n && (n.currentSrc || n.src)) || "")
+          .catch(() => "");
+      return toAbs(baseUrl, url || "");
     }
-    if (!url) {
-      const dataName = await img.getAttribute("data-name").catch(() => null);
-      if (dataName)
-        url = `https://cdn.fastly.steamstatic.com/steamcommunity/public/images/apps/${appid}/${dataName}`;
-    }
-    if (!url)
-      url = await img
-        .evaluate((n) => (n && (n.currentSrc || n.src)) || "")
-        .catch(() => "");
-    return toAbs(baseUrl, url || "");
-  }
 
-  const rows = [];
-  for (let i = 0; i < count; i++) {
-    const el = list.nth(i);
-    const id = await el.getAttribute("id").catch(() => null);
-    if (!id || !id.startsWith("achievement-")) continue;
+    rows = [];
+    for (let i = 0; i < count; i++) {
+      const el = list.nth(i);
+      const id = await el.getAttribute("id").catch(() => null);
+      if (!id || !id.startsWith("achievement-")) continue;
 
-    const apiName =
-      safeText(
-        await el
-          .locator(
-            "div.achievement_inner > div > div.achievement_right > div.achievement_api",
-          )
+      const apiName =
+        safeText(
+          await el
+            .locator(
+              "div.achievement_inner > div > div.achievement_right > div.achievement_api",
+            )
+            .textContent()
+            .catch(() => ""),
+        ) || id.replace(/^achievement-/, "");
+      const nameEN =
+        safeText(
+          await el
+            .locator(
+              "div.achievement_inner > div > div:nth-child(1) > div.achievement_name",
+            )
+            .textContent()
+            .catch(() => ""),
+        ) || "";
+      const descEN0 =
+        safeText(
+          await el
+            .locator(
+              "div.achievement_inner > div > div:nth-child(1) > div.achievement_desc",
+            )
+            .textContent()
+            .catch(() => ""),
+        ) || "";
+      const { hidden, clean: descEN } = normalizeHidden(descEN0);
+
+      let iconUrl = await extractImgUrl(el, "div.achievement_inner > img", url);
+      if (!iconUrl)
+        iconUrl = await extractImgUrl(
+          el,
+          ".achievement_inner picture img",
+          url,
+        );
+      let iconGrayUrl = await extractGrayUrl(el, url);
+
+      rows.push({ apiName, nameEN, descEN, hidden, iconUrl, iconGrayUrl });
+      if (verbose && i % 10 === 0) log(`[${appid}] scraped ${i + 1}/${count}`);
+    }
+
+    if (!gameTitle) {
+      gameTitle = safeText(
+        await page
+          .locator("h1")
+          .first()
           .textContent()
           .catch(() => ""),
-      ) || id.replace(/^achievement-/, "");
-    const nameEN =
-      safeText(
-        await el
-          .locator(
-            "div.achievement_inner > div > div:nth-child(1) > div.achievement_name",
-          )
-          .textContent()
-          .catch(() => ""),
-      ) || "";
-    const descEN0 =
-      safeText(
-        await el
-          .locator(
-            "div.achievement_inner > div > div:nth-child(1) > div.achievement_desc",
-          )
-          .textContent()
-          .catch(() => ""),
-      ) || "";
-    const { hidden, clean: descEN } = normalizeHidden(descEN0);
-
-    let iconUrl = await extractImgUrl(el, "div.achievement_inner > img", url);
-    if (!iconUrl)
-      iconUrl = await extractImgUrl(el, ".achievement_inner picture img", url);
-    let iconGrayUrl = await extractGrayUrl(el, url);
-
-    rows.push({ apiName, nameEN, descEN, hidden, iconUrl, iconGrayUrl });
-    if (verbose && i % 10 === 0) log(`[${appid}] scraped ${i + 1}/${count}`);
+      );
+    }
   }
 
-  await browser.close();
+  if (ownsSession) {
+    await session.close();
+  }
   return { rows, title: gameTitle };
 }
 
 /* ---------- Scraping SteamHunters ---------- */
-async function scrapeSteamHunters(appid) {
+async function scrapeSteamHunters(appid, sharedSession = null) {
   const url = `https://steamhunters.com/apps/${appid}/achievements`;
   log(`[${appid}] fallback open`, url);
 
-  const browser = await launchChromiumSafe({
-    headless: !headed,
-    args: ["--disable-blink-features=AutomationControlled"],
-  });
-  const ctx = await browser.newContext({
-    userAgent:
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121 Safari/537.36",
-    viewport: { width: 1400, height: 1000 },
-  });
-
-  await ctx.route("**/*", (route) => {
-    const u = route.request().url();
-    if (/\.(mp4|webm|gif|woff2?|ttf|otf)$/i.test(u)) return route.abort();
-    route.continue();
-  });
-
-  const page = await ctx.newPage();
-  page.setDefaultTimeout(15000);
+  const session = sharedSession || (await createSteamScrapeSession());
+  const ownsSession = !sharedSession;
+  const { page } = session;
   await page.goto(url, { waitUntil: "domcontentloaded" });
 
   // a<href="/apps/<appid>/achievements/...">
@@ -1386,95 +1541,172 @@ async function scrapeSteamHunters(appid) {
     })
     .catch(() => {});
 
-  const rows = await page.$$eval(
-    'a[href*="/achievements/"][href*="/apps/"]',
-    (links) => {
-      const safeText = (s) => (s || "").replace(/\u00A0/g, " ").trim();
-      const takeFromSrcset = (ss) => {
-        if (!ss) return "";
-        const p = ss
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean)
-          .map((s) => s.split(/\s+/)[0]);
-        return p[0] || "";
-      };
-      const abs = (u) => {
-        if (!u) return "";
-        if (/^https?:\/\//i.test(u)) return u;
-        if (u.startsWith("//")) return "https:" + u;
-        try {
-          return new URL(u, location.origin).toString();
-        } catch {
-          return u;
-        }
-      };
+  function extractSteamHuntersFromHtml(html, baseUrl) {
+    const $ = cheerio.load(html || "");
+    const out = [];
+    const seen = new Set();
 
-      const out = [];
-      for (const a of links) {
-        const displayName = safeText(a.textContent);
-        const row = a.closest("tr") || a.closest("li") || a.closest("div");
-
-        const descEl = row && row.querySelector("p.small");
-        const descEN = safeText(descEl ? descEl.textContent : "");
-
-        // icon (<span class="image ..."><img ...>)
-        const img =
-          row &&
-          (row.querySelector("span.image img") || row.querySelector("img"));
-        let iconUrl = "";
-        if (img) {
-          iconUrl =
-            img.getAttribute("src") ||
-            img.getAttribute("data-src") ||
-            takeFromSrcset(
-              img.getAttribute("srcset") || img.getAttribute("data-srcset"),
-            );
-          iconUrl = abs(iconUrl);
-        }
-
-        // API Name  title/data-original-title
-        const span = row && row.querySelector("span.image");
-        const title =
-          (span &&
-            (span.getAttribute("title") ||
-              span.getAttribute("data-original-title"))) ||
-          "";
-        let apiName = "";
-        const m = /API Name:\s*([^\s<>"']+)/i.exec(title);
-        if (m) apiName = m[1];
-
-        out.push({
-          apiName,
-          nameEN: displayName,
-          descEN,
-          hidden: /^Hidden achievement:/i.test(descEN) ? 1 : 0,
-          iconUrl,
-          iconGrayUrl: "", // if not exists use icon
-        });
+    const abs = (u) => {
+      if (!u) return "";
+      if (/^https?:\/\//i.test(u)) return u;
+      if (u.startsWith("//")) return "https:" + u;
+      try {
+        return new URL(u, baseUrl).toString();
+      } catch {
+        return u;
       }
+    };
 
-      // apiName (fallback on name)
-      const seen = new Set(),
-        uniq = [];
-      for (const r of out) {
-        const key = r.apiName || r.nameEN;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        uniq.push(r);
-      }
-      return uniq;
-    },
-  );
+    const links = $('a[href*="/achievements/"][href*="/apps/"]');
+    links.each((_, el) => {
+      const $a = $(el);
+      const displayName = safeText($a.text());
+      const row = $a.closest("tr, li, div");
 
-  const gameTitle = safeText(
-    await page
-      .locator("h1")
-      .first()
-      .textContent()
-      .catch(() => ""),
-  );
-  await browser.close();
+      const descEN = safeText(row.find("p.small").first().text());
+
+      const img = row.find("span.image img, img").first();
+      let iconUrl =
+        img.attr("src") ||
+        img.attr("data-src") ||
+        takeFromSrcset(img.attr("srcset")) ||
+        takeFromSrcset(img.attr("data-srcset")) ||
+        "";
+      iconUrl = abs(iconUrl);
+
+      const span = row.find("span.image").first();
+      const title =
+        span.attr("title") || span.attr("data-original-title") || "";
+      let apiName = "";
+      const m = /API Name:\s*([^\s<>"']+)/i.exec(title);
+      if (m) apiName = m[1];
+
+      const key = apiName || displayName;
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+
+      out.push({
+        apiName,
+        nameEN: displayName,
+        descEN,
+        hidden: /^Hidden achievement:/i.test(descEN) ? 1 : 0,
+        iconUrl,
+        iconGrayUrl: "", // if not exists use icon
+      });
+    });
+
+    const title = safeText($("h1").first().text());
+    return { rows: out, title };
+  }
+
+  // HTML-first extraction (faster), DOM fallback if needed
+  let html = "";
+  try {
+    html = await page.content();
+  } catch {}
+
+  let extracted = { rows: [], title: "" };
+  if (html) {
+    extracted = extractSteamHuntersFromHtml(html, url);
+  }
+  let rows = extracted.rows || [];
+  let gameTitle = extracted.title || "";
+
+  if (!rows.length) {
+    rows = await page.$$eval(
+      'a[href*="/achievements/"][href*="/apps/"]',
+      (links) => {
+        const safeText = (s) => (s || "").replace(/\u00A0/g, " ").trim();
+        const takeFromSrcset = (ss) => {
+          if (!ss) return "";
+          const p = ss
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .map((s) => s.split(/\s+/)[0]);
+          return p[0] || "";
+        };
+        const abs = (u) => {
+          if (!u) return "";
+          if (/^https?:\/\//i.test(u)) return u;
+          if (u.startsWith("//")) return "https:" + u;
+          try {
+            return new URL(u, location.origin).toString();
+          } catch {
+            return u;
+          }
+        };
+
+        const out = [];
+        for (const a of links) {
+          const displayName = safeText(a.textContent);
+          const row = a.closest("tr") || a.closest("li") || a.closest("div");
+
+          const descEl = row && row.querySelector("p.small");
+          const descEN = safeText(descEl ? descEl.textContent : "");
+
+          // icon (<span class="image ..."><img ...>)
+          const img =
+            row &&
+            (row.querySelector("span.image img") || row.querySelector("img"));
+          let iconUrl = "";
+          if (img) {
+            iconUrl =
+              img.getAttribute("src") ||
+              img.getAttribute("data-src") ||
+              takeFromSrcset(
+                img.getAttribute("srcset") || img.getAttribute("data-srcset"),
+              );
+            iconUrl = abs(iconUrl);
+          }
+
+          // API Name  title/data-original-title
+          const span = row && row.querySelector("span.image");
+          const title =
+            (span &&
+              (span.getAttribute("title") ||
+                span.getAttribute("data-original-title"))) ||
+            "";
+          let apiName = "";
+          const m = /API Name:\s*([^\s<>"']+)/i.exec(title);
+          if (m) apiName = m[1];
+
+          out.push({
+            apiName,
+            nameEN: displayName,
+            descEN,
+            hidden: /^Hidden achievement:/i.test(descEN) ? 1 : 0,
+            iconUrl,
+            iconGrayUrl: "", // if not exists use icon
+          });
+        }
+
+        // apiName (fallback on name)
+        const seen = new Set(),
+          uniq = [];
+        for (const r of out) {
+          const key = r.apiName || r.nameEN;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          uniq.push(r);
+        }
+        return uniq;
+      },
+    );
+  }
+
+  if (!gameTitle) {
+    gameTitle = safeText(
+      await page
+        .locator("h1")
+        .first()
+        .textContent()
+        .catch(() => ""),
+    );
+  }
+  if (ownsSession) {
+    await session.close();
+  }
 
   if (!rows.length) throw new Error("No achievements found (SteamHunters)");
   return { rows, title: gameTitle };
@@ -1485,11 +1717,20 @@ function uniqueLangsWithEnglish(langs) {
   s.add("english");
   return Array.from(s);
 }
-async function buildAchievementsFromScrape(appid, imgDir, meta = {}) {
+async function buildAchievementsFromScrape(
+  appid,
+  imgDir,
+  meta = {},
+  sharedSession = null,
+) {
   let scraped = [];
   let scrapedTitle = "";
+  const session = sharedSession;
   try {
-    const data = await scrapeSteamDB(appid);
+    const data = session
+      ? await scrapeSteamDB(appid, session)
+      : await scrapeSteamDB(appid);
+    emit("info", "steam-scrape:source", { appid, source: "steamdb" });
     if (Array.isArray(data)) {
       scraped = data;
     } else {
@@ -1503,7 +1744,8 @@ async function buildAchievementsFromScrape(appid, imgDir, meta = {}) {
       )} -> trying SteamHunters`,
     );
     try {
-      const data = await scrapeSteamHunters(appid);
+      const data = await scrapeSteamHunters(appid, session);
+      emit("info", "steam-scrape:source", { appid, source: "steamhunters" });
       if (Array.isArray(data)) {
         scraped = data;
       } else {
@@ -1521,34 +1763,35 @@ async function buildAchievementsFromScrape(appid, imgDir, meta = {}) {
   }
 
   const results = [];
+  const downloadTasks = [];
+  const urlToRel = new Map();
+
+  const registerUrl = (url, fallbackName) => {
+    if (!url) return "";
+    if (urlToRel.has(url)) return urlToRel.get(url) || "";
+    let baseName = "";
+    try {
+      baseName = sanitize(
+        path.basename(new URL(url).pathname).replace(/\.[^.]+$/, ""),
+      );
+    } catch {
+      baseName = sanitize(fallbackName || "ach_icon");
+    }
+    const file = `${baseName}${extFromUrl(url)}`;
+    const rel = `img/${file}`;
+    urlToRel.set(url, rel);
+    downloadTasks.push({ url, dest: path.join(imgDir, file) });
+    return rel;
+  };
+
   for (const a of scraped) {
     const enNorm = normalizeHidden(a.descEN || "");
     const hidden = enNorm.hidden ? 1 : a.hidden ? 1 : 0;
 
-    let iconRel = "";
-    let iconGrayRel = "";
-    if (a.iconUrl) {
-      const baseName =
-        sanitize(
-          path.basename(new URL(a.iconUrl).pathname).replace(/\.[^.]+$/, ""),
-        ) || sanitize(a.apiName + "_icon");
-      const file = `${baseName}${extFromUrl(a.iconUrl)}`;
-      await download(a.iconUrl, path.join(imgDir, file));
-      iconRel = `img/${file}`;
-    }
-    if (a.iconGrayUrl) {
-      const baseName =
-        sanitize(
-          path
-            .basename(new URL(a.iconGrayUrl).pathname)
-            .replace(/\.[^.]+$/, ""),
-        ) || sanitize(a.apiName + "_gray");
-      const file = `${baseName}${extFromUrl(a.iconGrayUrl)}`;
-      await download(a.iconGrayUrl, path.join(imgDir, file));
-      iconGrayRel = `img/${file}`;
-    } else {
-      iconGrayRel = iconRel;
-    }
+    const iconRel = registerUrl(a.iconUrl, `${a.apiName}_icon`);
+    const iconGrayRel = a.iconGrayUrl
+      ? registerUrl(a.iconGrayUrl, `${a.apiName}_gray`)
+      : iconRel;
 
     results.push({
       hidden,
@@ -1557,6 +1800,14 @@ async function buildAchievementsFromScrape(appid, imgDir, meta = {}) {
       icon: iconRel,
       icon_gray: iconGrayRel,
       name: a.apiName,
+    });
+  }
+
+  if (downloadTasks.length) {
+    await mapWithConcurrency(downloadTasks, 10, async (task) => {
+      if (!task || !task.url) return;
+      if (fsSync.existsSync(task.dest)) return;
+      await download(task.url, task.dest);
     });
   }
 
@@ -1581,6 +1832,7 @@ async function buildAchievementsFromScrape(appid, imgDir, meta = {}) {
           platform,
           langKeys: EXOPHASE_LANG_KEYS,
           langMap: EXOPHASE_LANG_MAP,
+          page: session?.page,
         });
         usedSlug = candidate;
         break;
@@ -1643,220 +1895,246 @@ async function processOneApp(appMeta, apiKey, outBaseDir) {
   await fs.mkdir(imgDir, { recursive: true });
 
   const achievements = [];
+  let steamSession = null;
+  const ensureSteamSession = async () => {
+    if (!steamSession) {
+      steamSession = await createSteamScrapeSession();
+    }
+    return steamSession;
+  };
+  const closeSteamSession = async () => {
+    if (!steamSession) return;
+    await steamSession.close();
+    steamSession = null;
+  };
 
-  if (wantsGog) {
-    return processGogApp(folderId, outBaseDir);
-  }
-  if (wantsEpic) {
-    const langsToFetch = uniqueLangsWithEnglish(STEAM_LANGS);
-    const perLangByApi = {};
+  try {
+    if (wantsGog) {
+      return processGogApp(folderId, outBaseDir);
+    }
+    if (wantsEpic) {
+      const langsToFetch = uniqueLangsWithEnglish(STEAM_LANGS);
+      const perLangByApi = {};
 
-    await Promise.all(
-      langsToFetch.map(async (lang) => {
-        const locale = epicLocaleForLang(lang);
-        try {
-          const items = await fetchEpicAchievements(appid, locale);
-          const map = new Map();
-          for (const item of items) {
-            const parsed = parseEpicAchievement(item);
-            if (!parsed || !parsed.apiName) continue;
-            map.set(parsed.apiName, parsed);
+      await Promise.all(
+        langsToFetch.map(async (lang) => {
+          const locale = epicLocaleForLang(lang);
+          try {
+            const items = await fetchEpicAchievements(appid, locale);
+            const map = new Map();
+            for (const item of items) {
+              const parsed = parseEpicAchievement(item);
+              if (!parsed || !parsed.apiName) continue;
+              map.set(parsed.apiName, parsed);
+            }
+            perLangByApi[lang] = map;
+          } catch (e) {
+            emit("warn", `[${appid}] Epic API failed for ${lang}`, {
+              appid,
+              lang: locale,
+              error: String(e?.message || e),
+            });
+            perLangByApi[lang] = new Map();
           }
-          perLangByApi[lang] = map;
-        } catch (e) {
-          emit("warn", `[${appid}] Epic API failed for ${lang}`, {
-            appid,
-            lang: locale,
-            error: String(e?.message || e),
-          });
-          perLangByApi[lang] = new Map();
-        }
-      }),
-    );
+        }),
+      );
 
-    let enMap = perLangByApi["english"];
-    if (!enMap || enMap.size === 0) {
-      enMap =
-        Object.values(perLangByApi).find((m) => m && m.size > 0) || new Map();
-    }
-
-    for (const [apiName, enEntry = {}] of enMap.entries()) {
-      const displayName = {};
-      const description = {};
-      let hidden = enEntry.hidden ? 1 : 0;
-
-      displayName.english = enEntry.displayName || "";
-      description.english = enEntry.description || "";
-
-      for (const lang of langsToFetch) {
-        if (lang === "english") continue;
-        const entry = perLangByApi[lang]?.get(apiName);
-        if (entry?.displayName) displayName[lang] = entry.displayName;
-        if (entry?.description) description[lang] = entry.description;
-        if (entry?.hidden) hidden = 1;
+      let enMap = perLangByApi["english"];
+      if (!enMap || enMap.size === 0) {
+        enMap =
+          Object.values(perLangByApi).find((m) => m && m.size > 0) || new Map();
       }
 
-      let iconUrl = enEntry.icon || "";
-      let iconGrayUrl = enEntry.icon_gray || "";
-      if (!iconUrl || !iconGrayUrl) {
+      for (const [apiName, enEntry = {}] of enMap.entries()) {
+        const displayName = {};
+        const description = {};
+        let hidden = enEntry.hidden ? 1 : 0;
+
+        displayName.english = enEntry.displayName || "";
+        description.english = enEntry.description || "";
+
         for (const lang of langsToFetch) {
+          if (lang === "english") continue;
           const entry = perLangByApi[lang]?.get(apiName);
-          if (!iconUrl && entry?.icon) iconUrl = entry.icon;
-          if (!iconGrayUrl && entry?.icon_gray) iconGrayUrl = entry.icon_gray;
+          if (entry?.displayName) displayName[lang] = entry.displayName;
+          if (entry?.description) description[lang] = entry.description;
+          if (entry?.hidden) hidden = 1;
         }
-      }
 
-      let iconRel = "";
-      let iconGrayRel = "";
-      if (iconUrl) {
-        const baseName =
-          sanitize(
-            path.basename(new URL(iconUrl).pathname).replace(/\.[^.]+$/, ""),
-          ) || sanitize(apiName);
-        const file = `${baseName}${extFromUrl(iconUrl)}`;
-        await download(iconUrl, path.join(imgDir, file));
-        iconRel = `img/${file}`;
-      }
-      if (iconGrayUrl) {
-        const baseName =
-          sanitize(
-            path
-              .basename(new URL(iconGrayUrl).pathname)
-              .replace(/\.[^.]+$/, ""),
-          ) || sanitize(apiName + "_gray");
-        const file = `${baseName}${extFromUrl(iconGrayUrl)}`;
-        await download(iconGrayUrl, path.join(imgDir, file));
-        iconGrayRel = `img/${file}`;
-      } else {
-        iconGrayRel = iconRel;
-      }
+        let iconUrl = enEntry.icon || "";
+        let iconGrayUrl = enEntry.icon_gray || "";
+        if (!iconUrl || !iconGrayUrl) {
+          for (const lang of langsToFetch) {
+            const entry = perLangByApi[lang]?.get(apiName);
+            if (!iconUrl && entry?.icon) iconUrl = entry.icon;
+            if (!iconGrayUrl && entry?.icon_gray) iconGrayUrl = entry.icon_gray;
+          }
+        }
 
-      achievements.push({
-        hidden,
-        displayName,
-        description,
-        icon: iconRel,
-        icon_gray: iconGrayRel,
-        name: apiName,
-      });
-    }
-  } else if (apiKey) {
-    // ===== API-ONLY =====
-    // 1) langs
-    const langsToFetch = uniqueLangsWithEnglish(STEAM_LANGS);
+        let iconRel = "";
+        let iconGrayRel = "";
+        if (iconUrl) {
+          const baseName =
+            sanitize(
+              path.basename(new URL(iconUrl).pathname).replace(/\.[^.]+$/, ""),
+            ) || sanitize(apiName);
+          const file = `${baseName}${extFromUrl(iconUrl)}`;
+          await download(iconUrl, path.join(imgDir, file));
+          iconRel = `img/${file}`;
+        }
+        if (iconGrayUrl) {
+          const baseName =
+            sanitize(
+              path
+                .basename(new URL(iconGrayUrl).pathname)
+                .replace(/\.[^.]+$/, ""),
+            ) || sanitize(apiName + "_gray");
+          const file = `${baseName}${extFromUrl(iconGrayUrl)}`;
+          await download(iconGrayUrl, path.join(imgDir, file));
+          iconGrayRel = `img/${file}`;
+        } else {
+          iconGrayRel = iconRel;
+        }
 
-    // 2) fetch achievements -> fallback schema
-    const perLangByApi = {};
-    for (const lang of langsToFetch) {
-      let map = null;
-      try {
-        map = await fetchAchievementsLang(appid, apiKey, lang);
-      } catch {
-        map = null;
+        achievements.push({
+          hidden,
+          displayName,
+          description,
+          icon: iconRel,
+          icon_gray: iconGrayRel,
+          name: apiName,
+        });
       }
-      if (map && map.size) {
-        perLangByApi[lang] = map;
-      } else {
-        emit("info", "steam-achievements:fallback-schema", { appid, lang });
+    } else if (apiKey) {
+      // ===== API-ONLY =====
+      // 1) langs
+      const langsToFetch = uniqueLangsWithEnglish(STEAM_LANGS);
+
+      // 2) fetch achievements -> fallback schema
+      const perLangByApi = {};
+      for (const lang of langsToFetch) {
+        let map = null;
         try {
-          map = await fetchSchemaLang(appid, apiKey, lang);
+          map = await fetchAchievementsLang(appid, apiKey, lang);
         } catch {
           map = null;
         }
-        perLangByApi[lang] = map || new Map();
-      }
-      if (STEAM_API_GAP_MS > 0) {
-        await sleep(STEAM_API_GAP_MS);
-      }
-    }
-
-    // 3) take EN
-    let enMap = perLangByApi["english"];
-    if (!enMap || enMap.size === 0) {
-      // fallback: all langs
-      const keys = new Set();
-      for (const m of Object.values(perLangByApi))
-        for (const k of m.keys()) keys.add(k);
-      enMap = new Map(Array.from(keys).map((k) => [k, {}]));
-    }
-
-    for (const [apiName, enEntry] of enMap.entries()) {
-      // --- API ---
-      const displayName = {};
-      const description = {};
-      let hidden = 0;
-
-      displayName.english = enEntry?.displayName || "";
-      description.english = enEntry?.description || "";
-      if (enEntry?.hidden) hidden = 1;
-
-      for (const lang of langsToFetch) {
-        if (lang === "english") continue;
-        const entry = perLangByApi[lang]?.get(apiName);
-        if (entry?.displayName) displayName[lang] = entry.displayName;
-        if (entry?.description) description[lang] = entry.description;
-        if (entry?.hidden) hidden = 1;
-      }
-
-      // --- API Images ---
-      let iconUrl = enEntry?.icon || "";
-      let iconGrayUrl = enEntry?.icongray || "";
-      if (!iconUrl || !iconGrayUrl) {
-        for (const lang of langsToFetch) {
-          const entry = perLangByApi[lang]?.get(apiName);
-          if (!iconUrl && entry?.icon) iconUrl = entry.icon;
-          if (!iconGrayUrl && entry?.icongray) iconGrayUrl = entry.icongray;
-          if (iconUrl && iconGrayUrl) break;
+        if (map && map.size) {
+          perLangByApi[lang] = map;
+        } else {
+          emit("info", "steam-achievements:fallback-schema", { appid, lang });
+          try {
+            map = await fetchSchemaLang(appid, apiKey, lang);
+          } catch {
+            map = null;
+          }
+          perLangByApi[lang] = map || new Map();
+        }
+        if (STEAM_API_GAP_MS > 0) {
+          await sleep(STEAM_API_GAP_MS);
         }
       }
 
-      // --- download images ---
-      let iconRel = "",
-        iconGrayRel = "";
-      if (iconUrl) {
-        const baseName =
-          sanitize(
-            path.basename(new URL(iconUrl).pathname).replace(/\.[^.]+$/, ""),
-          ) || sanitize(apiName + "_icon");
-        const file = `${baseName}${extFromUrl(iconUrl)}`;
-        await download(iconUrl, path.join(imgDir, file));
-        iconRel = `img/${file}`;
-      }
-      if (iconGrayUrl) {
-        const baseName =
-          sanitize(
-            path
-              .basename(new URL(iconGrayUrl).pathname)
-              .replace(/\.[^.]+$/, ""),
-          ) || sanitize(apiName + "_gray");
-        const file = `${baseName}${extFromUrl(iconGrayUrl)}`;
-        await download(iconGrayUrl, path.join(imgDir, file));
-        iconGrayRel = `img/${file}`;
+      // 3) take EN
+      let enMap = perLangByApi["english"];
+      if (!enMap || enMap.size === 0) {
+        // fallback: all langs
+        const keys = new Set();
+        for (const m of Object.values(perLangByApi))
+          for (const k of m.keys()) keys.add(k);
+        enMap = new Map(Array.from(keys).map((k) => [k, {}]));
       }
 
-      achievements.push({
-        hidden,
-        displayName,
-        description,
-        icon: iconRel,
-        icon_gray: iconGrayRel,
-        name: apiName,
-      });
-    }
-    if (achievements.length === 0) {
+      for (const [apiName, enEntry] of enMap.entries()) {
+        // --- API ---
+        const displayName = {};
+        const description = {};
+        let hidden = 0;
+
+        displayName.english = enEntry?.displayName || "";
+        description.english = enEntry?.description || "";
+        if (enEntry?.hidden) hidden = 1;
+
+        for (const lang of langsToFetch) {
+          if (lang === "english") continue;
+          const entry = perLangByApi[lang]?.get(apiName);
+          if (entry?.displayName) displayName[lang] = entry.displayName;
+          if (entry?.description) description[lang] = entry.description;
+          if (entry?.hidden) hidden = 1;
+        }
+
+        // --- API Images ---
+        let iconUrl = enEntry?.icon || "";
+        let iconGrayUrl = enEntry?.icongray || "";
+        if (!iconUrl || !iconGrayUrl) {
+          for (const lang of langsToFetch) {
+            const entry = perLangByApi[lang]?.get(apiName);
+            if (!iconUrl && entry?.icon) iconUrl = entry.icon;
+            if (!iconGrayUrl && entry?.icongray) iconGrayUrl = entry.icongray;
+            if (iconUrl && iconGrayUrl) break;
+          }
+        }
+
+        // --- download images ---
+        let iconRel = "",
+          iconGrayRel = "";
+        if (iconUrl) {
+          const baseName =
+            sanitize(
+              path.basename(new URL(iconUrl).pathname).replace(/\.[^.]+$/, ""),
+            ) || sanitize(apiName + "_icon");
+          const file = `${baseName}${extFromUrl(iconUrl)}`;
+          await download(iconUrl, path.join(imgDir, file));
+          iconRel = `img/${file}`;
+        }
+        if (iconGrayUrl) {
+          const baseName =
+            sanitize(
+              path
+                .basename(new URL(iconGrayUrl).pathname)
+                .replace(/\.[^.]+$/, ""),
+            ) || sanitize(apiName + "_gray");
+          const file = `${baseName}${extFromUrl(iconGrayUrl)}`;
+          await download(iconGrayUrl, path.join(imgDir, file));
+          iconGrayRel = `img/${file}`;
+        }
+
+        achievements.push({
+          hidden,
+          displayName,
+          description,
+          icon: iconRel,
+          icon_gray: iconGrayRel,
+          name: apiName,
+        });
+      }
+      if (achievements.length === 0) {
+        achievements.push(
+          ...(await buildAchievementsFromScrape(
+            appid,
+            imgDir,
+            {
+              platform: meta?.platform || targetPlatform,
+            },
+            await ensureSteamSession(),
+          )),
+        );
+      }
+    } else {
+      // ===== STEAMDB-ONLY =====
       achievements.push(
-        ...(await buildAchievementsFromScrape(appid, imgDir, {
-          platform: meta?.platform || targetPlatform,
-        })),
+        ...(await buildAchievementsFromScrape(
+          appid,
+          imgDir,
+          {
+            platform: meta?.platform || targetPlatform,
+          },
+          await ensureSteamSession(),
+        )),
       );
     }
-  } else {
-    // ===== STEAMDB-ONLY =====
-    achievements.push(
-      ...(await buildAchievementsFromScrape(appid, imgDir, {
-        platform: meta?.platform || targetPlatform,
-      })),
-    );
+  } finally {
+    await closeSteamSession();
   }
 
   const gogCredentialsReady =

@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "Hoan tat schema thanh tich.",
   "main.achgen.schema.empty": "Bo qua schema thanh tich. Khong tim thay thanh tich.",
   "main.message.schemaPs4Rescan": "Lược đồ PS4 được tạo từ các tệp cúp. Hãy quét lại thư mục thay vào đó.",
-  "main.message.schemaSteamOfficialRescan": "Lược đồ Steam (Official) được tạo từ thống kê appcache. Hãy quét lại thư mục thống kê thay vào đó."
+  "main.message.schemaSteamOfficialRescan": "Lược đồ Steam (Official) được tạo từ thống kê appcache. Hãy quét lại thư mục thống kê thay vào đó.",
+  "boot.loading.title": "Đang khởi động…",
+  "boot.loading.sub": "Đang chuẩn bị bộ đệm thành tích"
 }

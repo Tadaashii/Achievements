@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "Schema des succes termine.",
   "main.achgen.schema.empty": "Schema des succes ignore. Aucun succes trouve.",
   "main.message.schemaPs4Rescan": "Les schémas PS4 sont générés à partir des fichiers de trophées. Rescanez plutôt le dossier.",
-  "main.message.schemaSteamOfficialRescan": "Les schémas Steam (Official) sont générés à partir des statistiques appcache. Rescanez plutôt le dossier des statistiques."
+  "main.message.schemaSteamOfficialRescan": "Les schémas Steam (Official) sont générés à partir des statistiques appcache. Rescanez plutôt le dossier des statistiques.",
+  "boot.loading.title": "Démarrage…",
+  "boot.loading.sub": "Préparation du cache des succès"
 }

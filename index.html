@@ -176,6 +176,14 @@
       </div>
     </div>
 
+    <div id="bootLoading" role="status" aria-live="polite">
+      <div class="boot-loading-card">
+        <div class="boot-spinner" aria-hidden="true"></div>
+        <div class="boot-loading-title">Booting…</div>
+        <div class="boot-loading-sub">Preparing achievements cache</div>
+      </div>
+    </div>
+
     <!-- Settings Menu Panel -->
     <div id="settingsMenu" class="settings-menu hidden">
       <div
@@ -3784,6 +3792,9 @@
         }
         if (typeof window.refreshShortcutLabel === "function") {
           window.refreshShortcutLabel();
+        }
+        if (typeof window.refreshBootLoadingText === "function") {
+          window.refreshBootLoadingText();
         }
         if (window.__dashboardOpen && typeof buildDashboard === "function") {
           await buildDashboard();
@@ -8918,10 +8929,50 @@
           setActiveCard(safeName),
         );
         window.api?.on?.("refresh-achievements-table", () => {});
+        const bootLoadingEl = document.getElementById("bootLoading");
+        const setBootLoading = (visible) => {
+          if (!bootLoadingEl) return;
+          bootLoadingEl.classList.toggle("hidden", !visible);
+          bootLoadingEl.setAttribute(
+            "aria-hidden",
+            visible ? "false" : "true",
+          );
+        };
+        setBootLoading(true);
+        const bootTitleEl = document.querySelector(
+          "#bootLoading .boot-loading-title",
+        );
+        const bootSubEl = document.querySelector(
+          "#bootLoading .boot-loading-sub",
+        );
+        const refreshBootLoadingText = () => {
+          if (bootTitleEl)
+            bootTitleEl.textContent = tUi(
+              "boot.loading.title",
+              "Booting…",
+            );
+          if (bootSubEl)
+            bootSubEl.textContent = tUi(
+              "boot.loading.sub",
+              "Preparing achievements cache",
+            );
+        };
+        window.refreshBootLoadingText = refreshBootLoadingText;
+        refreshBootLoadingText();
         let bootNoticeShown = false;
+        window.api
+          ?.getBootStatus?.()
+          .then((status) => {
+            if (status?.bootDone) {
+              bootNoticeShown = true;
+              setBootLoading(false);
+            }
+          })
+          .catch(() => {});
         window.api?.on?.("boot:complete", () => {
           if (bootNoticeShown) return;
           bootNoticeShown = true;
+          setBootLoading(false);
           showNotification(
             tUi("notify.bootComplete", "Boot Complete!"),
             "#4CAF50",

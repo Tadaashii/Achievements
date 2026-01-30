@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "Shemata za postiжения e gotova.",
   "main.achgen.schema.empty": "Shemata za postiжения e preskochena. Ne sa namereni postiжения.",
   "main.message.schemaPs4Rescan": "Схемите за PS4 се генерират от файловете с трофеи. Вместо това сканирайте отново папката.",
-  "main.message.schemaSteamOfficialRescan": "Схемите за Steam (Official) се генерират от статистиките на appcache. Вместо това сканирайте отново папката със статистики."
+  "main.message.schemaSteamOfficialRescan": "Схемите за Steam (Official) се генерират от статистиките на appcache. Вместо това сканирайте отново папката със статистики.",
+  "boot.loading.title": "Стартиране…",
+  "boot.loading.sub": "Подготовка на кеша за постиженията"
 }

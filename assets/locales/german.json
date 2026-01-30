@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "Erfolgsschema abgeschlossen.",
   "main.achgen.schema.empty": "Erfolgsschema uebersprungen. Keine Erfolge gefunden.",
   "main.message.schemaPs4Rescan": "PS4-Schemata werden aus Trophäendateien erzeugt. Scanne stattdessen den Ordner erneut.",
-  "main.message.schemaSteamOfficialRescan": "Steam (Official)-Schemata werden aus appcache-Statistiken erzeugt. Scanne stattdessen den Statistikordner erneut."
+  "main.message.schemaSteamOfficialRescan": "Steam (Official)-Schemata werden aus appcache-Statistiken erzeugt. Scanne stattdessen den Statistikordner erneut.",
+  "boot.loading.title": "Starten…",
+  "boot.loading.sub": "Zwischenspeicher für Erfolge wird vorbereitet"
 }

@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "成就架構完成。",
   "main.achgen.schema.empty": "已略過成就架構。未找到成就。",
   "main.message.schemaPs4Rescan": "PS4 架構由獎盃檔案產生。請改為重新掃描資料夾。",
-  "main.message.schemaSteamOfficialRescan": "Steam（官方）架構由 appcache 統計產生。請改為重新掃描統計資料夾。"
+  "main.message.schemaSteamOfficialRescan": "Steam（官方）架構由 appcache 統計產生。請改為重新掃描統計資料夾。",
+  "boot.loading.title": "正在啟動…",
+  "boot.loading.sub": "正在準備成就快取"
 }

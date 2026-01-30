@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "Prestasjonsskjema fullfort.",
   "main.achgen.schema.empty": "Prestasjonsskjema hoppet over. Ingen prestasjoner funnet.",
   "main.message.schemaPs4Rescan": "PS4-skjemaer genereres fra troféfiler. Skann mappen på nytt i stedet.",
-  "main.message.schemaSteamOfficialRescan": "Steam (Official)-skjemaer genereres fra appcache-statistikk. Skann statistikkmappen på nytt i stedet."
+  "main.message.schemaSteamOfficialRescan": "Steam (Official)-skjemaer genereres fra appcache-statistikk. Skann statistikkmappen på nytt i stedet.",
+  "boot.loading.title": "Starter…",
+  "boot.loading.sub": "Forbereder cache for prestasjoner"
 }

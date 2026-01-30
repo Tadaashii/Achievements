@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "تم إنشاء مخطط الإنجازات.",
   "main.achgen.schema.empty": "تم تخطي مخطط الإنجازات. لم يتم العثور على إنجازات.",
   "main.message.schemaPs4Rescan": "يتم إنشاء مخططات PS4 من ملفات الكؤوس. أعد فحص المجلد بدلاً من ذلك.",
-  "main.message.schemaSteamOfficialRescan": "يتم إنشاء مخططات Steam (Official) من إحصاءات appcache. أعد فحص مجلد الإحصاءات بدلاً من ذلك."
+  "main.message.schemaSteamOfficialRescan": "يتم إنشاء مخططات Steam (Official) من إحصاءات appcache. أعد فحص مجلد الإحصاءات بدلاً من ذلك.",
+  "boot.loading.title": "جارٍ التشغيل…",
+  "boot.loading.sub": "جارٍ تحضير ذاكرة التخزين المؤقت للإنجازات"
 }

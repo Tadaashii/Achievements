@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "Schema uspechu hotove.",
   "main.achgen.schema.empty": "Schema uspechu preskoceno. Nebyly nalezeny zadne uspechy.",
   "main.message.schemaPs4Rescan": "Schémata pro PS4 se generují ze souborů trofejí. Místo toho znovu proskenujte složku.",
-  "main.message.schemaSteamOfficialRescan": "Schémata pro Steam (Official) se generují ze statistik appcache. Místo toho znovu proskenujte složku se statistikami."
+  "main.message.schemaSteamOfficialRescan": "Schémata pro Steam (Official) se generují ze statistik appcache. Místo toho znovu proskenujte složku se statistikami.",
+  "boot.loading.title": "Spouštění…",
+  "boot.loading.sub": "Připravuje se mezipaměť úspěchů"
 }

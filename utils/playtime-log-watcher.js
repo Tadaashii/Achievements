@@ -8,6 +8,7 @@ const { pathToFileURL } = require("url");
 const { accumulatePlaytime, sanitizeConfigName } = require("./playtime-store");
 const { fetchSteamGridDbImage } = require("./game-cover");
 const { normalizePlatform } = require("./config-platform-migrator");
+const processPoller = require("./process-poller");
 
 const defaultUplaySteamMapPath = path.join(
   __dirname,
@@ -50,38 +51,6 @@ function resolveSteamAppId(appid) {
   const lookup = loadUplaySteamMap();
   const entry = lookup.get(key);
   return entry?.steam_appid ? String(entry.steam_appid) : null;
-}
-
-function splitArgsString(input) {
-  const argStr = String(input || "").trim();
-  if (!argStr) return [];
-  const matches = argStr.match(/(?:[^\s"]+|"[^"]*"|'[^']*')+/g) || [];
-  return matches
-    .map((part) => {
-      const trimmed = String(part || "").trim();
-      if (
-        (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-        (trimmed.startsWith("'") && trimmed.endsWith("'"))
-      ) {
-        return trimmed.slice(1, -1);
-      }
-      return trimmed;
-    })
-    .filter(Boolean);
-}
-
-function normalizeCommandLine(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/["']/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function buildArgsSignature(argString) {
-  const parts = splitArgsString(argString);
-  if (!parts.length) return "";
-  return parts.map((p) => p.toLowerCase()).join(" ");
 }
 
 const playtimeStartMap = new Map();
@@ -251,35 +220,6 @@ async function cacheHeaderImage(
   return { headerUrl };
 }
 
-async function getProcessesSafe() {
-  const tryPaths = [
-    path.join(
-      process.resourcesPath || "",
-      "app.asar.unpacked",
-      "utils",
-      "pslist-wrapper.mjs"
-    ),
-    path.join(__dirname, "pslist-wrapper.mjs"),
-    path.join(__dirname, "utils", "pslist-wrapper.mjs"),
-    path.join(process.resourcesPath || "", "utils", "pslist-wrapper.mjs"),
-  ];
-
-  let found = null;
-  for (const p of tryPaths) {
-    try {
-      await fs.promises.access(p, fs.constants.R_OK);
-      found = p;
-      break;
-    } catch {}
-  }
-  if (!found)
-    throw new Error(`pslist-wrapper.mjs not found in:\n${tryPaths.join("\n")}`);
-
-  const { pathToFileURL } = require("url");
-  const { getProcesses } = await import(pathToFileURL(found).href);
-  return getProcesses();
-}
-
 function sendPlaytimeNotification(playData) {
   try {
     ipcMain.emit("show-playtime", null, playData);
@@ -369,7 +309,6 @@ function startPlaytimeLogWatcher(configData) {
   const platform = normalizePlatform(configData?.platform) || "steam";
   const isSteamGridOnly =
     platform === "xenia" || platform === "rpcs3" || platform === "shadps4";
-  const argsSignature = buildArgsSignature(configData?.arguments);
   const launchPid =
     Number.isFinite(Number(configData?.__launchPid)) &&
     Number(configData.__launchPid) > 0
@@ -436,10 +375,12 @@ function startPlaytimeLogWatcher(configData) {
       ? pathToFileURL(logoFallbackPath).toString()
       : remoteHeaderUrl;
 
-  let interval = null;
+  let unsubscribe = null;
   let closed = false;
   let startNotified = false;
   let lastHeaderUrl = null;
+  let seenRunning = false;
+  const startGraceUntil = Date.now() + 15000;
   const tracker = {
     playtimeKey:
       configData?.__playtimeKey ||
@@ -451,9 +392,13 @@ function startPlaytimeLogWatcher(configData) {
   const cleanup = () => {
     closed = true;
     playtimeStartMap.delete(appid);
-    if (interval) clearInterval(interval);
+    if (unsubscribe) {
+      try {
+        unsubscribe();
+      } catch {}
+      unsubscribe = null;
+    }
     activeWatchers.delete(appid);
-    interval = null;
   };
   tracker.cleanup = cleanup;
 
@@ -521,21 +466,22 @@ function startPlaytimeLogWatcher(configData) {
       }
     });
 
-  interval = setInterval(async () => {
+  const handleSnapshot = (processes) => {
     if (closed) return;
-    try {
-      const processes = await getProcessesSafe();
-      const exeName = path.basename(processName).toLowerCase();
-      const running = processes.some((p) => {
-        if (launchPid && p.pid === launchPid) return true;
-        if (String(p.name || "").toLowerCase() !== exeName) return false;
-        if (!argsSignature) return true;
-        const cmd = normalizeCommandLine(p.cmd || "");
-        if (!cmd) return false;
-        return cmd.includes(argsSignature);
-      });
+    const list = Array.isArray(processes) ? processes : [];
+    if (!list.length) return;
+    const exeName = path.basename(processName).toLowerCase();
+    const running = list.some((p) => {
+      if (launchPid && p.pid === launchPid) return true;
+      if (String(p.name || "").toLowerCase() !== exeName) return false;
+      return true;
+    });
 
-      if (!running) {
+    if (!running) {
+      if (!seenRunning && Date.now() < startGraceUntil) {
+        return;
+      }
+      (async () => {
         try {
           const headerPathNew = path.join(
             userDataDir,
@@ -562,12 +508,18 @@ function startPlaytimeLogWatcher(configData) {
         } finally {
           cleanup();
         }
-      }
-    } catch (err) {
-      notifyError(`? Playtime watcher error: ${err.message}`);
-      cleanup();
+      })();
     }
-  }, 2000);
+    if (running) {
+      seenRunning = true;
+    }
+  };
+
+  const initialSnapshot = processPoller.getSnapshot();
+  if (initialSnapshot && initialSnapshot.length) {
+    handleSnapshot(initialSnapshot);
+  }
+  unsubscribe = processPoller.subscribe(handleSnapshot);
 
   return cleanup;
 }

@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "Achievement sema kesz.",
   "main.achgen.schema.empty": "Achievement sema kihagyva. Nem talalhato achievement.",
   "main.message.schemaPs4Rescan": "A PS4-sémák trófeafájlokból készülnek. Ehelyett szkenneld újra a mappát.",
-  "main.message.schemaSteamOfficialRescan": "A Steam (Official) sémák az appcache statisztikáiból készülnek. Ehelyett szkenneld újra a statisztika mappát."
+  "main.message.schemaSteamOfficialRescan": "A Steam (Official) sémák az appcache statisztikáiból készülnek. Ehelyett szkenneld újra a statisztika mappát.",
+  "boot.loading.title": "Indítás…",
+  "boot.loading.sub": "Eredmények gyorsítótárának előkészítése"
 }

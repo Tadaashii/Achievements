@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "実績スキーマが完了しました。",
   "main.achgen.schema.empty": "実績スキーマをスキップしました。実績が見つかりません。",
   "main.message.schemaPs4Rescan": "PS4のスキーマはトロフィーファイルから生成されます。代わりにフォルダーを再スキャンしてください。",
-  "main.message.schemaSteamOfficialRescan": "Steam（Official）のスキーマはappcacheの統計から生成されます。代わりに統計フォルダーを再スキャンしてください。"
+  "main.message.schemaSteamOfficialRescan": "Steam（Official）のスキーマはappcacheの統計から生成されます。代わりに統計フォルダーを再スキャンしてください。",
+  "boot.loading.title": "起動中…",
+  "boot.loading.sub": "実績キャッシュを準備しています"
 }

@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "Schema obiettivi completato.",
   "main.achgen.schema.empty": "Schema obiettivi ignorato. Nessun obiettivo trovato.",
   "main.message.schemaPs4Rescan": "Gli schemi PS4 vengono generati dai file dei trofei. Esegui invece una nuova scansione della cartella.",
-  "main.message.schemaSteamOfficialRescan": "Gli schemi Steam (Official) vengono generati dalle statistiche appcache. Esegui invece una nuova scansione della cartella delle statistiche."
+  "main.message.schemaSteamOfficialRescan": "Gli schemi Steam (Official) vengono generati dalle statistiche appcache. Esegui invece una nuova scansione della cartella delle statistiche.",
+  "boot.loading.title": "Avvio…",
+  "boot.loading.sub": "Preparazione della cache degli obiettivi"
 }

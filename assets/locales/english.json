@@ -422,5 +422,7 @@
   "ui.toggle.hideOptions": "Hide Options",
   "ui.toggle.showOptions": "Show Options",
   "main.message.schemaPs4Rescan": "PS4 schemas are generated from trophy files. Rescan the folder instead.",
-  "main.message.schemaSteamOfficialRescan": "Steam (Official) schemas are generated from appcache stats. Rescan the stats folder instead."
+  "main.message.schemaSteamOfficialRescan": "Steam (Official) schemas are generated from appcache stats. Rescan the stats folder instead.",
+  "boot.loading.title": "Booting…",
+  "boot.loading.sub": "Preparing achievements cache"
 }

@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "Praestationsskema faerdigt.",
   "main.achgen.schema.empty": "Praestationsskema sprunget over. Ingen praestationer fundet.",
   "main.message.schemaPs4Rescan": "PS4-skemaer genereres fra trofæfiler. Genindlæs i stedet mappen.",
-  "main.message.schemaSteamOfficialRescan": "Steam (Official)-skemaer genereres fra appcache-statistikker. Genindlæs i stedet statistikmappen."
+  "main.message.schemaSteamOfficialRescan": "Steam (Official)-skemaer genereres fra appcache-statistikker. Genindlæs i stedet statistikmappen.",
+  "boot.loading.title": "Starter…",
+  "boot.loading.sub": "Forbereder cache til præstationer"
 }

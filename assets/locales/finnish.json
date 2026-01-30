@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "Saavutusten skeema valmis.",
   "main.achgen.schema.empty": "Saavutusten skeema ohitettu. Saavutuksia ei loytynyt.",
   "main.message.schemaPs4Rescan": "PS4-skeemat luodaan trophy-tiedostoista. Skannaa kansio sen sijaan uudelleen.",
-  "main.message.schemaSteamOfficialRescan": "Steam (Official) -skeemat luodaan appcache-tilastoista. Skannaa tilastokansio sen sijaan uudelleen."
+  "main.message.schemaSteamOfficialRescan": "Steam (Official) -skeemat luodaan appcache-tilastoista. Skannaa tilastokansio sen sijaan uudelleen.",
+  "boot.loading.title": "Käynnistetään…",
+  "boot.loading.sub": "Valmistellaan saavutusten välimuistia"
 }

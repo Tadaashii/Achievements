@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "Skhema dostizheniy gotova.",
   "main.achgen.schema.empty": "Skhema dostizheniy propushchena. Dostizheniya ne naydeny.",
   "main.message.schemaPs4Rescan": "Схемы PS4 генерируются из файлов трофеев. Вместо этого пересканируйте папку.",
-  "main.message.schemaSteamOfficialRescan": "Схемы Steam (Official) генерируются из статистики appcache. Вместо этого пересканируйте папку со статистикой."
+  "main.message.schemaSteamOfficialRescan": "Схемы Steam (Official) генерируются из статистики appcache. Вместо этого пересканируйте папку со статистикой.",
+  "boot.loading.title": "Запуск…",
+  "boot.loading.sub": "Подготовка кэша достижений"
 }

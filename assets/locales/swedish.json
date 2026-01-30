@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "Prestationsschema klart.",
   "main.achgen.schema.empty": "Prestationsschema hoppades over. Inga prestationer hittades.",
   "main.message.schemaPs4Rescan": "PS4-scheman genereras från troféfiler. Skanna mappen igen i stället.",
-  "main.message.schemaSteamOfficialRescan": "Steam (Official)-scheman genereras från appcache-statistik. Skanna statistikmappen igen i stället."
+  "main.message.schemaSteamOfficialRescan": "Steam (Official)-scheman genereras från appcache-statistik. Skanna statistikmappen igen i stället.",
+  "boot.loading.title": "Startar…",
+  "boot.loading.sub": "Förbereder cache för prestationer"
 }

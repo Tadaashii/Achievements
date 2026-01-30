@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "Skhemu dosiahnon zaversheno.",
   "main.achgen.schema.empty": "Skhemu dosiahnon propushcheno. Dosiahnen ne znaideno.",
   "main.message.schemaPs4Rescan": "Схеми PS4 генеруються з файлів трофеїв. Замість цього перескануйте папку.",
-  "main.message.schemaSteamOfficialRescan": "Схеми Steam (Official) генеруються зі статистики appcache. Замість цього перескануйте папку зі статистикою."
+  "main.message.schemaSteamOfficialRescan": "Схеми Steam (Official) генеруються зі статистики appcache. Замість цього перескануйте папку зі статистикою.",
+  "boot.loading.title": "Запуск…",
+  "boot.loading.sub": "Підготовка кешу досягнень"
 }

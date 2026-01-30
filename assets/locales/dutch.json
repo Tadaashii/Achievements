@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "Achievements-schema voltooid.",
   "main.achgen.schema.empty": "Achievements-schema overgeslagen. Geen achievements gevonden.",
   "main.message.schemaPs4Rescan": "PS4-schema's worden gegenereerd uit trofeebestanden. Scan de map in plaats daarvan opnieuw.",
-  "main.message.schemaSteamOfficialRescan": "Steam (Official)-schema's worden gegenereerd uit appcache-statistieken. Scan de map met statistieken in plaats daarvan opnieuw."
+  "main.message.schemaSteamOfficialRescan": "Steam (Official)-schema's worden gegenereerd uit appcache-statistieken. Scan de map met statistieken in plaats daarvan opnieuw.",
+  "boot.loading.title": "Opstarten…",
+  "boot.loading.sub": "Cache voor prestaties wordt voorbereid"
 }

@@ -143,6 +143,7 @@ contextBridge.exposeInMainWorld("api", {
   onSchemaReady: (handler) => ipcRenderer.on("config:schema-ready", handler),
   onAutoSelectConfig: (handler) =>
     ipcRenderer.on("auto-select-config", (_e, name) => handler(name)),
+  getBootStatus: () => ipcRenderer.invoke("boot:status"),
   getSteamDbCover: (appid) => ipcRenderer.invoke("covers:steamdb", appid),
   getSteamGridDbCover: (payload) =>
     ipcRenderer.invoke("covers:steamgriddb", payload),

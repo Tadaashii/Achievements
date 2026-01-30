@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "Esquema de logros completado.",
   "main.achgen.schema.empty": "Se omitio el esquema de logros. No se encontraron logros.",
   "main.message.schemaPs4Rescan": "Los esquemas de PS4 se generan a partir de los archivos de trofeos. En su lugar, vuelve a escanear la carpeta.",
-  "main.message.schemaSteamOfficialRescan": "Los esquemas de Steam (Official) se generan a partir de las estadísticas de appcache. En su lugar, vuelve a escanear la carpeta de estadísticas."
+  "main.message.schemaSteamOfficialRescan": "Los esquemas de Steam (Official) se generan a partir de las estadísticas de appcache. En su lugar, vuelve a escanear la carpeta de estadísticas.",
+  "boot.loading.title": "Iniciando…",
+  "boot.loading.sub": "Preparando la caché de logros"
 }

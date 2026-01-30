@@ -173,7 +173,7 @@ Creates a standalone `.exe` installer in the `dist/` folder.
    - %APPDATA%\SmartSteamEmu
    - %LOCALAPPDATA%\SKIDROW
 
-**Note**: Auto-configuration uses the Steam Web API when a key is provided in Settings. Without a key, it falls back to SteamDB/SteamHunters (English only).
+**Note**: Auto-configuration uses the Steam Web API when a key is provided in Settings. Without a key, it falls back to SteamDB/SteamHunters + Languages from Exophase.
 
 #### Xenia-Canary Support
 

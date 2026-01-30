@@ -422,5 +422,7 @@
   "main.achgen.schema.done": "Basarim semasi tamamlandi.",
   "main.achgen.schema.empty": "Basarim semasi atlandi. Basarim bulunamadi.",
   "main.message.schemaPs4Rescan": "PS4 şemaları kupa dosyalarından oluşturulur. Bunun yerine klasörü yeniden tarayın.",
-  "main.message.schemaSteamOfficialRescan": "Steam (Official) şemaları appcache istatistiklerinden oluşturulur. Bunun yerine istatistik klasörünü yeniden tarayın."
+  "main.message.schemaSteamOfficialRescan": "Steam (Official) şemaları appcache istatistiklerinden oluşturulur. Bunun yerine istatistik klasörünü yeniden tarayın.",
+  "boot.loading.title": "Başlatılıyor…",
+  "boot.loading.sub": "Başarılar önbelleği hazırlanıyor"
 }

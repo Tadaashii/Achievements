@@ -1915,6 +1915,10 @@ ipcMain.handle("dashboard:set-open", (_e, state) => {
 ipcMain.handle("dashboard:is-open", () => {
   return dashboardOpen;
 });
+ipcMain.handle("boot:status", () => ({
+  bootDone: global.bootDone === true,
+  bootSeeding,
+}));
 
 // List existing configs
 function listConfigs() {
@@ -2474,9 +2478,31 @@ ipcMain.handle("load-saved-achievements", async (_event, configName) => {
     const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
 
     const normalizedPlatform = normalizePlatform(config?.platform);
+    const cacheFallbackPlatforms = new Set([
+      "xenia",
+      "steam",
+      "uplay",
+      "gog",
+      "epic",
+    ]);
+    const getCacheFallback = () =>
+      loadPreviousAchievements(configName, normalizedPlatform) || {};
+    const shouldUseCacheFallback = () =>
+      cacheFallbackPlatforms.has(normalizedPlatform);
+
     if (normalizedPlatform === "xenia") {
       const gpdPath = resolveGpdPathForConfig(config);
       if (!gpdPath || !fs.existsSync(gpdPath)) {
+        if (shouldUseCacheFallback()) {
+          const cached = getCacheFallback();
+          if (cached && Object.keys(cached).length) {
+            return {
+              achievements: cached,
+              save_path: config.save_path || "",
+              error: "gpd not found (cached)",
+            };
+          }
+        }
         return {
           achievements: {},
           save_path: config.save_path || "",
@@ -2663,6 +2689,19 @@ ipcMain.handle("load-saved-achievements", async (_event, configName) => {
         fullSchemaPath: schemaPath,
       },
     );
+
+    const hasAchievements =
+      achievements && Object.keys(achievements).length > 0;
+    if (!hasAchievements && !effectiveSavePath && shouldUseCacheFallback()) {
+      const cached = getCacheFallback();
+      if (cached && Object.keys(cached).length) {
+        return {
+          achievements: cached,
+          save_path: effectiveSavePath || saveBase || "",
+          error: "save file missing (cached)",
+        };
+      }
+    }
 
     return {
       achievements: achievements || {},
@@ -5905,7 +5944,9 @@ app.whenReady().then(async () => {
   copyFolderOnce(defaultPresetsFolder, userPresetsFolder);
 
   createMainWindow();
-  setInterval(autoSelectRunningGameConfig, 2000);
+  processPoller.subscribe((list) => {
+    autoSelectRunningGameConfig(list);
+  });
   createTray();
   mainWindow.hide();
   app.on("activate", () => {
@@ -6271,28 +6312,7 @@ ipcMain.on("notify-from-child", (_event, message) => {
 });
 
 const { pathToFileURL } = require("url");
-
-async function importPsListWrapper() {
-  const tryPaths = [
-    path.join(__dirname, "utils", "pslist-wrapper.mjs"),
-    path.join(
-      process.resourcesPath,
-      "app.asar.unpacked",
-      "utils",
-      "pslist-wrapper.mjs",
-    ),
-  ];
-
-  for (const p of tryPaths) {
-    try {
-      await fs.promises.access(p, fs.constants.R_OK);
-      return await import(pathToFileURL(p).href);
-    } catch {
-      /* continue */
-    }
-  }
-  throw new Error(`pslist-wrapper.mjs not found in:\n${tryPaths.join("\n")}`);
-}
+const processPoller = require("./utils/process-poller");
 
 let detectedConfigName = null;
 const activePlaytimeConfigs = new Set();
@@ -6315,42 +6335,24 @@ function splitArgsString(input) {
     .filter(Boolean);
 }
 
-function normalizeCommandLine(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/["']/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function buildArgsSignature(argString) {
-  const parts = splitArgsString(argString);
-  if (!parts.length) return "";
-  return parts.map((p) => p.toLowerCase()).join(" ");
-}
-
 function processMatchesConfig(proc, configData, configName) {
   if (!proc || !proc.name || !configData?.process_name) return false;
   const exeName = path.basename(configData.process_name).toLowerCase();
   if (String(proc.name || "").toLowerCase() !== exeName) return false;
   const mapped = manualLaunchPidMap.get(proc.pid);
   if (mapped) return mapped === configName;
-  const argsSig = buildArgsSignature(configData.arguments);
-  if (!argsSig) return true;
-  const cmd = normalizeCommandLine(proc.cmd || "");
-  if (!cmd) return false;
-  return cmd.includes(argsSig);
+  return true;
 }
 
-async function autoSelectRunningGameConfig() {
+async function autoSelectRunningGameConfig(processes) {
   try {
-    const { getProcesses } = await importPsListWrapper();
-    const processes = await getProcesses();
+    const list = Array.isArray(processes) ? processes : [];
+    if (!list.length) return;
     if (process.env.ACH_LOG_PROCESSES === "1") {
       const logPath = path.join(app.getPath("userData"), "process-log.txt");
       fs.writeFileSync(
         logPath,
-        processes.map((p) => p.name).join("\n"),
+        list.map((p) => p.name).join("\n"),
         "utf8",
       );
     }
@@ -6362,7 +6364,7 @@ async function autoSelectRunningGameConfig() {
         detectedConfigName = null;
       } else {
         const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-        const isRunning = processes.some((p) =>
+        const isRunning = list.some((p) =>
           processMatchesConfig(p, config, detectedConfigName),
         );
 
@@ -6384,7 +6386,7 @@ async function autoSelectRunningGameConfig() {
           detectedConfigName = null;
         } else {
           const configData = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-          const isStillRunning = processes.some((p) =>
+          const isStillRunning = list.some((p) =>
             processMatchesConfig(p, configData, detectedConfigName),
           );
 
@@ -6408,7 +6410,7 @@ async function autoSelectRunningGameConfig() {
         }
 
         const cfgData = JSON.parse(fs.readFileSync(cfgPath, "utf-8"));
-        const stillRunning = processes.some((p) =>
+        const stillRunning = list.some((p) =>
           processMatchesConfig(p, cfgData, activeName),
         );
 
@@ -6427,7 +6429,7 @@ async function autoSelectRunningGameConfig() {
         const configData = JSON.parse(fs.readFileSync(configPath, "utf-8"));
         if (!configData.process_name) continue;
 
-        const isRunning = processes.some((p) =>
+        const isRunning = list.some((p) =>
           processMatchesConfig(p, configData, configName),
         );
 

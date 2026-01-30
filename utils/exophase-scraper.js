@@ -2,6 +2,13 @@ const fs = require("fs");
 const fsp = require("fs/promises");
 const path = require("path");
 
+// Electron main process may not define File; undici expects it.
+if (typeof global.File === "undefined") {
+  global.File = class File {};
+}
+
+const cheerio = require("cheerio");
+
 function resolvePlaywrightBrowsersPath() {
   const current = process.env.PLAYWRIGHT_BROWSERS_PATH || "";
   if (current && current !== "0") return current;
@@ -27,51 +34,67 @@ const EXOPHASE_PLATFORM_MAP = {
 };
 
 const EXOPHASE_LANG_MAP = {
-  english: "us",
-  german: "de",
-  french: "fr",
-  italian: "it",
-  spanish: "es",
-  latam: "es_MX",
-  portuguese: "pt",
+  arabic: "ar",
+  bulgarian: "bg",
   brazilian: "pt_BR",
-  russian: "ru",
-  polish: "pl",
-  japanese: "jp",
-  koreana: "ko",
-  tchinese: "zh_TW",
-  schinese: "zh_CN",
-  thai: "th",
+  czech: "cs",
   danish: "dk",
   dutch: "nl",
-  swedish: "se",
+  english: "us",
+  finnish: "fi",
+  french: "fr",
+  german: "de",
+  greek: "el",
   hungarian: "hu",
+  indonesian: "in",
+  italian: "it",
+  japanese: "jp",
+  koreana: "ko",
+  latam: "es_MX",
+  norwegian: "no",
+  polish: "pl",
+  portuguese: "pt",
+  romanian: "ro",
+  russian: "ru",
+  spanish: "es",
+  schinese: "zh_CN",
+  tchinese: "zh_TW",
+  thai: "th",
   turkish: "tr",
+  swedish: "se",
   ukrainian: "uk",
   vietnamese: "vi",
 };
 
 const EXOPHASE_LANG_KEYS = [
-  "english",
-  "german",
-  "french",
-  "italian",
-  "spanish",
-  "latam",
-  "portuguese",
+  "arabic",
+  "bulgarian",
   "brazilian",
-  "russian",
-  "polish",
-  "japanese",
-  "koreana",
-  "tchinese",
-  "schinese",
-  "thai",
+  "czech",
   "danish",
   "dutch",
-  "swedish",
+  "english",
+  "finnish",
+  "french",
+  "german",
+  "greek",
   "hungarian",
+  "indonesian",
+  "italian",
+  "japanese",
+  "koreana",
+  "latam",
+  "norwegian",
+  "polish",
+  "portuguese",
+  "romanian",
+  "russian",
+  "spanish",
+  "schinese",
+  "tchinese",
+  "thai",
   "turkish",
+  "swedish",
   "ukrainian",
   "vietnamese",
 ];
@@ -95,7 +118,9 @@ async function launchChromiumSafe(opts = {}) {
 }
 
 function mapExophasePlatform(platform) {
-  const key = String(platform || "").trim().toLowerCase();
+  const key = String(platform || "")
+    .trim()
+    .toLowerCase();
   if (!key) return "";
   return EXOPHASE_PLATFORM_MAP[key] || key;
 }
@@ -155,9 +180,7 @@ function slugify(input) {
 function buildExophaseSlugVariants(input) {
   const base = String(input || "").trim();
   if (!base) return ["game"];
-  const normalized = base
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+  const normalized = base.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const lower = normalized.toLowerCase();
 
   const variants = new Set();
@@ -283,77 +306,63 @@ async function loadAwardsPage(page, url) {
     waitUntil: "domcontentloaded",
     timeout: DEFAULT_WAIT_MS,
   });
-  await page.waitForTimeout(800);
-  await nukeOverlays(page);
-
+  await page
+    .waitForSelector("[class*=award-detail]", {
+      timeout: 15000,
+    })
+    .catch(() => {});
+  const html = await page.content();
   const status = resp ? resp.status() : 0;
-  if (status === 403 || (await looksBlocked(page))) {
-    throw new Error(`Blocked (status=${status || "unknown"})`);
-  }
-
-  await page.waitForSelector("[class*=award-detail]", {
-    timeout: 15000,
-  });
+  return { html, status };
 }
 
-async function extractAchievements(page, baseUrl) {
-  return await page.evaluate((baseUrlInner) => {
-    const clean = (s) => (s || "").replace(/\s+/g, " ").trim();
-    const abs = (u) => {
-      try {
-        return new URL(u, baseUrlInner).toString();
-      } catch {
-        return u;
-      }
-    };
+function extractAchievementsFromHtml(html, baseUrl) {
+  const $ = cheerio.load(html || "");
+  const clean = (s) => (s || "").replace(/\s+/g, " ").trim();
+  const abs = (u) => {
+    try {
+      return new URL(u, baseUrl).toString();
+    } catch {
+      return u;
+    }
+  };
 
-    // New selectors match Exophase layout:
-    //   title: [class*=award-detail] > [class*=award-title]
-    //   description: [class*=award-detail] > [class*=award-description]
-    //   image: [class*=award-image]
-    const details = Array.from(
-      document.querySelectorAll("[class*=award-detail]")
+  const details = $("[class*=award-detail]").toArray();
+  const items = [];
+
+  details.forEach((detail, idx) => {
+    const title = clean($(detail).find("[class*=award-title]").first().text());
+    if (!title) return;
+    const description = clean(
+      $(detail).find("[class*=award-description]").first().text(),
     );
-    const items = [];
 
-    details.forEach((detail, idx) => {
-      const titleEl = detail.querySelector("[class*=award-title]");
-      const descEl = detail.querySelector("[class*=award-description]");
-      const card =
-        detail.closest("li") ||
-        detail.closest("[class*=award]") ||
-        detail.parentElement;
-      const imgEl = card
-        ? card.querySelector("[class*=award-image] img, [class*=award-image]")
-        : null;
+    const card = $(detail).closest("li").length
+      ? $(detail).closest("li")
+      : $(detail).closest("[class*=award]").length
+        ? $(detail).closest("[class*=award]")
+        : $(detail).parent();
 
-      const title = clean(titleEl?.textContent || "");
-      if (!title) return;
+    let iconUrl = "";
+    const img = card.find("[class*=award-image] img").first();
+    if (img && img.length) {
+      iconUrl = abs(img.attr("src") || "");
+    } else {
+      const imgEl = card.find("[class*=award-image]").first();
+      const bg = imgEl.css("background-image") || "";
+      const m = bg.match(/url\(["']?(.*?)["']?\)/i);
+      if (m && m[1]) iconUrl = abs(m[1]);
+    }
 
-      const description = clean(descEl?.textContent || "");
-
-      let iconUrl = "";
-      if (imgEl) {
-        if (imgEl.getAttribute("src")) {
-          iconUrl = abs(imgEl.getAttribute("src"));
-        } else {
-          const st = window.getComputedStyle(imgEl);
-          const bg = st.backgroundImage || "";
-          const m = bg.match(/url\(["']?(.*?)["']?\)/i);
-          if (m && m[1]) iconUrl = abs(m[1]);
-        }
-      }
-
-      items.push({
-        index: idx + 1,
-        title,
-        description,
-        icon_url: iconUrl,
-      });
+    items.push({
+      index: idx + 1,
+      title,
+      description,
+      icon_url: iconUrl,
     });
+  });
 
-    return items;
-  }, baseUrl);
+  return items;
 }
 
 async function downloadExophaseIcon(iconUrl, outPath) {
@@ -375,43 +384,84 @@ async function fetchExophaseAchievementsMultiLang(options = {}) {
   if (!platform) {
     throw new Error("Missing platform for Exophase");
   }
-  const slugCandidates =
-    options.slugCandidates ||
-    [options.slug || buildExophaseSlug(options.title || "")];
+  const slugCandidates = options.slugCandidates || [
+    options.slug || buildExophaseSlug(options.title || ""),
+  ];
 
   const langMap = options.langMap || EXOPHASE_LANG_MAP;
   const langKeysRaw = options.langKeys || EXOPHASE_LANG_KEYS;
   const langKeys = langKeysRaw.filter((k) => langMap[k]);
   if (!langKeys.includes("english")) langKeys.unshift("english");
 
-  const baseUrlTemplate = `${BASE_EXOPHASE_URL}__SLUG__/__PATH__/`;
   const headed = options.headed === true;
   const logger = options.logger || null;
   const storageState = options.storageState;
 
-  const browser = await launchChromiumSafe({ headless: !headed });
   const ctxOpts = {
     userAgent: options.userAgent || DEFAULT_UA,
     locale: "en-US",
     viewport: { width: 1400, height: 1000 },
   };
-  if (storageState && fs.existsSync(storageState)) {
-    ctxOpts.storageState = storageState;
+  let browser = null;
+  let context = null;
+  let page = null;
+  let ownsBrowser = false;
+  let ownsContext = false;
+  let ownsPage = false;
+
+  if (options.page) {
+    page = options.page;
+    context = page.context();
+  } else if (options.context) {
+    context = options.context;
+    page = await context.newPage();
+    ownsPage = true;
+  } else if (options.browser) {
+    browser = options.browser;
+    context = await browser.newContext(ctxOpts);
+    ownsContext = true;
+    page = await context.newPage();
+    ownsPage = true;
+  } else {
+    browser = await launchChromiumSafe({ headless: !headed });
+    ownsBrowser = true;
+    if (storageState && fs.existsSync(storageState)) {
+      ctxOpts.storageState = storageState;
+    }
+    context = await browser.newContext(ctxOpts);
+    ownsContext = true;
+    page = await context.newPage();
+    ownsPage = true;
   }
-  const context = await browser.newContext(ctxOpts);
-  await context.addInitScript(() => {
-    try {
-      Object.defineProperty(navigator, "webdriver", {
-        get: () => undefined,
-      });
-    } catch {}
-  });
-  await installAdBlockRouting(context);
-  const page = await context.newPage();
+
+  if (context) {
+    await context
+      .addInitScript(() => {
+        try {
+          Object.defineProperty(navigator, "webdriver", {
+            get: () => undefined,
+          });
+        } catch {}
+      })
+      .catch(() => {});
+    await installAdBlockRouting(context).catch(() => {});
+  }
+  if (page && options.page) {
+    await page
+      .addInitScript(() => {
+        try {
+          Object.defineProperty(navigator, "webdriver", {
+            get: () => undefined,
+          });
+        } catch {}
+      })
+      .catch(() => {});
+  }
 
   try {
     let baseUrl = null;
     let firstErr = null;
+    let baseItems = [];
     for (const slug of slugCandidates) {
       const candidateBase =
         platform === "ps3"
@@ -419,9 +469,13 @@ async function fetchExophaseAchievementsMultiLang(options = {}) {
           : `${BASE_EXOPHASE_URL}${slug}-${platform}/achievements/`;
       const testUrl = ensureLangUrl(candidateBase, langMap.english);
       try {
-        await loadAwardsPage(page, testUrl);
-        baseUrl = candidateBase;
-        break;
+        const { html } = await loadAwardsPage(page, testUrl);
+        const items = extractAchievementsFromHtml(html, testUrl);
+        if (items.length) {
+          baseUrl = candidateBase;
+          baseItems = items;
+          break;
+        }
       } catch (err) {
         firstErr = firstErr || err;
         continue;
@@ -432,15 +486,16 @@ async function fetchExophaseAchievementsMultiLang(options = {}) {
     }
 
     const englishUrl = ensureLangUrl(baseUrl, langMap.english);
-    await loadAwardsPage(page, englishUrl);
-
+    const { html: baseHtml } = await loadAwardsPage(page, englishUrl);
     const gameTitle =
       (await page
         .locator("h1, h2")
         .first()
         .textContent()
         .catch(() => "")) || "";
-    const baseItems = await extractAchievements(page, englishUrl);
+    if (!baseItems.length) {
+      baseItems = extractAchievementsFromHtml(baseHtml, englishUrl);
+    }
     if (!baseItems.length) {
       throw new Error("No achievements extracted for english baseline.");
     }
@@ -452,6 +507,14 @@ async function fetchExophaseAchievementsMultiLang(options = {}) {
       icon_url: it.icon_url || "",
     }));
 
+    const normalizePair = (a, b) =>
+      `${String(a || "").trim().toLowerCase()}|${String(b || "")
+        .trim()
+        .toLowerCase()}`;
+    const englishSignature = baseItems
+      .map((it) => normalizePair(it.title, it.description))
+      .join("\n");
+
     for (const langKey of langKeys) {
       if (langKey === "english") continue;
       const exoCode = langMap[langKey];
@@ -460,11 +523,23 @@ async function fetchExophaseAchievementsMultiLang(options = {}) {
       if (logger) {
         logger.info("exophase:lang:load", { lang: langKey, url: langUrl });
       }
-      await loadAwardsPage(page, langUrl);
-      const items = await extractAchievements(page, langUrl);
+      const { html: langHtml } = await loadAwardsPage(page, langUrl);
+      const items = extractAchievementsFromHtml(langHtml, langUrl);
       if (!items.length) {
         if (logger) {
           logger.warn("exophase:lang:empty", { lang: langKey, url: langUrl });
+        }
+        continue;
+      }
+      const langSignature = items
+        .map((it) => normalizePair(it.title, it.description))
+        .join("\n");
+      if (langSignature === englishSignature) {
+        if (logger) {
+          logger.warn("exophase:lang:default-english", {
+            lang: langKey,
+            url: langUrl,
+          });
         }
         continue;
       }
@@ -488,8 +563,15 @@ async function fetchExophaseAchievementsMultiLang(options = {}) {
       items: achievements,
     };
   } finally {
-    await context.close().catch(() => {});
-    await browser.close().catch(() => {});
+    if (ownsPage && page) {
+      await page.close().catch(() => {});
+    }
+    if (ownsContext && context) {
+      await context.close().catch(() => {});
+    }
+    if (ownsBrowser && browser) {
+      await browser.close().catch(() => {});
+    }
   }
 }
 
