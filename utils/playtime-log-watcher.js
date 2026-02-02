@@ -137,20 +137,49 @@ function isPlaytimeDisabled() {
 
 function downloadImage(url, dest) {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    let response = null;
+    const finalize = (err) => {
+      if (settled) return;
+      settled = true;
+      if (err) reject(err);
+      else resolve();
+    };
+    const cleanupFile = () => {
+      try {
+        fs.unlink(dest, () => {});
+      } catch {}
+    };
+    const handleError = (err) => {
+      try {
+        if (response && typeof response.destroy === "function") {
+          response.destroy();
+        }
+      } catch {}
+      try {
+        file.destroy();
+      } catch {}
+      cleanupFile();
+      finalize(err);
+    };
+
     const file = fs.createWriteStream(dest);
+    file.on("error", handleError);
     https
       .get(url, { headers: { "User-Agent": "Mozilla/5.0" } }, (res) => {
-        if (res.statusCode === 200) {
-          res.pipe(file);
-          file.on("finish", () => file.close(resolve));
-        } else {
-          fs.unlink(dest, () => {});
-          reject(new Error(`Failed to download image: ${res.statusCode}`));
+        response = res;
+        if (res.statusCode !== 200) {
+          res.resume();
+          handleError(new Error(`Failed to download image: ${res.statusCode}`));
+          return;
         }
+        res.on("error", handleError);
+        res.pipe(file);
+        file.on("finish", () => file.close(() => finalize()));
       })
-      .on("error", (err) => {
-        fs.unlink(dest, () => {});
-        reject(err);
+      .on("error", handleError)
+      .setTimeout(15000, function () {
+        this.destroy(new Error("Download timed out"));
       });
   });
 }
@@ -189,6 +218,9 @@ async function cacheHeaderImage(
   };
   const coverName = stripCoverSuffix(fallbackName) || fallbackName;
   const fallbackSize = options?.gridSize || "460x215";
+  const fallbackSizes = [fallbackSize, "920x430"].filter(
+    (size, idx, arr) => size && arr.indexOf(size) === idx
+  );
   const downloadToLocal = async (url) => {
     await downloadImage(url, headerPath);
     return { headerUrl: localUrl() };
@@ -201,20 +233,22 @@ async function cacheHeaderImage(
     // fallthrough to steamgrid
   }
   if (coverName) {
-    try {
-      const gridUrl = await fetchSteamGridDbImage(coverName, {
-        size: fallbackSize,
-      });
+    for (const size of fallbackSizes) {
       try {
-        return await downloadToLocal(gridUrl);
-      } catch {
-        return { headerUrl: gridUrl };
+        const gridUrl = await fetchSteamGridDbImage(coverName, { size });
+        try {
+          return await downloadToLocal(gridUrl);
+        } catch {
+          return { headerUrl: gridUrl };
+        }
+      } catch (gridErr) {
+        if (size === fallbackSizes[fallbackSizes.length - 1]) {
+          console.warn(
+            `steamgriddb header fallback failed for ${appid}:`,
+            gridErr.message || gridErr
+          );
+        }
       }
-    } catch (gridErr) {
-      console.warn(
-        `steamgriddb header fallback failed for ${appid}:`,
-        gridErr.message || gridErr
-      );
     }
   }
   return { headerUrl };

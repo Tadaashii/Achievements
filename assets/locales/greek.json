@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "Να αφαιρέσετε όλα τα παιχνίδια που βρίσκονται στη μαύρη λίστα;",
   "confirm.blacklistReset.title": "Επαναφορά μαύρης λίστας",
   "confirm.deleteConfig.message": "Θέλετε να διαγράψετε: {name};",
+  "confirm.deleteConfig.deleteExtras": "Θέλετε επίσης να διαγράψετε το σχήμα, την cache και τις εικόνες;",
   "confirm.deleteConfig.title": "Διαγραφή ρυθμίσεων",
   "confirm.steamApiRemove.message": "Να διαγράψετε το αποθηκευμένο κλειδί API Steam;",
   "confirm.steamApiRemove.title": "Κατάργηση κλειδιού API Steam",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "Τα σχήματα PS4 δημιουργούνται από αρχεία τροπαίων. Κάντε επανασάρωση του φακέλου.",
   "main.message.schemaSteamOfficialRescan": "Τα σχήματα Steam (Official) δημιουργούνται από τα στατιστικά appcache. Κάντε επανασάρωση του φακέλου στατιστικών.",
   "boot.loading.title": "Εκκίνηση…",
-  "boot.loading.sub": "Προετοιμασία της προσωρινής μνήμης επιτευγμάτων"
+  "boot.loading.sub": "Προετοιμασία της προσωρινής μνήμης επιτευγμάτων",
+  "label.overlay-interact-shortcut-btn": "Πλήκτρο αλληλεπίδρασης:",
+  "settings-overlayInteractShortcutTitle": "Πλήκτρο αλληλεπίδρασης overlay",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "Εναλλαγή αλληλεπίδρασης: πατήστε μία φορά για ενεργοποίηση σύρσιμου/κύλισης, πατήστε ξανά για επιστροφή στο κλικ μέσω. Απαιτείται μη τροποποιητικό πλήκτρο (π.χ. \\).",
+  "aria.overlay-interact-shortcut-info": "Εναλλαγή αλληλεπίδρασης: πατήστε μία φορά για ενεργοποίηση σύρσιμου/κύλισης, πατήστε ξανά για επιστροφή στο κλικ μέσω. Απαιτείται μη τροποποιητικό πλήκτρο (π.χ. \\)."
 }
+
+
+

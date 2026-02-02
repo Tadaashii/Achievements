@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "Rimuovere tutti i giochi inseriti nella lista nera?",
   "confirm.blacklistReset.title": "Reimposta lista nera",
   "confirm.deleteConfig.message": "Vuoi eliminare: {name}?",
+  "confirm.deleteConfig.deleteExtras": "Vuoi eliminare anche lo schema, la cache e le immagini?",
   "confirm.deleteConfig.title": "Elimina configurazione",
   "confirm.steamApiRemove.message": "Rimuovere la chiave API Steam memorizzata?",
   "confirm.steamApiRemove.title": "Rimuovi chiave API Steam",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "Gli schemi PS4 vengono generati dai file dei trofei. Esegui invece una nuova scansione della cartella.",
   "main.message.schemaSteamOfficialRescan": "Gli schemi Steam (Official) vengono generati dalle statistiche appcache. Esegui invece una nuova scansione della cartella delle statistiche.",
   "boot.loading.title": "Avvio…",
-  "boot.loading.sub": "Preparazione della cache degli obiettivi"
+  "boot.loading.sub": "Preparazione della cache degli obiettivi",
+  "label.overlay-interact-shortcut-btn": "Tasto di interazione:",
+  "settings-overlayInteractShortcutTitle": "Tasto di interazione overlay",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "Alterna interazione: premi una volta per abilitare trascinamento/scorrimento, premi di nuovo per tornare al click-through. Richiede un tasto non modificatore (es. \\).",
+  "aria.overlay-interact-shortcut-info": "Alterna interazione: premi una volta per abilitare trascinamento/scorrimento, premi di nuovo per tornare al click-through. Richiede un tasto non modificatore (es. \\)."
 }
+
+
+

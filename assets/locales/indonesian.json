@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "Hapus semua game yang masuk daftar hitam?",
   "confirm.blacklistReset.title": "Reset daftar hitam",
   "confirm.deleteConfig.message": "Apakah Anda ingin menghapus: {name}?",
+  "confirm.deleteConfig.deleteExtras": "Apakah Anda juga ingin menghapus skema, cache, dan gambar?",
   "confirm.deleteConfig.title": "Hapus konfigurasi",
   "confirm.steamApiRemove.message": "Hapus kunci API Steam yang disimpan?",
   "confirm.steamApiRemove.title": "Hapus Kunci API Steam",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "Skema PS4 dibuat dari file trofi. Pindai ulang folder sebagai gantinya.",
   "main.message.schemaSteamOfficialRescan": "Skema Steam (Official) dibuat dari statistik appcache. Pindai ulang folder statistik sebagai gantinya.",
   "boot.loading.title": "Memulai…",
-  "boot.loading.sub": "Menyiapkan cache pencapaian"
+  "boot.loading.sub": "Menyiapkan cache pencapaian",
+  "label.overlay-interact-shortcut-btn": "Tombol Interaksi:",
+  "settings-overlayInteractShortcutTitle": "Tombol Interaksi Overlay",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "Alihkan interaksi: tekan sekali untuk mengaktifkan seret/gulir, tekan lagi untuk kembali ke klik tembus. Memerlukan tombol non-modifier (mis. \\).",
+  "aria.overlay-interact-shortcut-info": "Alihkan interaksi: tekan sekali untuk mengaktifkan seret/gulir, tekan lagi untuk kembali ke klik tembus. Memerlukan tombol non-modifier (mis. \\)."
 }
+
+
+

@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "Remover todos os jogos da lista negra?",
   "confirm.blacklistReset.title": "Redefinir lista negra",
   "confirm.deleteConfig.message": "Deseja eliminar: {name}?",
+  "confirm.deleteConfig.deleteExtras": "Deseja eliminar também o esquema, a cache e as imagens?",
   "confirm.deleteConfig.title": "Apagar configuração",
   "confirm.steamApiRemove.message": "Remover a chave API Steam armazenada?",
   "confirm.steamApiRemove.title": "Remover chave API Steam",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "Os esquemas do PS4 são gerados a partir dos ficheiros de troféus. Em vez disso, volte a analisar a pasta.",
   "main.message.schemaSteamOfficialRescan": "Os esquemas do Steam (Official) são gerados a partir das estatísticas do appcache. Em vez disso, volte a analisar a pasta de estatísticas.",
   "boot.loading.title": "A iniciar…",
-  "boot.loading.sub": "A preparar a cache de conquistas"
+  "boot.loading.sub": "A preparar a cache de conquistas",
+  "label.overlay-interact-shortcut-btn": "Tecla de interação:",
+  "settings-overlayInteractShortcutTitle": "Tecla de interação da sobreposição",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "Alternar interação: prima uma vez para ativar arrastar/rolar, prima novamente para voltar ao clique através. Requer uma tecla não modificadora (ex.: \\).",
+  "aria.overlay-interact-shortcut-info": "Alternar interação: prima uma vez para ativar arrastar/rolar, prima novamente para voltar ao clique através. Requer uma tecla não modificadora (ex.: \\)."
 }
+
+
+

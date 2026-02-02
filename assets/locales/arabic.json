@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "إزالة جميع الألعاب المدرجة في القائمة السوداء؟",
   "confirm.blacklistReset.title": "إعادة تعيين القائمة السوداء",
   "confirm.deleteConfig.message": "هل تريد حذف: {name}؟",
+  "confirm.deleteConfig.deleteExtras": "هل تريد أيضًا حذف المخطط وذاكرة التخزين المؤقت والصور؟",
   "confirm.deleteConfig.title": "حذف التكوين",
   "confirm.steamApiRemove.message": "إزالة مفتاح API Steam المخزن؟",
   "confirm.steamApiRemove.title": "إزالة مفتاح API Steam",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "يتم إنشاء مخططات PS4 من ملفات الكؤوس. أعد فحص المجلد بدلاً من ذلك.",
   "main.message.schemaSteamOfficialRescan": "يتم إنشاء مخططات Steam (Official) من إحصاءات appcache. أعد فحص مجلد الإحصاءات بدلاً من ذلك.",
   "boot.loading.title": "جارٍ التشغيل…",
-  "boot.loading.sub": "جارٍ تحضير ذاكرة التخزين المؤقت للإنجازات"
+  "boot.loading.sub": "جارٍ تحضير ذاكرة التخزين المؤقت للإنجازات",
+  "label.overlay-interact-shortcut-btn": "مفتاح التفاعل:",
+  "settings-overlayInteractShortcutTitle": "مفتاح تفاعل التراكب",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "تبديل التفاعل: اضغط مرة واحدة لتفعيل السحب/التمرير، واضغط مرة أخرى للعودة إلى النقر عبر النافذة. يتطلب مفتاحًا غير مُعدِّل (مثل \\).",
+  "aria.overlay-interact-shortcut-info": "تبديل التفاعل: اضغط مرة واحدة لتفعيل السحب/التمرير، واضغط مرة أخرى للعودة إلى النقر عبر النافذة. يتطلب مفتاحًا غير مُعدِّل (مثل \\)."
 }
+
+
+

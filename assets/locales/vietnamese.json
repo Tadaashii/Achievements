@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "Xóa tất cả các trò chơi bị đưa vào danh sách đen?",
   "confirm.blacklistReset.title": "Xóa danh sách đen",
   "confirm.deleteConfig.message": "Bạn có muốn xóa: {name}?",
+  "confirm.deleteConfig.deleteExtras": "Bạn có muốn xóa cả schema, cache và hình ảnh không?",
   "confirm.deleteConfig.title": "Xóa cấu hình",
   "confirm.steamApiRemove.message": "Xóa khóa API Steam đã lưu?",
   "confirm.steamApiRemove.title": "Xóa khóa API Steam",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "Lược đồ PS4 được tạo từ các tệp cúp. Hãy quét lại thư mục thay vào đó.",
   "main.message.schemaSteamOfficialRescan": "Lược đồ Steam (Official) được tạo từ thống kê appcache. Hãy quét lại thư mục thống kê thay vào đó.",
   "boot.loading.title": "Đang khởi động…",
-  "boot.loading.sub": "Đang chuẩn bị bộ đệm thành tích"
+  "boot.loading.sub": "Đang chuẩn bị bộ đệm thành tích",
+  "label.overlay-interact-shortcut-btn": "Phím tương tác:",
+  "settings-overlayInteractShortcutTitle": "Phím tương tác Overlay",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "Chuyển đổi tương tác: nhấn một lần để bật kéo/cuộn, nhấn lần nữa để trở lại click-through. Cần phím không phải phím bổ trợ (vd. \\).",
+  "aria.overlay-interact-shortcut-info": "Chuyển đổi tương tác: nhấn một lần để bật kéo/cuộn, nhấn lần nữa để trở lại click-through. Cần phím không phải phím bổ trợ (vd. \\)."
 }
+
+
+

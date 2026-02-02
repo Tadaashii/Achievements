@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "Fjerne alle spill på svartelisten?",
   "confirm.blacklistReset.title": "Tilbakestill svarteliste",
   "confirm.deleteConfig.message": "Vil du slette: {name}?",
+  "confirm.deleteConfig.deleteExtras": "Vil du også slette skjemaet, cachen og bildene?",
   "confirm.deleteConfig.title": "Slett konfigurasjon",
   "confirm.steamApiRemove.message": "Fjerne den lagrede Steam API-nøkkelen?",
   "confirm.steamApiRemove.title": "Fjern Steam API-nøkkel",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "PS4-skjemaer genereres fra troféfiler. Skann mappen på nytt i stedet.",
   "main.message.schemaSteamOfficialRescan": "Steam (Official)-skjemaer genereres fra appcache-statistikk. Skann statistikkmappen på nytt i stedet.",
   "boot.loading.title": "Starter…",
-  "boot.loading.sub": "Forbereder cache for prestasjoner"
+  "boot.loading.sub": "Forbereder cache for prestasjoner",
+  "label.overlay-interact-shortcut-btn": "Interaksjonstast:",
+  "settings-overlayInteractShortcutTitle": "Overlay-interaksjonstast",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "Bytt interaksjon: trykk én gang for å aktivere dra/scroll, trykk igjen for å gå tilbake til klikk-gjennom. Krever en ikke-modifikatortast (f.eks. \\).",
+  "aria.overlay-interact-shortcut-info": "Bytt interaksjon: trykk én gang for å aktivere dra/scroll, trykk igjen for å gå tilbake til klikk-gjennom. Krever en ikke-modifikatortast (f.eks. \\)."
 }
+
+
+

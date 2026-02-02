@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "Видалити всі ігри з чорного списку?",
   "confirm.blacklistReset.title": "Скинути чорний список",
   "confirm.deleteConfig.message": "Ви хочете видалити: {name}?",
+  "confirm.deleteConfig.deleteExtras": "Видалити також схему, кеш і зображення?",
   "confirm.deleteConfig.title": "Видалити конфігурацію",
   "confirm.steamApiRemove.message": "Видалити збережений ключ API Steam?",
   "confirm.steamApiRemove.title": "Видалити ключ API Steam",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "Схеми PS4 генеруються з файлів трофеїв. Замість цього перескануйте папку.",
   "main.message.schemaSteamOfficialRescan": "Схеми Steam (Official) генеруються зі статистики appcache. Замість цього перескануйте папку зі статистикою.",
   "boot.loading.title": "Запуск…",
-  "boot.loading.sub": "Підготовка кешу досягнень"
+  "boot.loading.sub": "Підготовка кешу досягнень",
+  "label.overlay-interact-shortcut-btn": "Клавіша взаємодії:",
+  "settings-overlayInteractShortcutTitle": "Клавіша взаємодії оверлею",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "Перемикання взаємодії: натисніть один раз, щоб увімкнути перетягування/прокрутку, натисніть ще раз, щоб повернутись до кліку крізь. Потрібна немодифікаторна клавіша (наприклад, \\).",
+  "aria.overlay-interact-shortcut-info": "Перемикання взаємодії: натисніть один раз, щоб увімкнути перетягування/прокрутку, натисніть ще раз, щоб повернутись до кліку крізь. Потрібна немодифікаторна клавіша (наприклад, \\)."
 }
+
+
+

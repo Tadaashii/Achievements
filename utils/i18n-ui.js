@@ -42,7 +42,24 @@
       if (key.startsWith("label.")) {
         const id = key.slice("label.".length);
         const el = document.querySelector(`label[for="${cssEscape(id)}"]`);
-        if (el) el.textContent = value;
+        if (el) {
+          const hasElementChild = Array.from(el.childNodes).some(
+            (node) => node.nodeType === 1,
+          );
+          let textNode = null;
+          for (const node of el.childNodes) {
+            if (node.nodeType === 3 && node.textContent.trim() !== "") {
+              textNode = node;
+              break;
+            }
+          }
+          if (!textNode) {
+            textNode = document.createTextNode("");
+            el.insertBefore(textNode, el.firstChild);
+          }
+          const suffix = hasElementChild && !/\\s$/.test(value) ? " " : "";
+          textNode.textContent = value + suffix;
+        }
         continue;
       }
       if (key.startsWith("placeholder.")) {

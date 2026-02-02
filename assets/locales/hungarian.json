@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "Az összes feketelistára tett játékot eltávolítani?",
   "confirm.blacklistReset.title": "Feketelista visszaállítása",
   "confirm.deleteConfig.message": "Törölni szeretné: {name}?",
+  "confirm.deleteConfig.deleteExtras": "Szeretnéd a sémát, a gyorsítótárat és a képeket is törölni?",
   "confirm.deleteConfig.title": "Konfiguráció törlése",
   "confirm.steamApiRemove.message": "Távolítsa el a tárolt Steam API kulcsot?",
   "confirm.steamApiRemove.title": "Steam API kulcs eltávolítása",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "A PS4-sémák trófeafájlokból készülnek. Ehelyett szkenneld újra a mappát.",
   "main.message.schemaSteamOfficialRescan": "A Steam (Official) sémák az appcache statisztikáiból készülnek. Ehelyett szkenneld újra a statisztika mappát.",
   "boot.loading.title": "Indítás…",
-  "boot.loading.sub": "Eredmények gyorsítótárának előkészítése"
+  "boot.loading.sub": "Eredmények gyorsítótárának előkészítése",
+  "label.overlay-interact-shortcut-btn": "Interakciós billentyű:",
+  "settings-overlayInteractShortcutTitle": "Overlay interakciós billentyű",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "Interakció váltása: nyomd meg egyszer a húzás/görgetés engedélyezéséhez, nyomd meg újra a kattintás-átengedéshez. Nem módosító billentyű szükséges (pl. \\).",
+  "aria.overlay-interact-shortcut-info": "Interakció váltása: nyomd meg egyszer a húzás/görgetés engedélyezéséhez, nyomd meg újra a kattintás-átengedéshez. Nem módosító billentyű szükséges (pl. \\)."
 }
+
+
+

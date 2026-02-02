@@ -242,7 +242,7 @@ async function generateConfigFromPs4Dir(trophyDir, configsDir, options = {}) {
     parsed = parsePs4TrophySetDir(trophyDir);
   } catch (err) {
     autoConfigLogger.error("ps4:trophy:parse:failed", {
-      appid,
+      appid: appidFromDir,
       path: trophyDir,
       error: err?.message || String(err),
     });

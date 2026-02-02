@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "Tüm kara listeye alınmış oyunları kaldırmak mı?",
   "confirm.blacklistReset.title": "Kara listeyi sıfırla",
   "confirm.deleteConfig.message": "{name} öğesini silmek istiyor musunuz?",
+  "confirm.deleteConfig.deleteExtras": "Şemayı, önbelleği ve görselleri de silmek istiyor musunuz?",
   "confirm.deleteConfig.title": "Yapılandırmayı sil",
   "confirm.steamApiRemove.message": "Saklanan Steam API anahtarını silmek ister misiniz?",
   "confirm.steamApiRemove.title": "Steam API anahtarını kaldır",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "PS4 şemaları kupa dosyalarından oluşturulur. Bunun yerine klasörü yeniden tarayın.",
   "main.message.schemaSteamOfficialRescan": "Steam (Official) şemaları appcache istatistiklerinden oluşturulur. Bunun yerine istatistik klasörünü yeniden tarayın.",
   "boot.loading.title": "Başlatılıyor…",
-  "boot.loading.sub": "Başarılar önbelleği hazırlanıyor"
+  "boot.loading.sub": "Başarılar önbelleği hazırlanıyor",
+  "label.overlay-interact-shortcut-btn": "Etkileşim Tuşu:",
+  "settings-overlayInteractShortcutTitle": "Overlay Etkileşim Tuşu",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "Etkileşimi değiştir: sürükle/kaydırmayı etkinleştirmek için bir kez bas, tekrar basarak tıklama-geçişe dön. Değiştirici olmayan bir tuş gerekir (örn. \\).",
+  "aria.overlay-interact-shortcut-info": "Etkileşimi değiştir: sürükle/kaydırmayı etkinleştirmek için bir kez bas, tekrar basarak tıklama-geçişe dön. Değiştirici olmayan bir tuş gerekir (örn. \\)."
 }
+
+
+

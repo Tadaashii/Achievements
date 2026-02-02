@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "모든 블랙리스트 게임 제거하기?",
   "confirm.blacklistReset.title": "블랙리스트 초기화",
   "confirm.deleteConfig.message": "{name}를 삭제하시겠습니까?",
+  "confirm.deleteConfig.deleteExtras": "스키마, 캐시 및 이미지도 삭제할까요?",
   "confirm.deleteConfig.title": "구성 삭제",
   "confirm.steamApiRemove.message": "저장된 Steam API 키를 삭제하시겠습니까?",
   "confirm.steamApiRemove.title": "Steam API 키 제거",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "PS4 스키마는 트로피 파일에서 생성됩니다. 대신 폴더를 다시 스캔하세요.",
   "main.message.schemaSteamOfficialRescan": "Steam (Official) 스키마는 appcache 통계에서 생성됩니다. 대신 통계 폴더를 다시 스캔하세요.",
   "boot.loading.title": "시작 중…",
-  "boot.loading.sub": "도전 과제 캐시를 준비하는 중"
+  "boot.loading.sub": "도전 과제 캐시를 준비하는 중",
+  "label.overlay-interact-shortcut-btn": "상호작용 키:",
+  "settings-overlayInteractShortcutTitle": "오버레이 상호작용 키",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "상호작용 전환: 한 번 눌러 드래그/스크롤을 활성화하고, 다시 눌러 클릭 통과로 돌아갑니다. 비-수정 키가 필요합니다(예: \\).",
+  "aria.overlay-interact-shortcut-info": "상호작용 전환: 한 번 눌러 드래그/스크롤을 활성화하고, 다시 눌러 클릭 통과로 돌아갑니다. 비-수정 키가 필요합니다(예: \\)."
 }
+
+
+

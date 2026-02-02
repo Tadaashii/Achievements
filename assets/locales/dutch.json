@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "Alle games op de zwarte lijst verwijderen?",
   "confirm.blacklistReset.title": "Zwarte lijst resetten",
   "confirm.deleteConfig.message": "Wilt u verwijderen: {name}?",
+  "confirm.deleteConfig.deleteExtras": "Wilt u ook het schema, de cache en de afbeeldingen verwijderen?",
   "confirm.deleteConfig.title": "Configuratie verwijderen",
   "confirm.steamApiRemove.message": "De opgeslagen Steam API-sleutel verwijderen?",
   "confirm.steamApiRemove.title": "Steam API-sleutel verwijderen",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "PS4-schema's worden gegenereerd uit trofeebestanden. Scan de map in plaats daarvan opnieuw.",
   "main.message.schemaSteamOfficialRescan": "Steam (Official)-schema's worden gegenereerd uit appcache-statistieken. Scan de map met statistieken in plaats daarvan opnieuw.",
   "boot.loading.title": "Opstarten…",
-  "boot.loading.sub": "Cache voor prestaties wordt voorbereid"
+  "boot.loading.sub": "Cache voor prestaties wordt voorbereid",
+  "label.overlay-interact-shortcut-btn": "Interactietoets:",
+  "settings-overlayInteractShortcutTitle": "Overlay-interactietoets",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "Interactie schakelen: druk eenmaal om slepen/scrollen te activeren, druk opnieuw om terug te keren naar doorklikken. Vereist een niet-modificatietoets (bijv. \\).",
+  "aria.overlay-interact-shortcut-info": "Interactie schakelen: druk eenmaal om slepen/scrollen te activeren, druk opnieuw om terug te keren naar doorklikken. Vereist een niet-modificatietoets (bijv. \\)."
 }
+
+
+

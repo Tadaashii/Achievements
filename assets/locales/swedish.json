@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "Ta bort alla svartlistade spel?",
   "confirm.blacklistReset.title": "Återställ svartlista",
   "confirm.deleteConfig.message": "Vill du ta bort: {name}?",
+  "confirm.deleteConfig.deleteExtras": "Vill du även ta bort schemat, cachen och bilderna?",
   "confirm.deleteConfig.title": "Ta bort konfiguration",
   "confirm.steamApiRemove.message": "Ta bort den lagrade Steam API-nyckeln?",
   "confirm.steamApiRemove.title": "Ta bort Steam API-nyckel",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "PS4-scheman genereras från troféfiler. Skanna mappen igen i stället.",
   "main.message.schemaSteamOfficialRescan": "Steam (Official)-scheman genereras från appcache-statistik. Skanna statistikmappen igen i stället.",
   "boot.loading.title": "Startar…",
-  "boot.loading.sub": "Förbereder cache för prestationer"
+  "boot.loading.sub": "Förbereder cache för prestationer",
+  "label.overlay-interact-shortcut-btn": "Interaktionstangent:",
+  "settings-overlayInteractShortcutTitle": "Overlay-interaktionstangent",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "Växla interaktion: tryck en gång för att aktivera dra/scrolla, tryck igen för att återgå till klick-igenom. Kräver en icke-modifierande tangent (t.ex. \\).",
+  "aria.overlay-interact-shortcut-info": "Växla interaktion: tryck en gång för att aktivera dra/scrolla, tryck igen för att återgå till klick-igenom. Kräver en icke-modifierande tangent (t.ex. \\)."
 }
+
+
+

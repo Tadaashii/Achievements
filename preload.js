@@ -13,7 +13,15 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("schema:regenerate", payload),
   loadConfigs: () => ipcRenderer.invoke("loadConfigs"),
   selectFolder: () => ipcRenderer.invoke("selectFolder"),
-  deleteConfig: (configName) => ipcRenderer.invoke("delete-config", configName),
+  deleteConfig: (configName, options = {}) => {
+    if (configName && typeof configName === "object") {
+      return ipcRenderer.invoke("delete-config", configName);
+    }
+    return ipcRenderer.invoke("delete-config", {
+      configName,
+      ...(options || {}),
+    });
+  },
   blacklistConfig: (payload) => ipcRenderer.invoke("config:blacklist", payload),
   getBlacklist: () => ipcRenderer.invoke("blacklist:list"),
   resetBlacklist: () => ipcRenderer.invoke("blacklist:reset"),
@@ -76,7 +84,9 @@ contextBridge.exposeInMainWorld("api", {
   onLoadOverlayData: (callback) => {
     if (overlayDataHandler) {
       ipcRenderer.removeListener("load-overlay-data", overlayDataHandler);
+      overlayDataHandler = null;
     }
+    if (typeof callback !== "function") return;
     overlayDataHandler = (_event, config) => callback(config);
     ipcRenderer.on("load-overlay-data", overlayDataHandler);
   },
@@ -133,6 +143,10 @@ contextBridge.exposeInMainWorld("api", {
   updateOverlayShortcut: (combo) =>
     ipcRenderer.send("update-overlay-shortcut", combo),
   requestCurrentConfig: () => ipcRenderer.send("request-current-config"),
+  getWindowPosition: () => ipcRenderer.invoke("window:get-position"),
+  setWindowPosition: (x, y) =>
+    ipcRenderer.send("window:set-position", { x, y }),
+  requestOverlayFocus: () => ipcRenderer.send("overlay:request-focus"),
   // language
   refreshUILanguage: (language) =>
     ipcRenderer.send("refresh-ui-after-language-change", language),

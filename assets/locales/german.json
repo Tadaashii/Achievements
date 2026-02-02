@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "Alle Spiele auf der schwarzen Liste entfernen?",
   "confirm.blacklistReset.title": "Blacklist zurücksetzen",
   "confirm.deleteConfig.message": "Möchten Sie löschen: {name}?",
+  "confirm.deleteConfig.deleteExtras": "Möchten Sie auch das Schema, den Cache und die Bilder löschen?",
   "confirm.deleteConfig.title": "Konfiguration löschen",
   "confirm.steamApiRemove.message": "Den gespeicherten Steam-API-Schlüssel entfernen?",
   "confirm.steamApiRemove.title": "Steam-API-Schlüssel entfernen",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "PS4-Schemata werden aus Trophäendateien erzeugt. Scanne stattdessen den Ordner erneut.",
   "main.message.schemaSteamOfficialRescan": "Steam (Official)-Schemata werden aus appcache-Statistiken erzeugt. Scanne stattdessen den Statistikordner erneut.",
   "boot.loading.title": "Starten…",
-  "boot.loading.sub": "Zwischenspeicher für Erfolge wird vorbereitet"
+  "boot.loading.sub": "Zwischenspeicher für Erfolge wird vorbereitet",
+  "label.overlay-interact-shortcut-btn": "Interaktionstaste:",
+  "settings-overlayInteractShortcutTitle": "Overlay-Interaktionstaste",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "Interaktion umschalten: einmal drücken, um Ziehen/Scrollen zu aktivieren, erneut drücken, um zum Durchklicken zurückzukehren. Erfordert eine Nicht-Modifikatortaste (z. B. \\).",
+  "aria.overlay-interact-shortcut-info": "Interaktion umschalten: einmal drücken, um Ziehen/Scrollen zu aktivieren, erneut drücken, um zum Durchklicken zurückzukehren. Erfordert eine Nicht-Modifikatortaste (z. B. \\)."
 }
+
+
+

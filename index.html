@@ -245,7 +245,7 @@
             role="tabpanel"
             aria-labelledby="tab-general"
           >
-            <div style="padding: 0 5px">
+            <div style="padding: 0 10px">
               <div class="settings-section">
                 <h4 id="settings-appScaleTitle">App Scale</h4>
                 <div class="settings-control">
@@ -259,20 +259,41 @@
                   </select>
                 </div>
               </div>
-              <div class="settings-section" style="margin-bottom: 5px">
+              <div class="settings-section">
                 <h4 id="settings-appLanguageTitle">App Language</h4>
                 <div class="settings-control">
                   <label for="appLanguageSelect">App Language:</label>
                   <select id="appLanguageSelect"></select>
                 </div>
               </div>
-              <div class="settings-section" style="margin-bottom: 5px">
+              <div class="settings-section settings-section--pad-top">
                 <h4 id="settings-overlayShortcutTitle">Overlay Shortcut</h4>
                 <div class="settings-control">
-                  <label for="overlay-shortcut-btn">Shortcut Key:</label>
+                  <label for="overlay-shortcut-btn" style="margin-top: -10px"
+                    >Shortcut Key:</label
+                  >
                   <button id="overlay-shortcut-btn" type="button">
                     Set Shortcut
                   </button>
+                </div>
+                <div class="settings-section">
+                  <div class="settings-control">
+                    <label
+                      for="overlay-interact-shortcut-btn"
+                      style="margin-top: -10px"
+                      >Interact Key:
+                      <span
+                        id="overlay-interact-shortcut-info"
+                        class="info-dot"
+                        title="Toggle interaction: press once to enable drag/scroll, press again to return to click-through."
+                        aria-label="Toggle interaction: press once to enable drag/scroll, press again to return to click-through."
+                        >i</span
+                      ></label
+                    >
+                    <button id="overlay-interact-shortcut-btn" type="button">
+                      \
+                    </button>
+                  </div>
                 </div>
               </div>
               <div class="settings-section">
@@ -367,7 +388,7 @@
             aria-labelledby="tab-notification"
             hidden
           >
-            <div style="padding: 0 5px">
+            <div style="padding: 0 10px">
               <div class="settings-section">
                 <h4 id="settings-testingTitle">Achievement Testing</h4>
                 <button
@@ -541,7 +562,7 @@
             aria-labelledby="tab-folders"
             hidden
           >
-            <div style="padding: 0 5px">
+            <div style="padding: 0 10px">
               <div class="settings-section">
                 <h4 id="settings-foldersTitle">
                   Folders (auto-detect achievements)
@@ -564,7 +585,7 @@
             aria-labelledby="tab-advanced"
             hidden
           >
-            <div style="padding: 0 5px">
+            <div style="padding: 0 10px">
               <div class="settings-section">
                 <div class="settings-section" style="margin-bottom: 5px">
                   <h4 id="settings-steamApiTitle">Steam Web API</h4>
@@ -609,6 +630,19 @@
                     </button>
                   </div>
                 </div>
+                <div class="settings-section">
+                  <h4 id="settings-renderingTitle">Rendering</h4>
+                  <div class="checkbox-control">
+                    <input
+                      type="checkbox"
+                      id="settings-disableHardwareAccelerationCheckbox"
+                    />
+                    <label for="settings-disableHardwareAccelerationCheckbox">
+                      Disable Hardware Acceleration
+                      <span class="hint">(restart required)</span>
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -622,7 +656,7 @@
             tabindex="0"
           >
             <template id="shortcutsTabTemplate">
-              <div style="padding: 0 5px">
+              <div style="padding: 0 10px">
                 <!-- Global -->
                 <div class="settings-section">
                   <h4 id="settings-globalTitle">Global</h4>
@@ -1508,13 +1542,15 @@
                       <select id="platformSelect">
                         <option value="auto" selected>Auto</option>
                         <option value="steam">Steam</option>
-                        <option value="steam-official" disabled>Steam (Official)</option>
+                        <option value="steam-official" disabled>
+                          Steam (Official)
+                        </option>
                         <option value="uplay">Uplay</option>
                         <option value="epic">Epic</option>
                         <option value="gog">GOG</option>
-                <option value="xenia" disabled>Xenia</option>
-                <option value="rpcs3" disabled>RPCS3</option>
-                <option value="shadps4" disabled>PS4 (shadps4)</option>
+                        <option value="xenia" disabled>Xenia</option>
+                        <option value="rpcs3" disabled>RPCS3</option>
+                        <option value="shadps4" disabled>PS4 (shadps4)</option>
                       </select>
 
                       <div
@@ -1912,6 +1948,10 @@
       <div class="modal-content confirm-modal">
         <h3 id="appConfirmTitle">Confirm</h3>
         <p id="appConfirmMessage"></p>
+        <label id="appConfirmCheckboxRow" class="confirm-checkbox-row hidden">
+          <input id="appConfirmCheckbox" type="checkbox" />
+          <span id="appConfirmCheckboxLabel"></span>
+        </label>
         <div class="confirm-actions">
           <button id="appConfirmCancelBtn" type="button">Cancel</button>
           <button id="appConfirmOkBtn" type="button">OK</button>
@@ -2164,7 +2204,9 @@
             .replace(/\s+/g, "+");
         }
         function normalizeCoverPlatform(value) {
-          return String(value || "").trim().toLowerCase();
+          return String(value || "")
+            .trim()
+            .toLowerCase();
         }
         function isSteamGridOnlyPlatform(value) {
           const platform = normalizeCoverPlatform(value);
@@ -2386,7 +2428,8 @@
             const rawFallbackName = String(
               options?.gameName || getCoverSearchTerm(targetAppId) || "",
             ).trim();
-            const fallbackName = stripCoverSuffix(rawFallbackName) || rawFallbackName;
+            const fallbackName =
+              stripCoverSuffix(rawFallbackName) || rawFallbackName;
             const normalizedPlatform = normalizeCoverPlatform(platform);
             const steamGridOnly = isSteamGridOnlyPlatform(normalizedPlatform);
             const steamGridSize =
@@ -2831,29 +2874,29 @@
             "/",
           )}`;
 
-        const statusLocked =
-          (window.i18nUi &&
-            typeof window.i18nUi.getString === "function" &&
-            window.i18nUi.getString("overlay.statusLocked", "Locked")) ||
-          "Locked";
-        const statusUnlocked =
-          (window.i18nUi &&
-            typeof window.i18nUi.getString === "function" &&
-            window.i18nUi.getString("overlay.statusUnlocked", "Unlocked")) ||
-          "Unlocked";
-        const progressLabel =
-          (window.i18nUi &&
-            typeof window.i18nUi.getString === "function" &&
-            window.i18nUi.getString("overlay.progressLabel", "Progress")) ||
-          "Progress";
-        const hiddenLabel =
-          (window.i18nUi &&
-            typeof window.i18nUi.getString === "function" &&
-            window.i18nUi.getString("overlay.hiddenFallback", "Hidden")) ||
-          "Hidden";
-        const statusHTML = saved?.earned
-          ? `<span class="unlocked">${statusUnlocked}</span>`
-          : `<span class="locked">${statusLocked}</span>`;
+          const statusLocked =
+            (window.i18nUi &&
+              typeof window.i18nUi.getString === "function" &&
+              window.i18nUi.getString("overlay.statusLocked", "Locked")) ||
+            "Locked";
+          const statusUnlocked =
+            (window.i18nUi &&
+              typeof window.i18nUi.getString === "function" &&
+              window.i18nUi.getString("overlay.statusUnlocked", "Unlocked")) ||
+            "Unlocked";
+          const progressLabel =
+            (window.i18nUi &&
+              typeof window.i18nUi.getString === "function" &&
+              window.i18nUi.getString("overlay.progressLabel", "Progress")) ||
+            "Progress";
+          const hiddenLabel =
+            (window.i18nUi &&
+              typeof window.i18nUi.getString === "function" &&
+              window.i18nUi.getString("overlay.hiddenFallback", "Hidden")) ||
+            "Hidden";
+          const statusHTML = saved?.earned
+            ? `<span class="unlocked">${statusUnlocked}</span>`
+            : `<span class="locked">${statusLocked}</span>`;
 
           const earnedTimeText = saved?.earned_time
             ? `<br>${tsToLocal(saved.earned_time)}`
@@ -3793,6 +3836,12 @@
         if (typeof window.refreshShortcutLabel === "function") {
           window.refreshShortcutLabel();
         }
+        if (typeof window.refreshInteractShortcutLabel === "function") {
+          window.refreshInteractShortcutLabel();
+        }
+        if (typeof window.refreshInteractShortcutInfo === "function") {
+          window.refreshInteractShortcutInfo();
+        }
         if (typeof window.refreshBootLoadingText === "function") {
           window.refreshBootLoadingText();
         }
@@ -4116,10 +4165,18 @@
       const confirmModal = document.getElementById("appConfirmModal");
       const confirmTitleEl = document.getElementById("appConfirmTitle");
       const confirmMessageEl = document.getElementById("appConfirmMessage");
+      const confirmCheckboxRow = document.getElementById(
+        "appConfirmCheckboxRow",
+      );
+      const confirmCheckbox = document.getElementById("appConfirmCheckbox");
+      const confirmCheckboxLabel = document.getElementById(
+        "appConfirmCheckboxLabel",
+      );
       const confirmOkBtn = document.getElementById("appConfirmOkBtn");
       const confirmCancelBtn = document.getElementById("appConfirmCancelBtn");
       let confirmResolve = null;
       let confirmLastFocus = null;
+      let confirmCheckboxValue = false;
       const tUi = (key, fallback) =>
         window.i18nUi && typeof window.i18nUi.getString === "function"
           ? window.i18nUi.getString(key, fallback)
@@ -4133,6 +4190,16 @@
         confirmModal.setAttribute("aria-hidden", "true");
         confirmModal.inert = false;
         document.body.classList.remove("modal-open");
+        if (confirmCheckboxRow && confirmCheckbox) {
+          confirmCheckboxValue = !confirmCheckboxRow.classList.contains("hidden")
+            ? confirmCheckbox.checked === true
+            : false;
+          confirmCheckboxRow.classList.add("hidden");
+          confirmCheckbox.checked = false;
+          if (confirmCheckboxLabel) confirmCheckboxLabel.textContent = "";
+        } else {
+          confirmCheckboxValue = false;
+        }
         if (confirmLastFocus && typeof confirmLastFocus.focus === "function") {
           try {
             confirmLastFocus.focus();
@@ -4172,6 +4239,17 @@
         confirmOkBtn.textContent = opts.okText || tUi("appConfirmOkBtn", "OK");
         confirmCancelBtn.textContent =
           opts.cancelText || tUi("appConfirmCancelBtn", "Cancel");
+        if (confirmCheckboxRow && confirmCheckbox && confirmCheckboxLabel) {
+          if (opts.checkboxLabel) {
+            confirmCheckboxLabel.textContent = opts.checkboxLabel;
+            confirmCheckbox.checked = opts.checkboxDefault === true;
+            confirmCheckboxRow.classList.remove("hidden");
+          } else {
+            confirmCheckboxRow.classList.add("hidden");
+            confirmCheckbox.checked = false;
+            confirmCheckboxLabel.textContent = "";
+          }
+        }
         confirmModal.inert = false;
         confirmModal.classList.remove("hidden");
         confirmModal.setAttribute("aria-hidden", "false");
@@ -4238,6 +4316,32 @@
           return result;
         } catch {
           return false;
+        }
+      }
+
+      async function safeConfirmWithCheckbox(opts) {
+        logUiEvent("info", "ui:confirm:start", {
+          title: opts?.title || "",
+          message: opts?.message || "",
+          checkbox: !!opts?.checkboxLabel,
+        });
+        try {
+          const result = await showAppConfirm(opts);
+          const checked = confirmCheckboxValue === true;
+          logUiEvent("info", "ui:confirm:result", { result, checked });
+          return { confirmed: result === true, checked };
+        } catch (err) {
+          logUiEvent("warn", "ui:confirm-failed", {
+            message: err?.message || String(err),
+          });
+        }
+        try {
+          const message = opts?.message || "Are you sure?";
+          const result = window.confirm(message);
+          logUiEvent("info", "ui:confirm:fallback-result", { result });
+          return { confirmed: result === true, checked: false };
+        } catch {
+          return { confirmed: false, checked: false };
         }
       }
 
@@ -4343,21 +4447,27 @@
       async function deleteConfigByName(configName, displayName = "") {
         if (!configName) return;
         const label = displayName || configName;
-        const confirmDelete = await safeConfirm({
+        const confirmDelete = await safeConfirmWithCheckbox({
           title: tUi("confirm.deleteConfig.title", "Delete config"),
           message: tUiFmt(
             "confirm.deleteConfig.message",
             { name: label },
             `Do you want to delete: ${label}?`,
           ),
+          checkboxLabel: tUi(
+            "confirm.deleteConfig.deleteExtras",
+            "Do you want to delete also the Schema, Cache and Images?",
+          ),
         });
-        if (!confirmDelete) return;
+        if (!confirmDelete?.confirmed) return;
 
         await safeRefocus();
 
         try {
           const wasSelected = configList?.value === configName;
-          const response = await window.api.deleteConfig(configName);
+          const response = await window.api.deleteConfig(configName, {
+            deleteExtras: confirmDelete.checked === true,
+          });
           if (response?.success) {
             if (typeof reloadConfigsDropdown === "function") {
               await reloadConfigsDropdown(true);
@@ -5389,6 +5499,17 @@
           );
           if (cb) cb.checked = prefs.disablePlaytime;
         }
+        {
+          const hwCb = document.getElementById(
+            "settings-disableHardwareAccelerationCheckbox",
+          );
+          if (hwCb) {
+            hwCb.checked =
+              prefs?.disableHardwareAcceleration === undefined
+                ? true
+                : !!prefs.disableHardwareAcceleration;
+          }
+        }
 
         if (prefs.windowZoomFactor) {
           const zoomDropdown = document.getElementById("app-zoom-dropdown");
@@ -5412,6 +5533,10 @@
         if (prefs.overlayShortcut) {
           document.getElementById("overlay-shortcut-btn").textContent =
             prefs.overlayShortcut;
+        }
+        if (prefs.overlayInteractShortcut) {
+          document.getElementById("overlay-interact-shortcut-btn").textContent =
+            formatInteractShortcutLabel(prefs.overlayInteractShortcut);
         }
       }
 
@@ -5568,6 +5693,19 @@
               document.getElementById("overlay-shortcut-btn").textContent = tUi(
                 "overlay-shortcut-btn",
                 "Set Shortcut",
+              );
+            }
+            if (prefs?.overlayInteractShortcut) {
+              document.getElementById(
+                "overlay-interact-shortcut-btn",
+              ).textContent = formatInteractShortcutLabel(
+                prefs.overlayInteractShortcut,
+              );
+            } else {
+              document.getElementById(
+                "overlay-interact-shortcut-btn",
+              ).textContent = formatInteractShortcutLabel(
+                DEFAULT_OVERLAY_INTERACT_SHORTCUT,
               );
             }
 
@@ -5755,6 +5893,21 @@
                 await buildMainAchievementsTable(cfg, lang);
               } catch {}
             }
+          });
+        }
+
+        const hwAccelEl = document.getElementById(
+          "settings-disableHardwareAccelerationCheckbox",
+        );
+        if (hwAccelEl) {
+          hwAccelEl.checked =
+            prefs?.disableHardwareAcceleration === undefined
+              ? true
+              : !!prefs.disableHardwareAcceleration;
+          hwAccelEl.addEventListener("change", async (e) => {
+            await window.api.savePreferences({
+              disableHardwareAcceleration: e.target.checked,
+            });
           });
         }
 
@@ -6880,6 +7033,9 @@
           showDashboardOnStart: checkbox(
             "settings-showDashboardOnStartCheckbox",
           ),
+          disableHardwareAcceleration: checkbox(
+            "settings-disableHardwareAccelerationCheckbox",
+          ),
           screenshotFolder: pick(
             getVal("settings-screenshotFolder").trim(),
             base.screenshotFolder || "",
@@ -6949,6 +7105,37 @@
       const getPressKeysLabel = () =>
         tUi("ui.shortcut.pressKeys", "Press keys...");
 
+      const normalizeShortcutKey = (event) => {
+        if (event.key === "AltGraph") return "AltGraph";
+        if (event.key === "Alt" && event.location === 2) return "AltGraph";
+        return event.key;
+      };
+
+      const buildShortcutCombo = (keysSet, opts = {}) => {
+        const allowSingle = opts.allowSingle === true;
+        const keys = [];
+        const hasCtrl = keysSet.has("Control");
+        const hasShift = keysSet.has("Shift");
+        const hasAltGr = keysSet.has("AltGraph");
+        const hasAlt = keysSet.has("Alt");
+
+        if (hasCtrl) keys.push("Control");
+        if (hasShift) keys.push("Shift");
+        if (hasAltGr) keys.push("AltGr");
+        else if (hasAlt) keys.push("Alt");
+
+        const mainKeys = [...keysSet].filter(
+          (k) => !["Control", "Shift", "Alt", "AltGraph", "Meta"].includes(k),
+        );
+        if (mainKeys.length > 0) {
+          const mainKey = mainKeys[0];
+          keys.push(mainKey.length === 1 ? mainKey.toUpperCase() : mainKey);
+          if (!allowSingle && keys.length < 2) return null;
+          return keys.join("+");
+        }
+        return null;
+      };
+
       overlayShortcutBtn.addEventListener("click", () => {
         if (
           overlayShortcutBtn.textContent === getPressKeysLabel() ||
@@ -6964,38 +7151,30 @@
         isListeningForShortcut = true;
         pressedKeys.clear();
 
+        if (isListeningForInteractShortcut) {
+          cleanupInteractShortcutRecording();
+          restoreSavedInteractShortcutLabel();
+        }
+
         const handleKeyDown = (e) => {
           if (!isListeningForShortcut) return;
 
           e.preventDefault();
-          pressedKeys.add(e.key);
+          pressedKeys.add(normalizeShortcutKey(e));
 
           clearTimeout(shortcutTimeout);
           shortcutTimeout = setTimeout(() => {
             if (!isListeningForShortcut) return;
-
-            const keys = [];
-
-            if (pressedKeys.has("Control")) keys.push("Control");
-            if (pressedKeys.has("Shift")) keys.push("Shift");
-            if (pressedKeys.has("Alt")) keys.push("Alt");
-
-            const mainKeys = [...pressedKeys].filter(
-              (k) => !["Control", "Shift", "Alt", "Meta"].includes(k),
-            );
-            if (mainKeys.length > 0) {
-              const mainKey = mainKeys[0];
-              keys.push(mainKey.length === 1 ? mainKey.toUpperCase() : mainKey);
-            }
-
-            if (keys.length < 2) {
+            const combo = buildShortcutCombo(pressedKeys, {
+              allowSingle: false,
+            });
+            if (!combo) {
               overlayShortcutBtn.textContent = tUi(
                 "ui.shortcut.invalidCombo",
                 "Invalid combo",
               );
               setTimeout(() => restoreSavedShortcutLabel(), 1200);
             } else {
-              const combo = keys.join("+");
               overlayShortcutBtn.textContent = combo;
               window.api.savePreferences({ overlayShortcut: combo });
               window.api.updateOverlayShortcut?.(combo);
@@ -7034,6 +7213,123 @@
         )
           return;
         restoreSavedShortcutLabel();
+      };
+
+      // Overlay interaction shortcut functionality
+      const overlayInteractShortcutBtn = document.getElementById(
+        "overlay-interact-shortcut-btn",
+      );
+      const DEFAULT_OVERLAY_INTERACT_SHORTCUT = "\\";
+      let isListeningForInteractShortcut = false;
+      let pressedInteractKeys = new Set();
+      let interactShortcutTimeout;
+      let currentInteractKeyHandler = null;
+
+      function formatInteractShortcutLabel(value) {
+        if (!value) return "";
+        return value
+          .replace(/(^|\\+)AltGr(\\+|$)/g, (match, p1, p2) => {
+            return `${p1}${tUi("overlay-interact-shortcut-btn", "Right Alt")}${p2}`;
+          })
+          .replace(/(^|\\+)Backslash(\\+|$)/gi, (match, p1, p2) => {
+            return `${p1}\\${p2}`;
+          });
+      }
+
+      function updateInteractShortcutInfoText() {
+        const infoEl = document.getElementById(
+          "overlay-interact-shortcut-info",
+        );
+        if (!infoEl) return;
+        const titleText = tUi(
+          "title.overlay-interact-shortcut-info",
+          "Toggle interaction: press once to enable drag/scroll, press again to return to click-through. Requires a non-modifier key (e.g. \\).",
+        );
+        const ariaText = tUi("aria.overlay-interact-shortcut-info", titleText);
+        infoEl.title = titleText;
+        infoEl.setAttribute("aria-label", ariaText);
+      }
+      window.refreshInteractShortcutInfo = updateInteractShortcutInfoText;
+
+      overlayInteractShortcutBtn?.addEventListener("click", () => {
+        if (
+          overlayInteractShortcutBtn.textContent === getPressKeysLabel() ||
+          overlayInteractShortcutBtn.classList.contains("listening")
+        ) {
+          cleanupInteractShortcutRecording();
+          restoreSavedInteractShortcutLabel();
+          return;
+        }
+
+        if (isListeningForShortcut) {
+          cleanupShortcutRecording();
+          restoreSavedShortcutLabel();
+        }
+
+        overlayInteractShortcutBtn.textContent = getPressKeysLabel();
+        overlayInteractShortcutBtn.classList.add("listening");
+        isListeningForInteractShortcut = true;
+        pressedInteractKeys.clear();
+
+        const handleKeyDown = (e) => {
+          if (!isListeningForInteractShortcut) return;
+
+          e.preventDefault();
+          pressedInteractKeys.add(normalizeShortcutKey(e));
+
+          clearTimeout(interactShortcutTimeout);
+          interactShortcutTimeout = setTimeout(() => {
+            if (!isListeningForInteractShortcut) return;
+
+            const combo = buildShortcutCombo(pressedInteractKeys, {
+              allowSingle: true,
+            });
+            if (!combo) {
+              overlayInteractShortcutBtn.textContent = tUi(
+                "ui.shortcut.invalidCombo",
+                "Invalid combo",
+              );
+              setTimeout(() => restoreSavedInteractShortcutLabel(), 1200);
+            } else {
+              overlayInteractShortcutBtn.textContent =
+                formatInteractShortcutLabel(combo);
+              window.api.savePreferences({ overlayInteractShortcut: combo });
+            }
+
+            cleanupInteractShortcutRecording();
+          }, 400);
+        };
+
+        currentInteractKeyHandler = handleKeyDown;
+        document.addEventListener("keydown", handleKeyDown);
+      });
+
+      function cleanupInteractShortcutRecording() {
+        isListeningForInteractShortcut = false;
+        pressedInteractKeys.clear();
+        clearTimeout(interactShortcutTimeout);
+        overlayInteractShortcutBtn?.classList.remove("listening");
+
+        if (currentInteractKeyHandler) {
+          document.removeEventListener("keydown", currentInteractKeyHandler);
+          currentInteractKeyHandler = null;
+        }
+      }
+
+      async function restoreSavedInteractShortcutLabel() {
+        await loadPreferencesCached();
+        const prefs = getCachedPreferences();
+        overlayInteractShortcutBtn.textContent =
+          formatInteractShortcutLabel(prefs?.overlayInteractShortcut) ||
+          formatInteractShortcutLabel(DEFAULT_OVERLAY_INTERACT_SHORTCUT);
+      }
+      window.refreshInteractShortcutLabel = () => {
+        if (
+          !overlayInteractShortcutBtn ||
+          overlayInteractShortcutBtn.classList.contains("listening")
+        )
+          return;
+        restoreSavedInteractShortcutLabel();
       };
 
       // ==== FOLDERS TAB – UI & IPC ====
@@ -7247,6 +7543,13 @@
         if (isListeningForShortcut && event.target !== overlayShortcutBtn) {
           cleanupShortcutRecording();
           restoreSavedShortcutLabel();
+        }
+        if (
+          isListeningForInteractShortcut &&
+          event.target !== overlayInteractShortcutBtn
+        ) {
+          cleanupInteractShortcutRecording();
+          restoreSavedInteractShortcutLabel();
         }
       });
 
@@ -8933,10 +9236,7 @@
         const setBootLoading = (visible) => {
           if (!bootLoadingEl) return;
           bootLoadingEl.classList.toggle("hidden", !visible);
-          bootLoadingEl.setAttribute(
-            "aria-hidden",
-            visible ? "false" : "true",
-          );
+          bootLoadingEl.setAttribute("aria-hidden", visible ? "false" : "true");
         };
         setBootLoading(true);
         const bootTitleEl = document.querySelector(
@@ -8947,10 +9247,7 @@
         );
         const refreshBootLoadingText = () => {
           if (bootTitleEl)
-            bootTitleEl.textContent = tUi(
-              "boot.loading.title",
-              "Booting…",
-            );
+            bootTitleEl.textContent = tUi("boot.loading.title", "Booting…");
           if (bootSubEl)
             bootSubEl.textContent = tUi(
               "boot.loading.sub",

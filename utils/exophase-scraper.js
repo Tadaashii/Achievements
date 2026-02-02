@@ -367,6 +367,7 @@ function extractAchievementsFromHtml(html, baseUrl) {
 
 async function downloadExophaseIcon(iconUrl, outPath) {
   if (!iconUrl || !outPath) return false;
+  if (typeof fetch !== "function") return false;
   try {
     const resp = await fetch(iconUrl);
     if (!resp.ok) return false;

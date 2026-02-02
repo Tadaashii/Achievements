@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "Poista kaikki mustalle listalle merkityt pelit?",
   "confirm.blacklistReset.title": "Nollaa musta lista",
   "confirm.deleteConfig.message": "Haluatko poistaa: {name}?",
+  "confirm.deleteConfig.deleteExtras": "Haluatko poistaa myös skeeman, välimuistin ja kuvat?",
   "confirm.deleteConfig.title": "Poista asetukset",
   "confirm.steamApiRemove.message": "Poista tallennettu Steam API -avain?",
   "confirm.steamApiRemove.title": "Poista Steam API -avain",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "PS4-skeemat luodaan trophy-tiedostoista. Skannaa kansio sen sijaan uudelleen.",
   "main.message.schemaSteamOfficialRescan": "Steam (Official) -skeemat luodaan appcache-tilastoista. Skannaa tilastokansio sen sijaan uudelleen.",
   "boot.loading.title": "Käynnistetään…",
-  "boot.loading.sub": "Valmistellaan saavutusten välimuistia"
+  "boot.loading.sub": "Valmistellaan saavutusten välimuistia",
+  "label.overlay-interact-shortcut-btn": "Vuorovaikutusnäppäin:",
+  "settings-overlayInteractShortcutTitle": "Overlay-vuorovaikutusnäppäin",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "Vaihda vuorovaikutus: paina kerran ottaaksesi vedon/selauksen käyttöön, paina uudelleen palataksesi läpiklikkaukseen. Vaatii ei-modifioivan näppäimen (esim. \\).",
+  "aria.overlay-interact-shortcut-info": "Vaihda vuorovaikutus: paina kerran ottaaksesi vedon/selauksen käyttöön, paina uudelleen palataksesi läpiklikkaukseen. Vaatii ei-modifioivan näppäimen (esim. \\)."
 }
+
+
+

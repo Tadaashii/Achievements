@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "Remove all blacklisted games?",
   "confirm.blacklistReset.title": "Reset blacklist",
   "confirm.deleteConfig.message": "Do you want to delete: {name}?",
+  "confirm.deleteConfig.deleteExtras": "Do you want to delete also the Schema, Cache and Images?",
   "confirm.deleteConfig.title": "Delete config",
   "confirm.steamApiRemove.message": "Remove the stored Steam API key?",
   "confirm.steamApiRemove.title": "Remove Steam API key",
@@ -91,6 +92,7 @@
   "label.languageSelect": "Select Language:",
   "label.muteProgressCheckbox": "Disable Game Progress Notifications",
   "label.overlay-shortcut-btn": "Shortcut Key:",
+  "label.overlay-interact-shortcut-btn": "Interact Key:",
   "label.platformSelect": "Platform:",
   "label.processName": "Process name (optional):",
   "label.savePath": "Save path:",
@@ -321,6 +323,7 @@
   "option.settings-positionDropdown.top-left": "Top Left",
   "option.settings-positionDropdown.top-right": "Top Right",
   "overlay-shortcut-btn": "Set Shortcut",
+  "overlay-interact-shortcut-btn": "\\",
   "overlay.hiddenFallback": "Hidden",
   "overlay.notAvailable": "N/A",
   "overlay.progressLabel": "Progress",
@@ -374,6 +377,10 @@
   "settings-mainScreenTitle": "Main screen",
   "settings-notesTitle": "Notes",
   "settings-overlayShortcutTitle": "Overlay Shortcut",
+  "settings-overlayInteractShortcutTitle": "Overlay Interaction Key",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "Toggle interaction: press once to enable drag/scroll, press again to return to click-through. Requires a non-modifier key (e.g. \\).",
+  "aria.overlay-interact-shortcut-info": "Toggle interaction: press once to enable drag/scroll, press again to return to click-through. Requires a non-modifier key (e.g. \\).",
   "settings-panelTitle": "Settings panel",
   "settings-platinumTitle": "Platinum Notification",
   "settings-resetBlacklistBtn": "Reset Blacklist",
@@ -426,3 +433,6 @@
   "boot.loading.title": "Booting…",
   "boot.loading.sub": "Preparing achievements cache"
 }
+
+
+

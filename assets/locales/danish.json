@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "Fjerne alle spil på sortlisten?",
   "confirm.blacklistReset.title": "Nulstil sortliste",
   "confirm.deleteConfig.message": "Vil du slette: {name}?",
+  "confirm.deleteConfig.deleteExtras": "Vil du også slette schemaet, cachen og billederne?",
   "confirm.deleteConfig.title": "Slet konfiguration",
   "confirm.steamApiRemove.message": "Fjerne den gemte Steam API-nøgle?",
   "confirm.steamApiRemove.title": "Fjern Steam API-nøgle",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "PS4-skemaer genereres fra trofæfiler. Genindlæs i stedet mappen.",
   "main.message.schemaSteamOfficialRescan": "Steam (Official)-skemaer genereres fra appcache-statistikker. Genindlæs i stedet statistikmappen.",
   "boot.loading.title": "Starter…",
-  "boot.loading.sub": "Forbereder cache til præstationer"
+  "boot.loading.sub": "Forbereder cache til præstationer",
+  "label.overlay-interact-shortcut-btn": "Interaktionstast:",
+  "settings-overlayInteractShortcutTitle": "Overlay-interaktionstast",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "Skift interaktion: tryk én gang for at aktivere træk/scroll, tryk igen for at vende tilbage til klik-gennem. Kræver en ikke-modifikatortast (f.eks. \\).",
+  "aria.overlay-interact-shortcut-info": "Skift interaktion: tryk én gang for at aktivere træk/scroll, tryk igen for at vende tilbage til klik-gennem. Kræver en ikke-modifikatortast (f.eks. \\)."
 }
+
+
+

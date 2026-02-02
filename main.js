@@ -35,7 +35,6 @@ const fs = require("fs");
 const os = require("os");
 const ini = require("ini");
 const chokidar = require("chokidar");
-app.disableHardwareAcceleration();
 const CRC32 = require("crc-32");
 const { copyFolderOnce, copyFolderOverwrite } = require("./utils/fileCopy");
 const {
@@ -215,6 +214,7 @@ const DEFAULT_PREFERENCES = {
   startInTray: false,
   screenshotFolder: getDefaultScreenshotFolder(),
   overlayShortcut: "",
+  overlayInteractShortcut: "\\",
   sound: "mute",
   soundVolume: 100,
   preset: "default",
@@ -230,6 +230,7 @@ const DEFAULT_PREFERENCES = {
   disableAchievementScreenshot: false,
   showDashboardOnStart: false,
   startMaximized: false,
+  disableHardwareAcceleration: true,
   disablePlaytime: false,
   platinumSound: "mute",
   platinumPreset: "default",
@@ -297,6 +298,22 @@ function tUi(key, params = {}, fallback = "") {
 
 function mergeWithDefaultPreferences(prefs = {}) {
   return { ...DEFAULT_PREFERENCES, ...(prefs || {}) };
+}
+
+const shouldDisableHardwareAcceleration = (() => {
+  try {
+    const prefs = readPrefsSafe();
+    const merged = mergeWithDefaultPreferences(prefs);
+    return merged.disableHardwareAcceleration === true;
+  } catch (err) {
+    prefsLogger.warn("preferences:hardwareAccel-read-failed", {
+      error: err?.message || String(err),
+    });
+    return DEFAULT_PREFERENCES.disableHardwareAcceleration === true;
+  }
+})();
+if (shouldDisableHardwareAcceleration) {
+  app.disableHardwareAcceleration();
 }
 
 function ensurePreferencesFile() {
@@ -1141,10 +1158,12 @@ async function queueXeniaNotificationWhenIconReady(achievement) {
 }
 
 function registerOverlayShortcut(newShortcut) {
-  if (!newShortcut || typeof newShortcut !== "string") return;
-
   try {
-    globalShortcut.unregisterAll();
+    if (registeredOverlayShortcut) {
+      globalShortcut.unregister(registeredOverlayShortcut);
+      registeredOverlayShortcut = null;
+    }
+    if (!newShortcut || typeof newShortcut !== "string") return;
 
     const registered = globalShortcut.register(newShortcut, () => {
       console.log(
@@ -1154,14 +1173,29 @@ function registerOverlayShortcut(newShortcut) {
           `Overlay Shortcut Pressed : ${newShortcut}`,
         ),
       );
-      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
         if (overlayWindow.isVisible()) {
-          overlayWindow.close();
+          overlayWindow.hide();
+          setOverlayInteractive(false);
+          applyOverlayInteractShortcutRegistration();
         } else {
-          overlayWindow.show();
+          if (typeof overlayWindow.showInactive === "function") {
+            overlayWindow.showInactive();
+          } else {
+            overlayWindow.show();
+          }
+          applyOverlayInteractShortcutRegistration();
         }
       } else {
         createOverlayWindow(selectedConfig);
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          if (typeof overlayWindow.showInactive === "function") {
+            overlayWindow.showInactive();
+          } else {
+            overlayWindow.show();
+          }
+          applyOverlayInteractShortcutRegistration();
+        }
       }
     });
 
@@ -1170,6 +1204,7 @@ function registerOverlayShortcut(newShortcut) {
         tUi("main.notify.shortcutSaveRejected", { shortcut: newShortcut }),
       );
     } else {
+      registeredOverlayShortcut = newShortcut;
       console.log(
         tUi(
           "main.notify.overlayShortcutSaved",
@@ -1177,6 +1212,132 @@ function registerOverlayShortcut(newShortcut) {
           `Overlay shortcut saved: ${newShortcut}`,
         ),
       );
+    }
+  } catch (err) {
+    notifyError(
+      tUi("main.notify.shortcutSaveFailed", {
+        shortcut: newShortcut,
+        error: err.message,
+      }),
+    );
+  }
+}
+
+function applyOverlayInputMode() {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  try {
+    overlayWindow.setIgnoreMouseEvents(!overlayInteractive, { forward: true });
+  } catch {}
+}
+
+function applyOverlayFocusMode() {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  try {
+    if (overlayInteractive) {
+      overlayWindow.setFocusable(true);
+    } else {
+      if (overlayWindow.isFocused()) {
+        overlayWindow.blur();
+      }
+      overlayWindow.setFocusable(false);
+    }
+  } catch {}
+}
+
+function setOverlayInteractive(next) {
+  overlayInteractive = !!next;
+  applyOverlayInputMode();
+  applyOverlayFocusMode();
+}
+
+function toggleOverlayInteractive() {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  if (!overlayWindow.isVisible()) return;
+  setOverlayInteractive(!overlayInteractive);
+}
+
+function clearOverlayInteractShortcut() {
+  if (registeredOverlayInteractShortcut) {
+    globalShortcut.unregister(registeredOverlayInteractShortcut);
+    registeredOverlayInteractShortcut = null;
+  }
+}
+
+function applyOverlayInteractShortcutRegistration() {
+  if (!overlayWindow || overlayWindow.isDestroyed() || !overlayWindow.isVisible()) {
+    clearOverlayInteractShortcut();
+    return;
+  }
+  const shortcut =
+    global.overlayInteractShortcut ||
+    (cachedPreferences && cachedPreferences.overlayInteractShortcut);
+  if (!shortcut || typeof shortcut !== "string" || !shortcut.trim()) {
+    clearOverlayInteractShortcut();
+    return;
+  }
+  registerOverlayInteractShortcut(shortcut);
+}
+
+function normalizeOverlayInteractAccelerator(shortcut) {
+  if (!shortcut || typeof shortcut !== "string") return null;
+  const trimmed = shortcut.trim();
+  if (!trimmed) return null;
+  const parts = trimmed.split("+").map((part) => part.trim()).filter(Boolean);
+  const seen = new Set();
+  const out = [];
+  const pushToken = (token) => {
+    if (seen.has(token)) return;
+    seen.add(token);
+    out.push(token);
+  };
+  for (const part of parts) {
+    if (/^altgr$/i.test(part) || /^altgraph$/i.test(part)) {
+      pushToken("Control");
+      pushToken("Alt");
+    } else {
+      pushToken(part);
+    }
+  }
+  if (!out.length) return null;
+  const modifierTokens = new Set([
+    "control",
+    "ctrl",
+    "shift",
+    "alt",
+    "altgr",
+    "altgraph",
+    "meta",
+    "super",
+    "command",
+    "cmd",
+    "cmdorctrl",
+    "commandorcontrol",
+    "option",
+  ]);
+  const hasNonModifier = out.some(
+    (token) => !modifierTokens.has(token.toLowerCase()),
+  );
+  return hasNonModifier ? out.join("+") : null;
+}
+
+function registerOverlayInteractShortcut(newShortcut) {
+  try {
+    clearOverlayInteractShortcut();
+    if (!newShortcut || typeof newShortcut !== "string") return;
+
+    const accelerator = normalizeOverlayInteractAccelerator(newShortcut);
+    if (!accelerator) return;
+
+    const registered = globalShortcut.register(accelerator, () => {
+      toggleOverlayInteractive();
+    });
+
+    if (!registered) {
+      notifyError(
+        tUi("main.notify.shortcutSaveRejected", { shortcut: newShortcut }),
+      );
+    } else {
+      registeredOverlayInteractShortcut = accelerator;
     }
   } catch (err) {
     notifyError(
@@ -1371,8 +1532,18 @@ function applyPreferenceSideEffects(
   }
   if (Object.prototype.hasOwnProperty.call(patch, "overlayShortcut")) {
     global.overlayShortcut = patch.overlayShortcut;
-    if (typeof patch.overlayShortcut === "string" && patch.overlayShortcut) {
-      registerOverlayShortcut(patch.overlayShortcut);
+    registerOverlayShortcut(patch.overlayShortcut);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "overlayInteractShortcut")) {
+    global.overlayInteractShortcut = patch.overlayInteractShortcut;
+    applyOverlayInteractShortcutRegistration();
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "showHiddenDescription")) {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send(
+        "overlay-preferences-updated",
+        { showHiddenDescription: prefsSnapshot.showHiddenDescription === true },
+      );
     }
   }
   if (options.removeSteamKey === true) {
@@ -1728,6 +1899,24 @@ async function saveFullScreenShot(gameName, achDisplayName) {
 ipcMain.handle("load-preferences", () => {
   prefsLogger.info("load-preferences:requested");
   cachedPreferences = readPrefsSafe();
+  if (
+    !Object.prototype.hasOwnProperty.call(
+      cachedPreferences || {},
+      "overlayInteractShortcut",
+    )
+  ) {
+    cachedPreferences.overlayInteractShortcut =
+      DEFAULT_PREFERENCES.overlayInteractShortcut;
+  } else if (
+    typeof cachedPreferences.overlayInteractShortcut === "string" &&
+    cachedPreferences.overlayInteractShortcut.trim() &&
+    !normalizeOverlayInteractAccelerator(
+      cachedPreferences.overlayInteractShortcut,
+    )
+  ) {
+    cachedPreferences.overlayInteractShortcut =
+      DEFAULT_PREFERENCES.overlayInteractShortcut;
+  }
   const fileKey = readSteamApiKeyFromFile();
   if (fileKey && !cachedPreferences.steamApiKey) {
     cachedPreferences.steamApiKey = fileKey;
@@ -2668,16 +2857,19 @@ ipcMain.handle("load-saved-achievements", async (_event, configName) => {
       bin: achievementsBinPath,
     } = resolveSaveSidecarPaths(saveBase, appid);
 
+    const safeExists = (p) =>
+      typeof p === "string" && p.length > 0 && fs.existsSync(p);
+
     let effectiveSavePath = "";
-    if (fs.existsSync(saveJsonPath))
+    if (safeExists(saveJsonPath))
       effectiveSavePath = path.dirname(saveJsonPath);
-    else if (fs.existsSync(tenokeIniPath))
+    else if (safeExists(tenokeIniPath))
       effectiveSavePath = path.dirname(tenokeIniPath);
-    else if (fs.existsSync(achievementsIniPath))
+    else if (safeExists(achievementsIniPath))
       effectiveSavePath = path.dirname(achievementsIniPath);
-    else if (fs.existsSync(achievementsIniOnlineFixPath))
+    else if (safeExists(achievementsIniOnlineFixPath))
       effectiveSavePath = path.dirname(achievementsIniOnlineFixPath);
-    else if (fs.existsSync(achievementsBinPath))
+    else if (safeExists(achievementsBinPath))
       effectiveSavePath = path.dirname(achievementsBinPath);
 
     const schemaPath = resolveConfigSchemaPath(config);
@@ -2717,13 +2909,100 @@ ipcMain.handle("load-saved-achievements", async (_event, configName) => {
 });
 
 // Handler for config deletion
-ipcMain.handle("delete-config", async (_event, configName) => {
-  ipcLogger.info("delete-config:request", { configName });
+ipcMain.handle("delete-config", async (_event, payload) => {
+  const configName =
+    typeof payload === "string" ? payload : payload?.configName;
+  const deleteExtras = payload?.deleteExtras === true;
+  ipcLogger.info("delete-config:request", { configName, deleteExtras });
+  if (!configName || typeof configName !== "string") {
+    return { success: false, error: "Config name missing." };
+  }
   try {
     const safeName = sanitizeConfigName(configName);
     const configPath = path.join(configsDir, `${safeName}.json`);
     //const configPath = path.join(process.env.APPDATA, 'Achievements', 'configs', `${safe}.json`);
     if (fs.existsSync(configPath)) {
+      if (deleteExtras) {
+        let configData = null;
+        try {
+          configData = JSON.parse(fs.readFileSync(configPath, "utf8"));
+        } catch (err) {
+          ipcLogger.warn("delete-config:parse-failed", {
+            configName,
+            error: err?.message || String(err),
+          });
+        }
+        const appid =
+          sanitizeAppId(configData?.appid) ||
+          sanitizeAppId(configData?.appId) ||
+          sanitizeAppId(configData?.steamAppId) ||
+          "";
+        const platform =
+          normalizePlatform(configData?.platform) ||
+          getPlatformForAppId(appid) ||
+          "steam";
+        try {
+          const cachePath = getCachePath(configName, platform);
+          if (fs.existsSync(cachePath)) fs.unlinkSync(cachePath);
+          const legacyCachePath = path.join(
+            cacheDir,
+            `${safeName}_achievements_cache.json`,
+          );
+          if (fs.existsSync(legacyCachePath)) fs.unlinkSync(legacyCachePath);
+        } catch (err) {
+          ipcLogger.warn("delete-config:cache-delete-failed", {
+            configName,
+            error: err?.message || String(err),
+          });
+        }
+        if (appid) {
+          try {
+            const imagesDir = path.join(
+              app.getPath("userData"),
+              "images",
+              platform || "steam",
+              String(appid),
+            );
+            if (fs.existsSync(imagesDir)) {
+              try {
+                fs.rmSync(imagesDir, { recursive: true, force: true });
+              } catch {
+                fs.rmdirSync(imagesDir, { recursive: true });
+              }
+            }
+          } catch (err) {
+            ipcLogger.warn("delete-config:images-delete-failed", {
+              configName,
+              appid,
+              error: err?.message || String(err),
+            });
+          }
+        }
+        const configPathValue =
+          typeof configData?.config_path === "string"
+            ? configData.config_path
+            : "";
+        const canDeleteSchema =
+          !configPathValue || isManagedSchemaPath(configPathValue);
+        if (canDeleteSchema && appid) {
+          try {
+            const schemaDir = resolveSchemaDirForPlatform(appid, platform);
+            if (fs.existsSync(schemaDir)) {
+              try {
+                fs.rmSync(schemaDir, { recursive: true, force: true });
+              } catch {
+                fs.rmdirSync(schemaDir, { recursive: true });
+              }
+            }
+          } catch (err) {
+            ipcLogger.warn("delete-config:schema-delete-failed", {
+              configName,
+              appid,
+              error: err?.message || String(err),
+            });
+          }
+        }
+      }
       fs.unlinkSync(configPath);
       pendingMissingAchievementFiles.delete(safeName);
       watchedFoldersApi?.refreshConfigState?.();
@@ -3535,7 +3814,7 @@ function createNotificationWindow(message) {
     frame: false,
     show: false,
     alwaysOnTop: true,
-    focusable: false,
+    focusable: true,
     resizable: false,
     fullscreenable: false,
     skipTaskbar: true,
@@ -5664,6 +5943,10 @@ ipcMain.on("close-notification-window", (event) => {
 });
 
 let overlayWindow = null;
+let overlayInteractive = false;
+let registeredOverlayShortcut = null;
+let registeredOverlayInteractShortcut = null;
+ 
 
 function createOverlayWindow(selectedConfig) {
   windowLogger.info("create-overlay:start", {
@@ -5675,6 +5958,7 @@ function createOverlayWindow(selectedConfig) {
   overlayWindow = new BrowserWindow({
     width: 450,
     height: 950,
+    show: false,
     x: width - 470,
     y: 20,
     frame: false,
@@ -5682,6 +5966,7 @@ function createOverlayWindow(selectedConfig) {
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: true,
+    movable: true,
     focusable: false,
     hasShadow: false,
     fullscreenable: false,
@@ -5702,10 +5987,20 @@ function createOverlayWindow(selectedConfig) {
   overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   overlayWindow.setFullScreenable(false);
   overlayWindow.setFocusable(false);
-  overlayWindow.blur();
+  overlayWindow.setSkipTaskbar(true);
+  setOverlayInteractive(false);
   const iconUrl = pathToFileURL(ICON_PNG_PATH).toString();
   overlayWindow.loadFile("overlay.html", { query: { icon: iconUrl } });
   windowLogger.info("create-overlay:load-file", { icon: iconUrl });
+
+  overlayWindow.once("ready-to-show", () => {
+    if (!overlayWindow || overlayWindow.isDestroyed()) return;
+    if (typeof overlayWindow.showInactive === "function") {
+      overlayWindow.showInactive();
+    } else {
+      overlayWindow.show();
+    }
+  });
 
   overlayWindow.webContents.on("did-finish-load", () => {
     windowLogger.info("create-overlay:did-finish-load", {
@@ -5721,6 +6016,27 @@ function createOverlayWindow(selectedConfig) {
   overlayWindow.on("closed", () => {
     windowLogger.info("create-overlay:closed");
     overlayWindow = null;
+    overlayInteractive = false;
+    clearOverlayInteractShortcut();
+  });
+
+  overlayWindow.on("show", () => {
+    applyOverlayInputMode();
+    applyOverlayFocusMode();
+    applyOverlayInteractShortcutRegistration();
+  });
+
+  overlayWindow.on("hide", () => {
+    setOverlayInteractive(false);
+    applyOverlayInteractShortcutRegistration();
+  });
+
+  overlayWindow.on("blur", () => {
+    if (!overlayWindow || overlayWindow.isDestroyed()) return;
+    if (!overlayWindow.isVisible()) return;
+    if (overlayInteractive) {
+      setOverlayInteractive(false);
+    }
   });
 }
 
@@ -5808,8 +6124,18 @@ ipcMain.on("toggle-overlay", (_event, selectedConfig) => {
       language: selectedLanguage,
       uiLanguage: selectedUiLanguage,
     });
+    if (!overlayWindow.isVisible()) {
+      setOverlayInteractive(false);
+      if (typeof overlayWindow.showInactive === "function") {
+        overlayWindow.showInactive();
+      } else {
+        overlayWindow.show();
+      }
+    }
   }
 });
+
+ 
 
 // Handle request for current config from overlay
 ipcMain.on("request-current-config", (event) => {
@@ -5888,6 +6214,33 @@ function closeWindow() {
 ipcMain.on("minimize-window", minimizeWindow);
 ipcMain.on("maximize-window", maximizeWindow);
 ipcMain.on("close-window", closeWindow);
+ipcMain.handle("window:get-position", (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) return null;
+  try {
+    return win.getPosition();
+  } catch {
+    return null;
+  }
+});
+ipcMain.on("window:set-position", (event, pos) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) return;
+  const x = Number(pos?.x);
+  const y = Number(pos?.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+  try {
+    win.setPosition(Math.round(x), Math.round(y), false);
+  } catch {}
+});
+ipcMain.on("overlay:request-focus", () => {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  if (!overlayWindow.isVisible()) return;
+  if (!overlayInteractive) return;
+  try {
+    overlayWindow.focus();
+  } catch {}
+});
 ipcMain.on("tray:action", (_event, action) => {
   const cmd = String(action || "").toLowerCase();
   if (cmd === "show") {
@@ -5930,6 +6283,21 @@ app.whenReady().then(async () => {
     if (overlayShortcut) {
       registerOverlayShortcut(overlayShortcut);
     }
+    let overlayInteractShortcut = Object.prototype.hasOwnProperty.call(
+      prefs,
+      "overlayInteractShortcut",
+    )
+      ? prefs.overlayInteractShortcut
+      : DEFAULT_PREFERENCES.overlayInteractShortcut;
+    if (
+      typeof overlayInteractShortcut === "string" &&
+      overlayInteractShortcut.trim() &&
+      !normalizeOverlayInteractAccelerator(overlayInteractShortcut)
+    ) {
+      overlayInteractShortcut = DEFAULT_PREFERENCES.overlayInteractShortcut;
+    }
+    global.overlayInteractShortcut = overlayInteractShortcut;
+    applyOverlayInteractShortcutRegistration();
     global.disableProgress = prefs.disableProgress === true;
     global.disablePlaytime = prefs.disablePlaytime === true;
     selectedSound = prefs.sound || "mute";

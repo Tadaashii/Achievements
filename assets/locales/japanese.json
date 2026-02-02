@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "ブラックリストに登録されたゲームをすべて削除しますか？",
   "confirm.blacklistReset.title": "ブラックリストをリセット",
   "confirm.deleteConfig.message": "{name} を削除しますか？",
+  "confirm.deleteConfig.deleteExtras": "スキーマ、キャッシュ、画像も削除しますか？",
   "confirm.deleteConfig.title": "設定を削除",
   "confirm.steamApiRemove.message": "保存されたSteam APIキーを削除しますか？",
   "confirm.steamApiRemove.title": "Steam API キーを削除する",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "PS4のスキーマはトロフィーファイルから生成されます。代わりにフォルダーを再スキャンしてください。",
   "main.message.schemaSteamOfficialRescan": "Steam（Official）のスキーマはappcacheの統計から生成されます。代わりに統計フォルダーを再スキャンしてください。",
   "boot.loading.title": "起動中…",
-  "boot.loading.sub": "実績キャッシュを準備しています"
+  "boot.loading.sub": "実績キャッシュを準備しています",
+  "label.overlay-interact-shortcut-btn": "操作キー：",
+  "settings-overlayInteractShortcutTitle": "オーバーレイ操作キー",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "操作の切り替え: 1回押すとドラッグ/スクロールを有効化、もう一度押すとクリック透過に戻ります。修飾キー以外が必要です（例: \\）。",
+  "aria.overlay-interact-shortcut-info": "操作の切り替え: 1回押すとドラッグ/スクロールを有効化、もう一度押すとクリック透過に戻ります。修飾キー以外が必要です（例: \\）。"
 }
+
+
+

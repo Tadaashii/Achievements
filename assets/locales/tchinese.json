@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "移除所有列入黑名單的遊戲？",
   "confirm.blacklistReset.title": "重置黑名單",
   "confirm.deleteConfig.message": "您是否要刪除：{name}？",
+  "confirm.deleteConfig.deleteExtras": "也要刪除架構、快取和圖片嗎？",
   "confirm.deleteConfig.title": "刪除設定檔",
   "confirm.steamApiRemove.message": "移除儲存的 Steam API 金鑰？",
   "confirm.steamApiRemove.title": "移除 Steam API 金鑰",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "PS4 架構由獎盃檔案產生。請改為重新掃描資料夾。",
   "main.message.schemaSteamOfficialRescan": "Steam（官方）架構由 appcache 統計產生。請改為重新掃描統計資料夾。",
   "boot.loading.title": "正在啟動…",
-  "boot.loading.sub": "正在準備成就快取"
+  "boot.loading.sub": "正在準備成就快取",
+  "label.overlay-interact-shortcut-btn": "互動鍵：",
+  "settings-overlayInteractShortcutTitle": "覆蓋層互動鍵",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "切換互動：按一次啟用拖曳/捲動，再按一次恢復點擊穿透。需要非修飾鍵（例如 \\）。",
+  "aria.overlay-interact-shortcut-info": "切換互動：按一次啟用拖曳/捲動，再按一次恢復點擊穿透。需要非修飾鍵（例如 \\）。"
 }
+
+
+

@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "Да премахнете всички игри от черния списък?",
   "confirm.blacklistReset.title": "Нулиране на черния списък",
   "confirm.deleteConfig.message": "Искате ли да изтриете: {name}?",
+  "confirm.deleteConfig.deleteExtras": "Искате ли да изтриете също схемата, кеша и изображенията?",
   "confirm.deleteConfig.title": "Изтрий конфигурацията",
   "confirm.steamApiRemove.message": "Да премахнете съхранения Steam API ключ?",
   "confirm.steamApiRemove.title": "Премахване на Steam API ключ",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "Схемите за PS4 се генерират от файловете с трофеи. Вместо това сканирайте отново папката.",
   "main.message.schemaSteamOfficialRescan": "Схемите за Steam (Official) се генерират от статистиките на appcache. Вместо това сканирайте отново папката със статистики.",
   "boot.loading.title": "Стартиране…",
-  "boot.loading.sub": "Подготовка на кеша за постиженията"
+  "boot.loading.sub": "Подготовка на кеша за постиженията",
+  "label.overlay-interact-shortcut-btn": "Клавиш за взаимодействие:",
+  "settings-overlayInteractShortcutTitle": "Клавиш за взаимодействие на overlay",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "Превключване на взаимодействието: натиснете веднъж, за да активирате влачене/скрол, натиснете отново, за да се върнете към клик-през. Изисква немодифициращ клавиш (напр. \\).",
+  "aria.overlay-interact-shortcut-info": "Превключване на взаимодействието: натиснете веднъж, за да активирате влачене/скрол, натиснете отново, за да се върнете към клик-през. Изисква немодифициращ клавиш (напр. \\)."
 }
+
+
+

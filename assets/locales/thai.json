@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "ลบเกมที่อยู่ในบัญชีดำทั้งหมดหรือไม่?",
   "confirm.blacklistReset.title": "รีเซ็ตบัญชีดำ",
   "confirm.deleteConfig.message": "คุณต้องการลบ: {name} หรือไม่?",
+  "confirm.deleteConfig.deleteExtras": "ต้องการลบสคีมา แคช และรูปภาพด้วยหรือไม่?",
   "confirm.deleteConfig.title": "ลบการตั้งค่า",
   "confirm.steamApiRemove.message": "ลบคีย์ Steam API ที่เก็บไว้หรือไม่?",
   "confirm.steamApiRemove.title": "ลบคีย์ API ของ Steam",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "สคีมาของ PS4 ถูกสร้างจากไฟล์ถ้วยรางวัล ให้สแกนโฟลเดอร์ใหม่แทน",
   "main.message.schemaSteamOfficialRescan": "สคีมาของ Steam (Official) ถูกสร้างจากสถิติของ appcache ให้สแกนโฟลเดอร์สถิติใหม่แทน",
   "boot.loading.title": "กำลังเริ่มต้น…",
-  "boot.loading.sub": "กำลังเตรียมแคชความสำเร็จ"
+  "boot.loading.sub": "กำลังเตรียมแคชความสำเร็จ",
+  "label.overlay-interact-shortcut-btn": "ปุ่มโต้ตอบ:",
+  "settings-overlayInteractShortcutTitle": "ปุ่มโต้ตอบของโอเวอร์เลย์",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "สลับการโต้ตอบ: กดหนึ่งครั้งเพื่อเปิดลาก/เลื่อน กดอีกครั้งเพื่อกลับไปเป็นคลิกทะลุ ต้องใช้ปุ่มที่ไม่ใช่ตัวปรับ (เช่น \\).",
+  "aria.overlay-interact-shortcut-info": "สลับการโต้ตอบ: กดหนึ่งครั้งเพื่อเปิดลาก/เลื่อน กดอีกครั้งเพื่อกลับไปเป็นคลิกทะลุ ต้องใช้ปุ่มที่ไม่ใช่ตัวปรับ (เช่น \\)."
 }
+
+
+

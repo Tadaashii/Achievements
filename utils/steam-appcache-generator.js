@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const https = require("https");
 const axios = require("axios");
 const { createLogger } = require("./logger");
 const {
@@ -86,9 +87,16 @@ async function getGameNameFromSteamHunters(appid) {
 
 async function fetchSteamStoreName(appid, fetchImpl = global.fetch) {
   if (!appid) return null;
-  if (typeof fetchImpl !== "function") return null;
   const key = String(appid);
   if (steamStoreCache.has(key)) return steamStoreCache.get(key);
+  if (typeof fetchImpl !== "function") {
+    const fallback = await getGameNameFromSteamHunters(appid);
+    if (fallback) {
+      steamStoreCache.set(key, fallback);
+      return fallback;
+    }
+    return null;
+  }
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 6000);
   try {
@@ -120,13 +128,71 @@ function ensureDir(p) {
   fs.mkdirSync(p, { recursive: true });
 }
 
+function downloadViaHttps(url, dest) {
+  return new Promise((resolve) => {
+    let settled = false;
+    let response = null;
+    const finalize = (ok) => {
+      if (settled) return;
+      settled = true;
+      resolve(ok);
+    };
+    const cleanupFile = () => {
+      try {
+        fs.unlinkSync(dest);
+      } catch {}
+    };
+    const handleError = () => {
+      try {
+        if (response && typeof response.destroy === "function") {
+          response.destroy();
+        }
+      } catch {}
+      try {
+        file.destroy();
+      } catch {}
+      cleanupFile();
+      finalize(false);
+    };
+
+    let file;
+    try {
+      ensureDir(path.dirname(dest));
+      file = fs.createWriteStream(dest);
+    } catch {
+      return finalize(false);
+    }
+
+    file.on("error", handleError);
+    https
+      .get(url, { headers: { "User-Agent": UA } }, (res) => {
+        response = res;
+        if (res.statusCode !== 200) {
+          res.resume();
+          handleError();
+          return;
+        }
+        res.on("error", handleError);
+        res.pipe(file);
+        file.on("finish", () => file.close(() => finalize(true)));
+      })
+      .on("error", handleError)
+      .setTimeout(20000, function () {
+        this.destroy(new Error("Download timed out"));
+      });
+  });
+}
+
 async function download(url, dest, fetchImpl = global.fetch) {
   if (!url) return false;
-  if (typeof fetchImpl !== "function") return false;
+  const targetUrl = url.replace(/^http:/, "https:");
+  if (typeof fetchImpl !== "function") {
+    return await downloadViaHttps(targetUrl, dest);
+  }
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 20000);
   try {
-    const r = await fetchImpl(url.replace(/^http:/, "https:"), {
+    const r = await fetchImpl(targetUrl, {
       signal: ctrl.signal,
     });
     if (!r.ok) return false;

@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "Usunąć wszystkie gry z czarnej listy?",
   "confirm.blacklistReset.title": "Zresetuj czarną listę",
   "confirm.deleteConfig.message": "Czy chcesz usunąć: {name}?",
+  "confirm.deleteConfig.deleteExtras": "Czy chcesz usunąć również schemat, pamięć podręczną i obrazy?",
   "confirm.deleteConfig.title": "Usuń konfigurację",
   "confirm.steamApiRemove.message": "Usunąć zapisany klucz API Steam?",
   "confirm.steamApiRemove.title": "Usuń klucz API Steam",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "Schematy PS4 są generowane z plików trofeów. Zamiast tego przeskanuj folder ponownie.",
   "main.message.schemaSteamOfficialRescan": "Schematy Steam (Official) są generowane ze statystyk appcache. Zamiast tego przeskanuj ponownie folder ze statystykami.",
   "boot.loading.title": "Uruchamianie…",
-  "boot.loading.sub": "Przygotowywanie pamięci podręcznej osiągnięć"
+  "boot.loading.sub": "Przygotowywanie pamięci podręcznej osiągnięć",
+  "label.overlay-interact-shortcut-btn": "Klawisz interakcji:",
+  "settings-overlayInteractShortcutTitle": "Klawisz interakcji nakładki",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "Przełącz interakcję: naciśnij raz, aby włączyć przeciąganie/przewijanie, naciśnij ponownie, aby wrócić do kliknięć przez. Wymaga klawisza niemodyfikującego (np. \\).",
+  "aria.overlay-interact-shortcut-info": "Przełącz interakcję: naciśnij raz, aby włączyć przeciąganie/przewijanie, naciśnij ponownie, aby wrócić do kliknięć przez. Wymaga klawisza niemodyfikującego (np. \\)."
 }
+
+
+

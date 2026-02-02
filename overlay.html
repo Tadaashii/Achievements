@@ -21,6 +21,7 @@
         --dracula-purple: #bd93f9;
         --dracula-red: #ff5555;
         --dracula-yellow: #f1fa8c;
+        --scrollbar-size: 8px;
       }
 
       html,
@@ -35,16 +36,54 @@
         height: 100vh;
       }
 
+      /* Custom scrollbar (global) */
+      *::-webkit-scrollbar {
+        width: var(--scrollbar-size) !important;
+        height: var(--scrollbar-size) !important;
+      }
+
+      *::-webkit-scrollbar-track {
+        background: transparent !important;
+      }
+
+      *::-webkit-scrollbar-thumb {
+        background: var(--dracula-purple) !important;
+        border-radius: 4px;
+      }
+
+      *::-webkit-scrollbar-thumb:hover {
+        background: var(--dracula-pink) !important;
+      }
+
+      .overlay-shell {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+
+      body.overlay-compact .overlay-shell {
+        height: calc(var(--overlay-top-height, 0px) + 240px);
+      }
+
       .overlay-container {
-        max-height: 100vh;
+        flex: 1 1 auto;
         overflow-y: auto;
         scrollbar-width: thin;
         -ms-overflow-style: none;
+        scrollbar-color: var(--dracula-purple) var(--dracula-background);
         background-color: rgba(40, 42, 54, 0.85);
-        border-radius: 12px;
+        border-radius: 0 0 12px 12px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
         backdrop-filter: blur(8px);
         border: 1px solid var(--dracula-purple);
+        border-top: 0;
+        position: relative;
+        z-index: 1;
+      }
+
+      body.overlay-compact .overlay-container {
+        max-height: 240px;
+        overflow-y: hidden;
       }
 
       .overlay-container::-webkit-scrollbar {
@@ -57,7 +96,20 @@
       }
 
       .overlay-container::-webkit-scrollbar-track {
-        background-color: var(--dracula-current-line);
+        background-color: transparent;
+      }
+
+      .overlay-top {
+        flex: 0 0 auto;
+        z-index: 10;
+        background: rgba(40, 42, 54, 0.88);
+        backdrop-filter: blur(8px);
+        pointer-events: auto;
+        border-radius: 12px 12px 0 0;
+        border: 1px solid var(--dracula-purple);
+        border-bottom: 0;
+        cursor: move;
+        touch-action: none;
       }
 
       .overlay-header {
@@ -69,7 +121,7 @@
         border-bottom: 1px solid var(--dracula-purple);
         border-top-left-radius: 12px;
         border-top-right-radius: 12px;
-        -webkit-app-region: drag;
+        z-index: 3;
       }
 
       .overlay-header h2 {
@@ -86,6 +138,7 @@
         justify-content: space-between;
         align-items: center;
         border-bottom: 1px solid var(--dracula-comment);
+        z-index: 3;
       }
 
       .stats-item {
@@ -224,25 +277,28 @@
   </head>
 
   <body>
-    <div class="overlay-container">
-      <div class="overlay-header">
-        <h2 id="overlayTitle">Achievements</h2>
-        <div id="achievement-count" class="stats-item">
-          <i class="fas fa-trophy"></i>
-          <span class="value">0/0</span>
+    <div class="overlay-shell">
+      <div class="overlay-top">
+        <div class="overlay-header">
+          <h2 id="overlayTitle">Achievements</h2>
+          <div id="achievement-count" class="stats-item">
+            <i class="fas fa-trophy"></i>
+            <span class="value">0/0</span>
+          </div>
         </div>
-      </div>
 
-      <div class="overlay-stats">
-        <div class="stats-item">
-          <i class="fas fa-chart-simple"></i>
-          <span id="overlayCompletionLabel">Completion:</span>
-          <span id="completion-percentage" class="value">0%</span>
-        </div>
-        <div class="progress-bar">
-          <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+        <div class="overlay-stats">
+          <div class="stats-item">
+            <i class="fas fa-chart-simple"></i>
+            <span id="overlayCompletionLabel">Completion:</span>
+            <span id="completion-percentage" class="value">0%</span>
+          </div>
+          <div class="progress-bar">
+            <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+          </div>
         </div>
       </div>
+      <div class="overlay-container">
 
       <div id="empty-state" class="empty-state">
         <i class="fas fa-gamepad"></i>
@@ -252,6 +308,7 @@
       </div>
 
       <ul id="achievements-list" class="achievements-list"></ul>
+      </div>
     </div>
 
     <script src="utils/i18n-ui.js"></script>
@@ -259,17 +316,20 @@
       let overlayLang = "english";
       let overlayUiLang = "english";
       let overlayPrefs = null;
+      let overlayPrefsLoaded = false;
       const tUi = (key, fallback) =>
         window.i18nUi && typeof window.i18nUi.getString === "function"
           ? window.i18nUi.getString(key, fallback)
           : fallback;
 
       async function loadOverlayPrefs() {
-        if (overlayPrefs) return overlayPrefs;
+        if (overlayPrefsLoaded && overlayPrefs) return overlayPrefs;
         try {
           overlayPrefs = await window.api.loadPreferences?.();
+          overlayPrefsLoaded = true;
         } catch (e) {
           overlayPrefs = null;
+          overlayPrefsLoaded = false;
         }
         return overlayPrefs || {};
       }
@@ -423,14 +483,15 @@
           const lang = overlayLang;
           const prefs = await loadOverlayPrefs();
 
-          if (!Array.isArray(achievementsDataObj.achievements)) {
-            emptyState.style.display = "flex";
-            achievementsList.style.display = "none";
-            updateStats([], null);
-            currentConfigName = configName;
-            currentDataHash = null;
-            return;
-          }
+        if (!Array.isArray(achievementsDataObj.achievements)) {
+          emptyState.style.display = "flex";
+          achievementsList.style.display = "none";
+          updateStats([], null);
+          document.body.classList.add("overlay-compact");
+          currentConfigName = configName;
+          currentDataHash = null;
+          return;
+        }
 
           const newHash = computeAchievementsHash(
             achievementsDataObj.achievements,
@@ -446,6 +507,7 @@
           emptyState.style.display = "none";
           achievementsList.style.display = "block";
           achievementsList.innerHTML = "";
+          document.body.classList.remove("overlay-compact");
 
           const uniqueAchievements = new Set();
           const achievements = [];
@@ -600,6 +662,7 @@
           emptyState.style.display = "flex";
           achievementsList.style.display = "none";
           updateStats([], null);
+          document.body.classList.add("overlay-compact");
           currentConfigName = null;
           currentDataHash = null;
           pendingConfigName = null;
@@ -622,8 +685,106 @@
         }
       });
 
+      window.api.on("overlay-preferences-updated", (payload) => {
+        if (!payload || typeof payload !== "object") return;
+        if (Object.prototype.hasOwnProperty.call(payload, "showHiddenDescription")) {
+          overlayPrefs = {
+            ...(overlayPrefs || {}),
+            showHiddenDescription: payload.showHiddenDescription === true,
+          };
+          overlayPrefsLoaded = true;
+          currentDataHash = null;
+          if (currentConfigName) {
+            loadAchievements(currentConfigName);
+          }
+        }
+      });
+
+      function setupOverlayDrag() {
+        const dragHandle = document.querySelector(".overlay-top");
+        if (!dragHandle) return;
+        if (
+          !window.api ||
+          typeof window.api.getWindowPosition !== "function" ||
+          typeof window.api.setWindowPosition !== "function"
+        ) {
+          return;
+        }
+
+        let dragState = null;
+        let pendingMove = null;
+        let rafId = null;
+
+        const startDrag = async (event) => {
+          if (dragState) {
+            dragHandle.releasePointerCapture?.(dragState.pointerId);
+            dragState = null;
+            pendingMove = null;
+            if (rafId !== null) {
+              window.cancelAnimationFrame(rafId);
+              rafId = null;
+            }
+          }
+          if (event.button !== 0) return;
+          event.preventDefault();
+          window.api?.requestOverlayFocus?.();
+          const pointerId = event.pointerId;
+          dragHandle.setPointerCapture?.(pointerId);
+          const pos = await window.api.getWindowPosition();
+          if (!Array.isArray(pos) || pos.length < 2) {
+            dragHandle.releasePointerCapture?.(pointerId);
+            return;
+          }
+          dragState = {
+            pointerId,
+            startX: event.screenX,
+            startY: event.screenY,
+            winX: pos[0],
+            winY: pos[1],
+          };
+        };
+
+        const moveDrag = (event) => {
+          if (!dragState) return;
+          if (event.pointerId !== dragState.pointerId) {
+            return;
+          }
+          event.preventDefault();
+          pendingMove = { screenX: event.screenX, screenY: event.screenY };
+          if (rafId !== null) return;
+          rafId = window.requestAnimationFrame(() => {
+            rafId = null;
+            if (!dragState || !pendingMove) return;
+            const dx = pendingMove.screenX - dragState.startX;
+            const dy = pendingMove.screenY - dragState.startY;
+            pendingMove = null;
+            window.api.setWindowPosition(dragState.winX + dx, dragState.winY + dy);
+          });
+        };
+
+        const endDrag = (event) => {
+          if (!dragState) return;
+          if (event.pointerId !== dragState.pointerId) {
+            return;
+          }
+          dragHandle.releasePointerCapture?.(event.pointerId);
+          dragState = null;
+          pendingMove = null;
+          if (rafId !== null) {
+            window.cancelAnimationFrame(rafId);
+            rafId = null;
+          }
+        };
+
+        dragHandle.addEventListener("pointerdown", startDrag);
+        window.addEventListener("pointermove", moveDrag);
+        window.addEventListener("pointerup", endDrag);
+        window.addEventListener("pointercancel", endDrag);
+      }
+
       window.onload = () => {
         window.api.requestCurrentConfig?.();
+        setupOverlayDrag();
       };
     </script>
   </body>

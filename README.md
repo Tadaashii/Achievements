@@ -7,7 +7,9 @@ A desktop application built with Electron that monitors running games and displa
 - 📈 Progress updates
 - 🖼️ Game image overlays
 - 📊 Real-time achievement dashboard
-- ?? Steam/Uplay/GOG/Epic schema support (auto-detected where possible)
+- Steam/Uplay/GOG/Epic schema support (auto-detected where possible)
+
+**Platform:** Windows (uses Task Scheduler + Windows paths).
 
 ## ✨ Features
 
@@ -58,19 +60,29 @@ A desktop application built with Electron that monitors running games and displa
 | File/Folder                             | Description                                          |
 | --------------------------------------- | ---------------------------------------------------- |
 | `main.js`                               | Main Electron process: window handling, core logic   |
-| `playtime-log-watcher.js`               | Tracks game start/stop and calculates total playtime |
+| `preload.js`                            | IPC bridge and renderer APIs                         |
+| `utils/playtime-log-watcher.js`         | Tracks game start/stop and calculates total playtime |
 | `index.html`                            | Main UI with dashboard and config management         |
 | `overlay.html`                          | Achievement notification overlay                     |
 | `playtime.html`                         | Playtime notification template                       |
 | `progress.html`                         | Progress notification template                       |
-| `playtime-totals.json`                  | Runtime-generated playtime totals per config         |
+| `tray-menu.html/js/css`                 | Tray menu UI and logic                               |
+| `playtime-totals.json`                  | Runtime-generated totals (`%APPDATA%/Achievements/`) |
+| `preferences.json`                      | Runtime settings (`%APPDATA%/Achievements/`)         |
 | `utils/`                                | Helper modules and utilities:                        |
 | `utils/auto-config-generator.js`        | Auto-generates game configs from save directories    |
 | `utils/generate_achievements_schema.js` | Scrapes achievement data from Steam API/Web          |
+| `utils/watched-folders.js`              | Watcher + auto-select + auto-config                  |
+| `utils/steam-appcache*.js`              | Steam official appcache parsing + schema build       |
+| `utils/exophase-scraper.js`             | Multi-language scraping from Exophase                |
+| `utils/xenia-*`                         | Xenia parsing + schema generation                     |
+| `utils/rpcs3-*`                         | RPCS3 parsing + schema generation                     |
+| `utils/shadps4-*`                       | PS4 trophy parsing + schema generation               |
 | `utils/paths.js`, etc.                  | Other utility modules                                |
 | `presets/`                              | Scalable and non-scalable notification themes        |
 | `sounds/`                               | Notification sound assets                            |
 | `style.css`                             | Global styling for all UI components                 |
+| `assets/locales/`                       | UI translations                                      |
 
 ## 🛠️ Installation
 
@@ -83,6 +95,10 @@ A desktop application built with Electron that monitors running games and displa
 3. Install dependencies:
    ```bash
    npm install
+   ```
+4. (Recommended) Install Playwright browsers for schema scraping:
+   ```bash
+   npm run dl-browsers
    ```
 
 ## 🚀 Running the App
@@ -152,6 +168,16 @@ Creates a standalone `.exe` installer in the `dist/` folder.
    - **Process Name** (optional): Specific .exe name to monitor
    - _Note_: Names are sanitized (illegal filename characters removed, condensed spacing) before saving; the sanitized name is used on disk and for playtime totals.
 
+**Config JSON fields (reference):**
+- `appid` (string) – game id
+- `platform` (string) – steam/uplay/gog/epic/xenia/rpcs3/shadps4/steam-official
+- `config_path` (string) – folder containing `achievements.json` and `img/`
+- `save_path` (string) – location of save/achievement progress
+- `process_name` (string) – executable name for process tracking
+- `executable` / `arguments` (optional) – used for Launch
+
+_Note_: If `config_path` points to a custom location, schema regeneration/cleanup will not overwrite that folder.
+
 #### Auto Configuration
 
 1. Use **Watched Folders** (recommended) to scan your emulator/save directories.
@@ -174,6 +200,7 @@ Creates a standalone `.exe` installer in the `dist/` folder.
    - %LOCALAPPDATA%\SKIDROW
 
 **Note**: Auto-configuration uses the Steam Web API when a key is provided in Settings. Without a key, it falls back to SteamDB/SteamHunters + Languages from Exophase.
+Sources used when available: Steam Web API, SteamDB, SteamHunters, Exophase, GOG, Epic.
 
 #### Xenia-Canary Support
 
@@ -236,6 +263,7 @@ Creates a standalone `.exe` installer in the `dist/` folder.
 - Toggle Show Hidden Description for hidden achievements
 - Enable Close to Tray (X button hides to tray)
 - Configure overlay shortcut or disable the overlay entirely
+- Configure Overlay Interaction Key (toggle click-through ↔ drag/scroll)
 - Enable/disable features:
   - Achievement screenshots
   - Progress Notification
@@ -244,6 +272,14 @@ Creates a standalone `.exe` installer in the `dist/` folder.
 - Per-game progress notifications can be muted when a config is active
 - Toggle "Start with Windows" to create/remove a Task Scheduler entry using the current executable path
 - All preferences persist to `%APPDATA%/Achievements/preferences.json` and are restored on startup
+
+### Runtime Data Locations
+
+- `%APPDATA%/Achievements/configs` – configs
+- `%APPDATA%/Achievements/schema` – generated schemas + images
+- `%APPDATA%/Achievements/images` – cached covers
+- `%APPDATA%/Achievements/ach_cache` – cached achievements
+- `%APPDATA%/Achievements/playtime-totals.json` – playtime totals
 
 ### Keyboard & Controller Navigation
 

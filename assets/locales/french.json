@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "Supprimer tous les jeux figurant sur la liste noire ?",
   "confirm.blacklistReset.title": "Réinitialiser la liste noire",
   "confirm.deleteConfig.message": "Voulez-vous supprimer : {name} ?",
+  "confirm.deleteConfig.deleteExtras": "Voulez-vous aussi supprimer le schéma, le cache et les images ?",
   "confirm.deleteConfig.title": "Supprimer la configuration",
   "confirm.steamApiRemove.message": "Supprimer la clé API Steam enregistrée ?",
   "confirm.steamApiRemove.title": "Supprimer la clé API Steam",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "Les schémas PS4 sont générés à partir des fichiers de trophées. Rescanez plutôt le dossier.",
   "main.message.schemaSteamOfficialRescan": "Les schémas Steam (Official) sont générés à partir des statistiques appcache. Rescanez plutôt le dossier des statistiques.",
   "boot.loading.title": "Démarrage…",
-  "boot.loading.sub": "Préparation du cache des succès"
+  "boot.loading.sub": "Préparation du cache des succès",
+  "label.overlay-interact-shortcut-btn": "Touche d'interaction :",
+  "settings-overlayInteractShortcutTitle": "Touche d'interaction de l'overlay",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "Basculer l'interaction : appuyez une fois pour activer le glisser/défilement, appuyez à nouveau pour revenir au clic à travers. Nécessite une touche non modificatrice (ex. \\).",
+  "aria.overlay-interact-shortcut-info": "Basculer l'interaction : appuyez une fois pour activer le glisser/défilement, appuyez à nouveau pour revenir au clic à travers. Nécessite une touche non modificatrice (ex. \\)."
 }
+
+
+

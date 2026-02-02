@@ -54,6 +54,7 @@
   "confirm.blacklistReset.message": "Stergi toate jocurile din blacklist?",
   "confirm.blacklistReset.title": "Reseteaza blacklist",
   "confirm.deleteConfig.message": "Vrei sa stergi: {name}?",
+  "confirm.deleteConfig.deleteExtras": "Vrei sa stergi si Schema, Cache-ul si Imaginile?",
   "confirm.deleteConfig.title": "Sterge config",
   "confirm.steamApiRemove.message": "Stergi cheia Steam API salvata?",
   "confirm.steamApiRemove.title": "Sterge cheia Steam API",
@@ -424,5 +425,13 @@
   "main.message.schemaPs4Rescan": "Schemele PS4 sunt generate din fișierele de trofee. Rescanează folderul în schimb.",
   "main.message.schemaSteamOfficialRescan": "Schemele Steam (Official) sunt generate din appcache. Rescanează folderul în schimb.",
   "boot.loading.title": "Pornire…",
-  "boot.loading.sub": "Se pregătește cache-ul realizărilor"
+  "boot.loading.sub": "Se pregătește cache-ul realizărilor",
+  "label.overlay-interact-shortcut-btn": "Tasta interactiune:",
+  "settings-overlayInteractShortcutTitle": "Tasta interactiune overlay",
+  "overlay-interact-shortcut-info": "i",
+  "title.overlay-interact-shortcut-info": "Comuta interactiunea: apasa o data pentru a activa drag/scroll, apasa din nou pentru a reveni la click-through. Necesita o tasta nemodificatoare (ex.: \\).",
+  "aria.overlay-interact-shortcut-info": "Comuta interactiunea: apasa o data pentru a activa drag/scroll, apasa din nou pentru a reveni la click-through. Necesita o tasta nemodificatoare (ex.: \\)."
 }
+
+
+
