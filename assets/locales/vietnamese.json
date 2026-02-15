@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "Thời gian chơi: 0 phút",
   "achStatsPlaytimeFmt": "Thời gian chơi: {value}",
+  "achStatsLastPlayed": "Chơi lần cuối: N/A",
+  "achStatsLastPlayedFmt": "Chơi lần cuối: {value}",
   "achStatsProgress": "Tiến độ: {unlocked} / {total}",
   "achStatsText": "Tiến độ: 0 / 0",
   "alert.altAppIdNoImage": "Không có hình ảnh nào có sẵn cho AppID thay thế.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "Có sự cố xảy ra khi tải cấu hình.",
   "alert.configNotFound": "Không tìm thấy cấu hình!",
   "alert.folderAddFailed": "Không thể thêm thư mục",
+  "alert.folderNotFound": "Không tìm thấy thư mục",
+  "alert.folderBlocked": "Thư mục đã bị chặn",
+  "alert.folderPathInvalid": "Đường dẫn thư mục không hợp lệ",
+  "alert.rescanBusy": "Quét lại đã đang chạy",
   "alert.folderRemoveFailed": "Không thể xóa thư mục",
   "alert.folderReplaceAddFailed": "Không thể thay thế thư mục (thêm bước).",
   "alert.folderReplaceRemoveFailed": "Không thể thay thế thư mục (bước xóa).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "Xóa danh sách đen",
   "confirm.deleteConfig.message": "Bạn có muốn xóa: {name}?",
   "confirm.deleteConfig.deleteExtras": "Bạn có muốn xóa cả schema, cache và hình ảnh không?",
+  "confirm.deleteConfig.deleteSave": "Bạn có muốn xóa dữ liệu lưu từ đường dẫn lưu không?",
   "confirm.deleteConfig.title": "Xóa cấu hình",
   "confirm.steamApiRemove.message": "Xóa khóa API Steam đã lưu?",
   "confirm.steamApiRemove.title": "Xóa khóa API Steam",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "Phím tương tác Overlay",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "Chuyển đổi tương tác: nhấn một lần để bật kéo/cuộn, nhấn lần nữa để trở lại click-through. Cần phím không phải phím bổ trợ (vd. \\).",
-  "aria.overlay-interact-shortcut-info": "Chuyển đổi tương tác: nhấn một lần để bật kéo/cuộn, nhấn lần nữa để trở lại click-through. Cần phím không phải phím bổ trợ (vd. \\)."
+  "aria.overlay-interact-shortcut-info": "Chuyển đổi tương tác: nhấn một lần để bật kéo/cuộn, nhấn lần nữa để trở lại click-through. Cần phím không phải phím bổ trợ (vd. \\).",
+  "placeholder.achievementsSearchInput": "Tìm kiếm thành tựu…",
+  "title.achievementsSearchToggle": "Tìm kiếm thành tựu (Ctrl+F)"
 }
-
-
 

@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "플레이타임: 0m",
   "achStatsPlaytimeFmt": "플레이타임: {value}",
+  "achStatsLastPlayed": "마지막 플레이: N/A",
+  "achStatsLastPlayedFmt": "마지막 플레이: {value}",
   "achStatsProgress": "진행 상황: {unlocked} / {total}",
   "achStatsText": "진행률: 0 / 0",
   "alert.altAppIdNoImage": "AppID에 대한 대체 이미지가 없습니다.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "설정 파일을 불러오는 과정에서 문제가 발생했습니다.",
   "alert.configNotFound": "구성 파일을 찾을 수 없습니다!",
   "alert.folderAddFailed": "폴더 추가에 실패했습니다",
+  "alert.folderNotFound": "폴더를 찾을 수 없습니다",
+  "alert.folderBlocked": "폴더가 차단되었습니다",
+  "alert.folderPathInvalid": "폴더 경로가 유효하지 않습니다",
+  "alert.rescanBusy": "재스캔이 이미 진행 중입니다",
   "alert.folderRemoveFailed": "폴더 제거에 실패했습니다",
   "alert.folderReplaceAddFailed": "폴더 교체 실패 (단계 추가).",
   "alert.folderReplaceRemoveFailed": "폴더 교체 실패 (단계 제거).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "블랙리스트 초기화",
   "confirm.deleteConfig.message": "{name}를 삭제하시겠습니까?",
   "confirm.deleteConfig.deleteExtras": "스키마, 캐시 및 이미지도 삭제할까요?",
+  "confirm.deleteConfig.deleteSave": "저장 경로에서 저장 데이터를 삭제하시겠습니까?",
   "confirm.deleteConfig.title": "구성 삭제",
   "confirm.steamApiRemove.message": "저장된 Steam API 키를 삭제하시겠습니까?",
   "confirm.steamApiRemove.title": "Steam API 키 제거",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "오버레이 상호작용 키",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "상호작용 전환: 한 번 눌러 드래그/스크롤을 활성화하고, 다시 눌러 클릭 통과로 돌아갑니다. 비-수정 키가 필요합니다(예: \\).",
-  "aria.overlay-interact-shortcut-info": "상호작용 전환: 한 번 눌러 드래그/스크롤을 활성화하고, 다시 눌러 클릭 통과로 돌아갑니다. 비-수정 키가 필요합니다(예: \\)."
+  "aria.overlay-interact-shortcut-info": "상호작용 전환: 한 번 눌러 드래그/스크롤을 활성화하고, 다시 눌러 클릭 통과로 돌아갑니다. 비-수정 키가 필요합니다(예: \\).",
+  "placeholder.achievementsSearchInput": "도전 과제 검색…",
+  "title.achievementsSearchToggle": "도전 과제 검색 (Ctrl+F)"
 }
-
-
 

@@ -469,7 +469,7 @@ function writeSchemaAssets(schemaDir, parsed) {
   return sanitized;
 }
 
-function updateSchemaFromGpd(schemaDir, parsed) {
+function updateSchemaFromGpd(schemaDir, parsed, options = {}) {
   if (!schemaDir || !parsed) return { updated: false, images: 0 };
   const schemaPath = path.join(schemaDir, "achievements.json");
   if (!fs.existsSync(schemaPath)) return { updated: false, images: 0 };
@@ -594,19 +594,27 @@ function updateSchemaFromGpd(schemaDir, parsed) {
     fs.writeFileSync(schemaPath, JSON.stringify(entries, null, 2), "utf8");
   }
 
-  schemaLogger.info("xenia:schema:updated", {
-    appid: String(parsed?.appid || ""),
-    dir: schemaDir,
-    updated,
-    added,
-    changed,
-    total: entries.length,
-    incoming: incoming.length,
-    images: imagesSaved,
-  });
+  const hasSchemaChanges = updated || added > 0 || changed > 0;
+  if (hasSchemaChanges) {
+    schemaLogger.info("xenia:schema:updated", {
+      appid: String(parsed?.appid || ""),
+      dir: schemaDir,
+      updated,
+      added,
+      changed,
+      total: entries.length,
+      incoming: incoming.length,
+      images: imagesSaved,
+    });
+  }
 
-  // Trigger Exophase if we added new achievements or still lack non-English text
-  if (added > 0 || !hasMultiLang(entries)) {
+  const bootMode = options.bootMode === true;
+  if (bootMode && !hasSchemaChanges) {
+    schemaLogger.info("xenia:exophase:skip", {
+      appid: String(parsed?.appid || ""),
+      reason: "schema-unchanged-boot",
+    });
+  } else if (added > 0 || !hasMultiLang(entries)) {
     queueExophaseEnrich(schemaDir, parsed, { platform: "xenia" });
   }
 
@@ -615,10 +623,6 @@ function updateSchemaFromGpd(schemaDir, parsed) {
 
 function generateConfigFromGpd(gpdPath, configsDir, options = {}) {
   const appid = path.basename(gpdPath, path.extname(gpdPath));
-  autoConfigLogger.info("xenia:gpd:parse:start", {
-    appid,
-    path: gpdPath,
-  });
   let parsed;
   try {
     parsed = parseGpdFile(gpdPath);
@@ -638,21 +642,7 @@ function generateConfigFromGpd(gpdPath, configsDir, options = {}) {
     options.schemaRoot || path.join(configsDir, "schema");
   const schemaDir = path.join(schemaRoot, "xenia", String(appid));
 
-  autoConfigLogger.info("xenia:gpd:parse:success", {
-    appid,
-    title,
-    achievements: achievementCount,
-    entries: parsed.entrySummary?.total || 0,
-    namespaces: parsed.entrySummary?.byNamespace || {},
-  });
-
   if (achievementCount === 0) {
-    autoConfigLogger.info("xenia:gpd:skip", {
-      appid,
-      title,
-      path: gpdPath,
-      reason: "no-achievements",
-    });
     return { skipped: true, appid, title, reason: "no-achievements" };
   }
 
@@ -677,7 +667,9 @@ function generateConfigFromGpd(gpdPath, configsDir, options = {}) {
     }
   }
   if (schemaReady) {
-    updateSchemaFromGpd(schemaDir, parsed);
+    updateSchemaFromGpd(schemaDir, parsed, {
+      bootMode: options.bootMode === true,
+    });
   } else {
     writeSchemaAssets(schemaDir, parsed);
     queueExophaseEnrich(schemaDir, parsed, { platform: "xenia" });
@@ -712,13 +704,6 @@ function generateConfigFromGpd(gpdPath, configsDir, options = {}) {
     if (hasConfigChanges(existing.data, merged)) {
       fs.writeFileSync(existing.filePath, JSON.stringify(merged, null, 2));
       autoConfigLogger.info("xenia:config:updated", {
-        appid,
-        name: merged.name,
-        filePath: existing.filePath,
-        schemaDir,
-      });
-    } else {
-      autoConfigLogger.info("xenia:config:unchanged", {
         appid,
         name: merged.name,
         filePath: existing.filePath,

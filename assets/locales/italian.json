@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "Tempo di gioco: 0m",
   "achStatsPlaytimeFmt": "Tempo di gioco: {value}",
+  "achStatsLastPlayed": "Giocato l'ultima volta: N/A",
+  "achStatsLastPlayedFmt": "Giocato l'ultima volta: {value}",
   "achStatsProgress": "Progressi: {unlocked} / {total}",
   "achStatsText": "Progresso: 0 / 0",
   "alert.altAppIdNoImage": "Nessuna immagine disponibile per l'AppID alternativo.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "Si è verificato un errore durante il caricamento della configurazione.",
   "alert.configNotFound": "Configurazione non trovata!",
   "alert.folderAddFailed": "Impossibile aggiungere la cartella",
+  "alert.folderNotFound": "Cartella non trovata",
+  "alert.folderBlocked": "La cartella è bloccata",
+  "alert.folderPathInvalid": "Percorso della cartella non valido",
+  "alert.rescanBusy": "La nuova scansione è già in corso",
   "alert.folderRemoveFailed": "Impossibile rimuovere la cartella",
   "alert.folderReplaceAddFailed": "Impossibile sostituire la cartella (aggiungi passaggio).",
   "alert.folderReplaceRemoveFailed": "Impossibile sostituire la cartella (rimuovere il passaggio).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "Reimposta lista nera",
   "confirm.deleteConfig.message": "Vuoi eliminare: {name}?",
   "confirm.deleteConfig.deleteExtras": "Vuoi eliminare anche lo schema, la cache e le immagini?",
+  "confirm.deleteConfig.deleteSave": "Vuoi eliminare i dati di salvataggio dal percorso di salvataggio?",
   "confirm.deleteConfig.title": "Elimina configurazione",
   "confirm.steamApiRemove.message": "Rimuovere la chiave API Steam memorizzata?",
   "confirm.steamApiRemove.title": "Rimuovi chiave API Steam",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "Tasto di interazione overlay",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "Alterna interazione: premi una volta per abilitare trascinamento/scorrimento, premi di nuovo per tornare al click-through. Richiede un tasto non modificatore (es. \\).",
-  "aria.overlay-interact-shortcut-info": "Alterna interazione: premi una volta per abilitare trascinamento/scorrimento, premi di nuovo per tornare al click-through. Richiede un tasto non modificatore (es. \\)."
+  "aria.overlay-interact-shortcut-info": "Alterna interazione: premi una volta per abilitare trascinamento/scorrimento, premi di nuovo per tornare al click-through. Richiede un tasto non modificatore (es. \\).",
+  "placeholder.achievementsSearchInput": "Cerca obiettivi…",
+  "title.achievementsSearchToggle": "Cerca obiettivi (Ctrl+F)"
 }
-
-
 

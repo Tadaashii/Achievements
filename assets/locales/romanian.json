@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "Timp de joc: 0m",
   "achStatsPlaytimeFmt": "Timp de joc: {value}",
+  "achStatsLastPlayed": "Jucat ultima dată: N/A",
+  "achStatsLastPlayedFmt": "Jucat ultima dată: {value}",
   "achStatsProgress": "Progres: {unlocked} / {total}",
   "achStatsText": "Progres: 0 / 0",
   "alert.altAppIdNoImage": "Nu exista imagine pentru AppID-ul alternativ.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "Ceva nu a mers la incarcarea configului.",
   "alert.configNotFound": "Configul nu a fost gasit!",
   "alert.folderAddFailed": "Nu s-a putut adauga folderul",
+  "alert.folderNotFound": "Folderul nu a fost găsit",
+  "alert.folderBlocked": "Folderul este blocat",
+  "alert.folderPathInvalid": "Calea folderului este invalidă",
+  "alert.rescanBusy": "Rescanarea este deja în curs",
   "alert.folderRemoveFailed": "Nu s-a putut sterge folderul",
   "alert.folderReplaceAddFailed": "Nu s-a putut inlocui folderul (pasul de adaugare).",
   "alert.folderReplaceRemoveFailed": "Nu s-a putut inlocui folderul (pasul de stergere).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "Reseteaza blacklist",
   "confirm.deleteConfig.message": "Vrei sa stergi: {name}?",
   "confirm.deleteConfig.deleteExtras": "Vrei sa stergi si Schema, Cache-ul si Imaginile?",
+  "confirm.deleteConfig.deleteSave": "Vrei sa stergi si datele de salvare din save path?",
   "confirm.deleteConfig.title": "Sterge config",
   "confirm.steamApiRemove.message": "Stergi cheia Steam API salvata?",
   "confirm.steamApiRemove.title": "Sterge cheia Steam API",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "Tasta interactiune overlay",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "Comuta interactiunea: apasa o data pentru a activa drag/scroll, apasa din nou pentru a reveni la click-through. Necesita o tasta nemodificatoare (ex.: \\).",
-  "aria.overlay-interact-shortcut-info": "Comuta interactiunea: apasa o data pentru a activa drag/scroll, apasa din nou pentru a reveni la click-through. Necesita o tasta nemodificatoare (ex.: \\)."
+  "aria.overlay-interact-shortcut-info": "Comuta interactiunea: apasa o data pentru a activa drag/scroll, apasa din nou pentru a reveni la click-through. Necesita o tasta nemodificatoare (ex.: \\).",
+  "placeholder.achievementsSearchInput": "Caută realizări…",
+  "title.achievementsSearchToggle": "Caută realizări (Ctrl+F)"
 }
-
-
 

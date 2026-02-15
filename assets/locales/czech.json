@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "Doba hraní: 0m",
   "achStatsPlaytimeFmt": "Doba hraní: {value}",
+  "achStatsLastPlayed": "Naposledy hráno: N/A",
+  "achStatsLastPlayedFmt": "Naposledy hráno: {value}",
   "achStatsProgress": "Pokrok: {unlocked} / {total}",
   "achStatsText": "Pokrok: 0 / 0",
   "alert.altAppIdNoImage": "Pro alternativní AppID není k dispozici žádný obrázek.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "Při načítání konfigurace došlo k chybě.",
   "alert.configNotFound": "Konfigurace nebyla nalezena!",
   "alert.folderAddFailed": "Nepodařilo se přidat složku",
+  "alert.folderNotFound": "Složka nebyla nalezena",
+  "alert.folderBlocked": "Složka je zablokována",
+  "alert.folderPathInvalid": "Neplatná cesta ke složce",
+  "alert.rescanBusy": "Opětovné skenování již probíhá",
   "alert.folderRemoveFailed": "Nepodařilo se odstranit složku",
   "alert.folderReplaceAddFailed": "Nepodařilo se nahradit složku (přidat krok).",
   "alert.folderReplaceRemoveFailed": "Nepodařilo se nahradit složku (odstranit krok).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "Obnovit černou listinu",
   "confirm.deleteConfig.message": "Chcete odstranit: {name}?",
   "confirm.deleteConfig.deleteExtras": "Chcete také odstranit schéma, cache a obrázky?",
+  "confirm.deleteConfig.deleteSave": "Chcete smazat uložená data z cesty uložení?",
   "confirm.deleteConfig.title": "Odstranit konfiguraci",
   "confirm.steamApiRemove.message": "Odstranit uložený klíč API služby Steam?",
   "confirm.steamApiRemove.title": "Odebrat klíč API služby Steam",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "Klávesa interakce překrytí",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "Přepnout interakci: stiskněte jednou pro zapnutí tažení/rolování, stiskněte znovu pro návrat ke kliknutí skrz. Vyžaduje nemodifikační klávesu (např. \\).",
-  "aria.overlay-interact-shortcut-info": "Přepnout interakci: stiskněte jednou pro zapnutí tažení/rolování, stiskněte znovu pro návrat ke kliknutí skrz. Vyžaduje nemodifikační klávesu (např. \\)."
+  "aria.overlay-interact-shortcut-info": "Přepnout interakci: stiskněte jednou pro zapnutí tažení/rolování, stiskněte znovu pro návrat ke kliknutí skrz. Vyžaduje nemodifikační klávesu (např. \\).",
+  "placeholder.achievementsSearchInput": "Hledat úspěchy…",
+  "title.achievementsSearchToggle": "Hledat úspěchy (Ctrl+F)"
 }
-
-
 

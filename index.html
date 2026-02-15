@@ -16,13 +16,8 @@
       html,
       body {
         user-select: none;
-        overflow-y: auto;
-        overflow-x: hidden;
+        overflow: hidden;
         height: 100vh;
-      }
-
-      body::-webkit-scrollbar {
-        display: none;
       }
 
       button,
@@ -1340,73 +1335,82 @@
       </div>
     </div>
 
-    <div class="container">
-      <!-- Toggle Settings Button -->
-      <div
-        id="mainControlsRow"
-        style="
-          margin-bottom: 10px;
-          position: relative;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        "
-      >
-        <div style="display: flex; flex-direction: column; gap: 0px">
-          <button id="toggleDashboardBtn" type="button">Show Dashboard</button>
-          <button id="toggleBtn">Hide Options</button>
-        </div>
-
-        <!-- Progres bar -->
+    <div
+      id="mainScroll"
+      class="scroll-container"
+      data-scroll-container="1"
+      tabindex="0"
+    >
+      <div class="container">
+        <!-- Toggle Settings Button -->
         <div
-          id="achStats"
+          id="mainControlsRow"
           style="
-            display: none;
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
-            text-align: center;
-            width: 320px;
-            z-index: 10;
-            margin-top: -30px;
+            margin-bottom: 10px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 10px;
           "
         >
-          <label id="achStatsText" style="color: white; font-weight: bold"
-            >Progress: 0 / 0</label
-          >
+          <div style="display: flex; flex-direction: column; gap: 0px">
+            <button id="toggleDashboardBtn" type="button">
+              Show Dashboard
+            </button>
+            <button id="toggleBtn">Hide Options</button>
+          </div>
+
+          <!-- Progres bar -->
           <div
+            id="achStats"
             style="
-              width: 100%;
-              background: #ccc;
-              border-radius: 8px;
-              height: 12px;
-              margin-top: -10px;
-              position: relative;
-              margin-bottom: 20px;
+              display: none;
+              position: absolute;
+              left: 50%;
+              top: 30px;
+              transform: translate(-50%, -30px);
+              text-align: center;
+              width: 320px;
+              z-index: 10;
             "
           >
-            <div
-              id="achStatsBar"
-              style="
-                width: 0%;
-                height: 100%;
-                background: #4caf50;
-                border-radius: 8px;
-                transition: width 0.3s;
-              "
-            ></div>
-            <span
-              id="achStatsPercent"
-              style="
-                position: absolute;
-                right: 5px;
-                top: -22px;
-                font-size: 12px;
-                color: white;
-                font-weight: bold;
-              "
-              >0%</span
+            <label id="achStatsText" style="color: white; font-weight: bold"
+              >Progress: 0 / 0</label
             >
+            <div
+              style="
+                width: 100%;
+                background: #ccc;
+                border-radius: 8px;
+                height: 12px;
+                margin-top: -10px;
+                position: relative;
+                margin-bottom: 0px;
+              "
+            >
+              <div
+                id="achStatsBar"
+                style="
+                  width: 0%;
+                  height: 100%;
+                  background: #4caf50;
+                  border-radius: 8px;
+                  transition: width 0.3s;
+                "
+              ></div>
+              <span
+                id="achStatsPercent"
+                style="
+                  position: absolute;
+                  right: 5px;
+                  top: -22px;
+                  font-size: 12px;
+                  color: white;
+                  font-weight: bold;
+                "
+                >0%</span
+              >
+            </div>
             <div
               id="achStatsPlaytime"
               style="
@@ -1418,352 +1422,396 @@
             >
               Playtime: 0m
             </div>
+            <div
+              id="achStatsLastPlayed"
+              style="
+                margin-top: 2px;
+                font-size: 12px;
+                color: #ffffff;
+                font-weight: bold;
+              "
+            >
+              Last Played: N/A
+            </div>
           </div>
+
+          <button id="playBtn" style="display: none; margin-left: auto">
+            <i class="fas fa-play"></i> Play
+          </button>
         </div>
 
-        <button id="playBtn" style="display: none; margin-left: auto">
-          <i class="fas fa-play"></i> Play
-        </button>
-      </div>
-
-      <!-- Toggleable Settings Container -->
-      <div
-        id="buttonContainer"
-        class="config-container"
-        style="display: flex; justify-content: space-between; gap: 15px"
-      >
-        <!-- Left Side: Create Config and Select Config -->
+        <!-- Toggleable Settings Container -->
         <div
-          class="left-config"
-          style="
-            flex: 1;
-            min-width: 300px;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-          "
+          id="buttonContainer"
+          class="config-container"
+          style="display: flex; justify-content: space-between; gap: 15px"
         >
-          <div>
-            <div style="display: flex; gap: 20px">
-              <button id="createNewConfigBtn" style="flex: 1; padding: 10px">
-                Create New Config <span class="arrow-icon">▼</span>
-              </button>
+          <!-- Left Side: Create Config and Select Config -->
+          <div
+            class="left-config"
+            style="
+              flex: 1;
+              min-width: 300px;
+              display: flex;
+              flex-direction: column;
+              gap: 5px;
+            "
+          >
+            <div>
+              <div style="display: flex; gap: 20px">
+                <button id="createNewConfigBtn" style="flex: 1; padding: 10px">
+                  Create New Config <span class="arrow-icon">▼</span>
+                </button>
 
-              <button
-                id="generateConfigsBtn"
-                style="flex: 1; padding: 10px; display: none"
-              >
-                Generate Auto-Configs
-              </button>
-            </div>
-
-            <div id="configModal" class="modal hidden">
-              <div class="modal-content">
-                <span class="close-button" id="closeConfigModal">&times;</span>
-                <h2 id="configFormTitle" style="margin-top: 0">Config Form</h2>
-
-                <div
-                  id="new-config-form"
-                  style="
-                    display: flex;
-                    flex-direction: column;
-                    gap: 14px;
-                    margin-top: -10px;
-                  "
+                <button
+                  id="generateConfigsBtn"
+                  style="flex: 1; padding: 10px; display: none"
                 >
-                  <div style="display: flex; gap: 20px">
-                    <!-- Right -->
-                    <div style="flex: 1; display: flex; flex-direction: column">
-                      <label for="configName">Config Name:</label>
-                      <input
-                        type="text"
-                        id="configName"
-                        placeholder="Enter Config Name *"
-                      />
+                  Generate Auto-Configs
+                </button>
+              </div>
 
-                      <label for="appid">AppID:</label>
-                      <input
-                        type="text"
-                        id="appid"
-                        placeholder="Enter AppID *"
-                      />
+              <div id="configModal" class="modal hidden">
+                <div class="modal-content">
+                  <span class="close-button" id="closeConfigModal"
+                    >&times;</span
+                  >
+                  <h2 id="configFormTitle" style="margin-top: 0">
+                    Config Form
+                  </h2>
 
-                      <label for="configPath"
-                        >Config path: ! Leave empty to generate !</label
-                      >
-                      <div class="input-with-button">
-                        <input
-                          type="text"
-                          id="configPath"
-                          placeholder="Example: steam_settings"
-                        />
-                        <button type="button" id="selectConfigFolder">
-                          📂
-                        </button>
-                      </div>
-
-                      <label for="savePath">Save path:</label>
-                      <div class="input-with-button">
-                        <input
-                          type="text"
-                          id="savePath"
-                          placeholder="Example: GSE Saves "
-                        />
-                        <button type="button" id="selectSaveFolder">📂</button>
-                      </div>
-                    </div>
-
-                    <!-- Left -->
-                    <div style="flex: 1; display: flex; flex-direction: column">
-                      <label for="executablePath">Executable (optional):</label>
-                      <div class="input-with-button">
-                        <input
-                          type="text"
-                          id="executablePath"
-                          placeholder="Path to executable"
-                        />
-                        <button type="button" id="selectExecutable">📂</button>
-                      </div>
-
-                      <label for="exeArgs">Arguments (optional):</label>
-                      <input
-                        type="text"
-                        id="exeArgs"
-                        placeholder="Optional arguments"
-                      />
-
-                      <label for="processName">Process name (optional):</label>
-                      <input
-                        type="text"
-                        id="processName"
-                        placeholder="Optional – real .exe name"
-                      />
-                      <label for="platformSelect">Platform:</label>
-                      <select id="platformSelect">
-                        <option value="auto" selected>Auto</option>
-                        <option value="steam">Steam</option>
-                        <option value="steam-official" disabled>
-                          Steam (Official)
-                        </option>
-                        <option value="uplay">Uplay</option>
-                        <option value="epic">Epic</option>
-                        <option value="gog">GOG</option>
-                        <option value="xenia" disabled>Xenia</option>
-                        <option value="rpcs3" disabled>RPCS3</option>
-                        <option value="shadps4" disabled>PS4 (shadps4)</option>
-                      </select>
-
-                      <div
-                        id="steamAppIdRow"
-                        class="input-with-button"
-                        style="display: none"
-                      >
-                        <input
-                          type="text"
-                          id="steamAppIdInput"
-                          placeholder="Mapped Steam AppID"
-                        />
-                        <button type="button" id="lookupSteamIdBtn">??</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Butoane Save / Regenerate -->
                   <div
+                    id="new-config-form"
                     style="
                       display: flex;
-                      justify-content: center;
-                      gap: 10px;
-                      flex-wrap: wrap;
-                      margin-top: 5px;
+                      flex-direction: column;
+                      gap: 14px;
+                      margin-top: -10px;
                     "
                   >
-                    <button
-                      id="saveBtn"
+                    <div style="display: flex; gap: 20px">
+                      <!-- Right -->
+                      <div
+                        style="flex: 1; display: flex; flex-direction: column"
+                      >
+                        <label for="configName">Config Name:</label>
+                        <input
+                          type="text"
+                          id="configName"
+                          placeholder="Enter Config Name *"
+                        />
+
+                        <label for="appid">AppID:</label>
+                        <input
+                          type="text"
+                          id="appid"
+                          placeholder="Enter AppID *"
+                        />
+
+                        <label for="configPath"
+                          >Config path: ! Leave empty to generate !</label
+                        >
+                        <div class="input-with-button">
+                          <input
+                            type="text"
+                            id="configPath"
+                            placeholder="Example: steam_settings"
+                          />
+                          <button type="button" id="selectConfigFolder">
+                            📂
+                          </button>
+                        </div>
+
+                        <label for="savePath">Save path:</label>
+                        <div class="input-with-button">
+                          <input
+                            type="text"
+                            id="savePath"
+                            placeholder="Example: GSE Saves "
+                          />
+                          <button type="button" id="selectSaveFolder">
+                            📂
+                          </button>
+                        </div>
+                      </div>
+
+                      <!-- Left -->
+                      <div
+                        style="flex: 1; display: flex; flex-direction: column"
+                      >
+                        <label for="executablePath"
+                          >Executable (optional):</label
+                        >
+                        <div class="input-with-button">
+                          <input
+                            type="text"
+                            id="executablePath"
+                            placeholder="Path to executable"
+                          />
+                          <button type="button" id="selectExecutable">
+                            📂
+                          </button>
+                        </div>
+
+                        <label for="exeArgs">Arguments (optional):</label>
+                        <input
+                          type="text"
+                          id="exeArgs"
+                          placeholder="Optional arguments"
+                        />
+
+                        <label for="processName"
+                          >Process name (optional):</label
+                        >
+                        <input
+                          type="text"
+                          id="processName"
+                          placeholder="Optional – real .exe name"
+                        />
+                        <label for="platformSelect">Platform:</label>
+                        <select id="platformSelect">
+                          <option value="auto" selected>Auto</option>
+                          <option value="steam">Steam</option>
+                          <option value="steam-official" disabled>
+                            Steam (Official)
+                          </option>
+                          <option value="uplay">Uplay</option>
+                          <option value="epic">Epic</option>
+                          <option value="gog">GOG</option>
+                          <option value="xenia" disabled>Xenia</option>
+                          <option value="rpcs3" disabled>RPCS3</option>
+                          <option value="shadps4" disabled>
+                            PS4 (shadps4)
+                          </option>
+                        </select>
+
+                        <div
+                          id="steamAppIdRow"
+                          class="input-with-button"
+                          style="display: none"
+                        >
+                          <input
+                            type="text"
+                            id="steamAppIdInput"
+                            placeholder="Mapped Steam AppID"
+                          />
+                          <button type="button" id="lookupSteamIdBtn">
+                            ??
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Butoane Save / Regenerate -->
+                    <div
                       style="
-                        background-color: #4caf50;
-                        color: white;
-                        border: none;
-                        padding: 10px 24px;
-                        border-radius: 6px;
-                        font-weight: bold;
-                        width: auto;
+                        display: flex;
+                        justify-content: center;
+                        gap: 10px;
+                        flex-wrap: wrap;
+                        margin-top: 5px;
                       "
                     >
-                      Save Config
-                    </button>
-                    <button
-                      id="regenSchemaBtn"
-                      style="
-                        background-color: #2196f3;
-                        color: white;
-                        border: none;
-                        padding: 10px 24px;
-                        border-radius: 6px;
-                        font-weight: bold;
-                        width: auto;
-                        display: none;
-                      "
-                    >
-                      Regenerate Schema
-                    </button>
+                      <button
+                        id="saveBtn"
+                        style="
+                          background-color: #4caf50;
+                          color: white;
+                          border: none;
+                          padding: 10px 24px;
+                          border-radius: 6px;
+                          font-weight: bold;
+                          width: auto;
+                        "
+                      >
+                        Save Config
+                      </button>
+                      <button
+                        id="regenSchemaBtn"
+                        style="
+                          background-color: #2196f3;
+                          color: white;
+                          border: none;
+                          padding: 10px 24px;
+                          border-radius: 6px;
+                          font-weight: bold;
+                          width: auto;
+                          display: none;
+                        "
+                      >
+                        Regenerate Schema
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div class="config-controls clean">
-            <label for="configList" class="field-label">Select Config:</label>
-            <select id="configList" class="field-input">
-              <option value="" disabled selected>Select</option>
-            </select>
-            <div
-              id="muteProgressRow"
-              class="checkbox-control"
-              style="display: none; margin-left: 10px"
-            >
-              <input type="checkbox" id="muteProgressCheckbox" />
-              <label for="muteProgressCheckbox"
-                >Disable Game Progress Notifications</label
-              >
-            </div>
-            <button
-              id="deleteConfigBtn"
-              style="display: none; margin-top: 25px"
-            >
-              Delete
-            </button>
-            <button id="blacklistConfigBtn" style="display: none">
-              Add to Blacklist
-            </button>
-            <div class="button-row">
-              <button id="editConfigBtn" style="display: none">
-                Edit Config
-              </button>
-              <button id="backButton" class="hidden">Back</button>
-            </div>
-            <div class="language-controls">
-              <label for="languageSelect" class="field-label"
-                >Select Language:</label
-              >
-              <select id="languageSelect" class="field-input">
-                <option value="english">English</option>
-                <option value="german">Deutsch (German)</option>
-                <option value="french">Français (French)</option>
-                <option value="italian">Italiano (Italian)</option>
-                <option value="koreana">한국어 (Korean)</option>
-                <option value="spanish">Español (Spanish)</option>
-                <option value="thai">ไทย (Thai)</option>
-                <option value="schinese">
-                  简体中文 (Chinese - Simplified)
-                </option>
-                <option value="tchinese">
-                  繁體中文 (Chinese - Traditional)
-                </option>
-                <option value="arabic">العربية (Arabic)</option>
-                <option value="russian">Русский (Russian)</option>
-                <option value="japanese">日本語 (Japanese)</option>
-                <option value="portuguese">Português (Portugal)</option>
-                <option value="danish">Dansk (Danish)</option>
-                <option value="dutch">Nederlands (Dutch)</option>
-                <option value="swedish">Svenska (Swedish)</option>
-                <option value="hungarian">Magyar (Hungarian)</option>
-                <option value="turkish">Türkçe (Turkish)</option>
-                <option value="polish">Polski (Polish)</option>
-                <option value="brazilian">Português (Brasil)</option>
-                <option value="ukrainian">Українська (Ukrainian)</option>
-                <option value="vietnamese">Tiếng Việt (Vietnamese)</option>
-                <option value="bulgarian">Български (Bulgarian)</option>
-                <option value="czech">Čeština (Czech)</option>
-                <option value="finnish">Suomi (Finnish)</option>
-                <option value="greek">Ελληνικά (Greek)</option>
-                <option value="indonesian">
-                  Bahasa Indonesia (Indonesian)
-                </option>
-                <option value="norwegian">Norsk (Norwegian)</option>
-                <option value="romanian">Română (Romanian)</option>
-                <option value="latam">
-                  Español (Latinoamérica) (Spanish - Latin America)
-                </option>
+            <div class="config-controls clean">
+              <label for="configList" class="field-label">Select Config:</label>
+              <select id="configList" class="field-input">
+                <option value="" disabled selected>Select</option>
               </select>
+              <div
+                id="muteProgressRow"
+                class="checkbox-control"
+                style="display: none; margin-left: 10px"
+              >
+                <input type="checkbox" id="muteProgressCheckbox" />
+                <label for="muteProgressCheckbox"
+                  >Disable Game Progress Notifications</label
+                >
+              </div>
+              <button
+                id="deleteConfigBtn"
+                style="display: none; margin-top: 25px"
+              >
+                Delete
+              </button>
+              <button id="blacklistConfigBtn" style="display: none">
+                Add to Blacklist
+              </button>
+              <div class="button-row">
+                <button id="editConfigBtn" style="display: none">
+                  Edit Config
+                </button>
+                <button id="backButton" class="hidden">Back</button>
+              </div>
+              <div class="language-controls">
+                <label for="languageSelect" class="field-label"
+                  >Select Language:</label
+                >
+                <select id="languageSelect" class="field-input">
+                  <option value="english">English</option>
+                  <option value="german">Deutsch (German)</option>
+                  <option value="french">Français (French)</option>
+                  <option value="italian">Italiano (Italian)</option>
+                  <option value="koreana">한국어 (Korean)</option>
+                  <option value="spanish">Español (Spanish)</option>
+                  <option value="thai">ไทย (Thai)</option>
+                  <option value="schinese">
+                    简体中文 (Chinese - Simplified)
+                  </option>
+                  <option value="tchinese">
+                    繁體中文 (Chinese - Traditional)
+                  </option>
+                  <option value="arabic">العربية (Arabic)</option>
+                  <option value="russian">Русский (Russian)</option>
+                  <option value="japanese">日本語 (Japanese)</option>
+                  <option value="portuguese">Português (Portugal)</option>
+                  <option value="danish">Dansk (Danish)</option>
+                  <option value="dutch">Nederlands (Dutch)</option>
+                  <option value="swedish">Svenska (Swedish)</option>
+                  <option value="hungarian">Magyar (Hungarian)</option>
+                  <option value="turkish">Türkçe (Turkish)</option>
+                  <option value="polish">Polski (Polish)</option>
+                  <option value="brazilian">Português (Brasil)</option>
+                  <option value="ukrainian">Українська (Ukrainian)</option>
+                  <option value="vietnamese">Tiếng Việt (Vietnamese)</option>
+                  <option value="bulgarian">Български (Bulgarian)</option>
+                  <option value="czech">Čeština (Czech)</option>
+                  <option value="finnish">Suomi (Finnish)</option>
+                  <option value="greek">Ελληνικά (Greek)</option>
+                  <option value="indonesian">
+                    Bahasa Indonesia (Indonesian)
+                  </option>
+                  <option value="norwegian">Norsk (Norwegian)</option>
+                  <option value="romanian">Română (Romanian)</option>
+                  <option value="latam">
+                    Español (Latinoamérica) (Spanish - Latin America)
+                  </option>
+                </select>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Right Side: Game Image (embedded) -->
-        <div
-          class="settings-container"
-          style="
-            flex: 1;
-            min-width: 300px;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-          "
-        >
-          <div id="embeddedGameImage" class="game-image-embed">
-            <div id="embeddedImageContainer">
-              <img id="embeddedGameImageImg" src="" alt="Game Cover" />
-              <button
-                id="edit-btn"
-                type="button"
-                onclick="showAltAppIdPrompt()"
-                title="Edit image"
-                aria-label="Edit image"
+          <!-- Right Side: Game Image (embedded) -->
+          <div
+            class="settings-container"
+            style="
+              flex: 1;
+              min-width: 300px;
+              display: flex;
+              flex-direction: column;
+              gap: 5px;
+            "
+          >
+            <div id="embeddedGameImage" class="game-image-embed">
+              <div id="embeddedImageContainer">
+                <img id="embeddedGameImageImg" src="" alt="Game Cover" />
+                <button
+                  id="edit-btn"
+                  type="button"
+                  onclick="showAltAppIdPrompt()"
+                  title="Edit image"
+                  aria-label="Edit image"
+                >
+                  ✎
+                </button>
+              </div>
+
+              <div
+                id="embeddedFallbackPrompt"
+                style="
+                  display: none;
+                  flex-direction: column;
+                  align-items: center;
+                  padding: 20px;
+                  color: white;
+                "
               >
-                ✎
-              </button>
-            </div>
-
-            <div
-              id="embeddedFallbackPrompt"
-              style="
-                display: none;
-                flex-direction: column;
-                align-items: center;
-                padding: 20px;
-                color: white;
-              "
-            >
-              <p id="altAppIdPromptText">
-                ⚠️ Does the game have a different Steam AppID on Steam?
-              </p>
-              <input
-                type="text"
-                id="altAppId"
-                placeholder="Enter alternative AppID"
-                style="padding: 5px; font-size: 16px; width: 200px"
-              />
-              <div style="margin-top: 10px">
-                <button
-                  id="altAppIdTryBtn"
-                  type="button"
-                  onclick="downloadFromAlternativeAppId()"
-                >
-                  ✅ Try Alternative
-                </button>
-                <button
-                  id="altAppIdCancelBtn"
-                  type="button"
-                  onclick="cancelFallback()"
-                  style="margin-left: 5px"
-                >
-                  ✖ Cancel
-                </button>
+                <p id="altAppIdPromptText">
+                  ⚠️ Does the game have a different Steam AppID on Steam?
+                </p>
+                <input
+                  type="text"
+                  id="altAppId"
+                  placeholder="Enter alternative AppID"
+                  style="padding: 5px; font-size: 16px; width: 200px"
+                />
+                <div style="margin-top: 10px">
+                  <button
+                    id="altAppIdTryBtn"
+                    type="button"
+                    onclick="downloadFromAlternativeAppId()"
+                  >
+                    ✅ Try Alternative
+                  </button>
+                  <button
+                    id="altAppIdCancelBtn"
+                    type="button"
+                    onclick="cancelFallback()"
+                    style="margin-left: 5px"
+                  >
+                    ✖ Cancel
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-
-    <div
-      id="mainScroll"
-      class="scroll-container"
-      data-scroll-container="1"
-      tabindex="0"
-    >
+      <div id="achievementsHeader" class="ach-header" style="display: none">
+        <div id="achievementsSearch" class="ach-header-search">
+          <button
+            id="achievementsSearchToggle"
+            class="ach-search-btn"
+            type="button"
+            title="Search achievements (Ctrl+F)"
+            aria-label="Search achievements"
+          >
+            <i class="fa-solid fa-magnifying-glass"></i>
+          </button>
+          <input
+            id="achievementsSearchInput"
+            class="ach-search-input"
+            type="text"
+            placeholder="Search achievements…"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+      </div>
       <table class="achievements">
         <thead>
           <tr></tr>
@@ -1951,6 +1999,10 @@
         <label id="appConfirmCheckboxRow" class="confirm-checkbox-row hidden">
           <input id="appConfirmCheckbox" type="checkbox" />
           <span id="appConfirmCheckboxLabel"></span>
+        </label>
+        <label id="appConfirmCheckboxRow2" class="confirm-checkbox-row hidden">
+          <input id="appConfirmCheckbox2" type="checkbox" />
+          <span id="appConfirmCheckboxLabel2"></span>
         </label>
         <div class="confirm-actions">
           <button id="appConfirmCancelBtn" type="button">Cancel</button>
@@ -2789,11 +2841,95 @@
         tryNext();
       }
 
+      function setAchievementsHeaderVisible(visible) {
+        const header = document.getElementById("achievementsHeader");
+        if (!header) return;
+        header.style.display = visible ? "flex" : "none";
+        if (!visible) {
+          const input = document.getElementById("achievementsSearchInput");
+          if (input) input.value = "";
+          const wrap = document.getElementById("achievementsSearch");
+          if (wrap) wrap.classList.remove("open");
+        }
+      }
+
+      function setAchievementsSearchOpen(open, selectAll = true) {
+        const header = document.getElementById("achievementsHeader");
+        const wrap = document.getElementById("achievementsSearch");
+        const input = document.getElementById("achievementsSearchInput");
+        if (!header || !wrap || !input) return;
+        if (header.style.display === "none") return;
+        wrap.classList.toggle("open", open);
+        if (open) {
+          input.focus({ preventScroll: true });
+          if (selectAll) input.select();
+        } else {
+          input.value = "";
+          applyAchievementsSearchFilter();
+          input.blur();
+        }
+      }
+
+      function applyAchievementsSearchFilter() {
+        const input = document.getElementById("achievementsSearchInput");
+        const query = String(input?.value || "")
+          .trim()
+          .toLowerCase();
+        const rows = document.querySelectorAll("#achievementsTableBody tr");
+        rows.forEach((row) => {
+          const hay = String(row?.dataset?.search || "");
+          row.style.display = !query || hay.includes(query) ? "" : "none";
+        });
+      }
+
+      function ensureAchievementsSearchAttached() {
+        if (window.__achSearchAttached) return;
+        const wrap = document.getElementById("achievementsSearch");
+        const input = document.getElementById("achievementsSearchInput");
+        const toggle = document.getElementById("achievementsSearchToggle");
+        if (!wrap || !input || !toggle) return;
+        toggle.addEventListener("click", () => {
+          const open = !wrap.classList.contains("open");
+          setAchievementsSearchOpen(open, true);
+        });
+        if (!input) return;
+        input.addEventListener("input", applyAchievementsSearchFilter);
+        input.addEventListener("blur", () => {
+          if (!input.value.trim()) setAchievementsSearchOpen(false);
+        });
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") {
+            e.preventDefault();
+            e.stopPropagation();
+            setAchievementsSearchOpen(false);
+          }
+        });
+        window.__achSearchAttached = true;
+      }
+
+      function focusAchievementsSearch(selectAll = true) {
+        const configList = document.getElementById("configList");
+        if (!configList || !configList.value) return;
+        setAchievementsSearchOpen(true, selectAll);
+      }
+      window.focusAchievementsSearch = focusAchievementsSearch;
+
       async function buildMainAchievementsTable(
         selectedConfig,
         lang = "english",
       ) {
-        if (!selectedConfig) return;
+        ensureAchievementsSearchAttached();
+        if (!selectedConfig) {
+          setAchievementsHeaderVisible(false);
+          return;
+        }
+        const achSearchInput = document.getElementById(
+          "achievementsSearchInput",
+        );
+        if (achSearchInput && window.__achSearchConfig !== selectedConfig) {
+          achSearchInput.value = "";
+          window.__achSearchConfig = selectedConfig;
+        }
 
         const achievementsDataObj =
           await window.api.loadAchievementData(selectedConfig);
@@ -2803,15 +2939,24 @@
         ) {
           const body = document.getElementById("achievementsTableBody");
           if (body) body.innerHTML = "";
+          setAchievementsHeaderVisible(false);
           const achStats = document.getElementById("achStats");
           if (achStats) achStats.style.display = "none";
           const playtimeLabel = document.getElementById("achStatsPlaytime");
+          const lastPlayedLabel = document.getElementById("achStatsLastPlayed");
           if (playtimeLabel)
             playtimeLabel.textContent = tUiFmt(
               "achStatsPlaytimeFmt",
               { value: "0m" },
               "Playtime: 0m",
             );
+          if (lastPlayedLabel) {
+            lastPlayedLabel.textContent = tUiFmt(
+              "achStatsLastPlayedFmt",
+              { value: "N/A" },
+              "Last Played: N/A",
+            );
+          }
           return;
         }
         const savedAchievementsObj =
@@ -2854,6 +2999,8 @@
           const d = new Date(String(ts).length === 10 ? ts * 1000 : Number(ts));
           return isNaN(d) ? "N/A" : d.toLocaleString();
         }
+
+        setAchievementsHeaderVisible(true);
 
         for (const achievement of unique) {
           const displayName = getSafeLocalizedText(
@@ -2948,6 +3095,10 @@
             isHiddenInSchema && !canShowHiddenDesc
               ? hiddenLabel
               : description || "";
+          row.dataset.search =
+            `${displayName || ""} ${descText || ""} ${achievement.name || ""}`
+              .toLowerCase()
+              .trim();
           descWrap.appendChild(document.createElement("em")).textContent =
             descText;
           tdText.appendChild(strong);
@@ -3000,6 +3151,7 @@
             imgRel,
           );
         }
+        applyAchievementsSearchFilter();
 
         // Main Progress Bar
         updateAchievementStats(
@@ -3068,24 +3220,48 @@
         return parts.join(" ").trim();
       }
 
+      function formatLastPlayed(ts) {
+        const value = Number(ts || 0);
+        if (!Number.isFinite(value) || value <= 0) return "N/A";
+        const d = new Date(value);
+        return isNaN(d) ? "N/A" : d.toLocaleString();
+      }
+
       async function updatePlaytimeLabel(configName) {
         const label = document.getElementById("achStatsPlaytime");
+        const lastPlayedLabel = document.getElementById("achStatsLastPlayed");
         if (!label || !configName) return;
         try {
           const res = await window.api.getTotalPlaytime(configName);
           const totalMs =
             typeof res === "number" ? res : Number(res?.totalMs || 0);
+          const updatedAt =
+            typeof res === "object" && res ? Number(res.updatedAt || 0) : 0;
           label.textContent = tUiFmt(
             "achStatsPlaytimeFmt",
             { value: formatPlaytimeLabel(totalMs) },
             `Playtime: ${formatPlaytimeLabel(totalMs)}`,
           );
+          if (lastPlayedLabel) {
+            lastPlayedLabel.textContent = tUiFmt(
+              "achStatsLastPlayedFmt",
+              { value: formatLastPlayed(updatedAt) },
+              `Last Played: ${formatLastPlayed(updatedAt)}`,
+            );
+          }
         } catch {
           label.textContent = tUiFmt(
             "achStatsPlaytimeFmt",
             { value: "0m" },
             "Playtime: 0m",
           );
+          if (lastPlayedLabel) {
+            lastPlayedLabel.textContent = tUiFmt(
+              "achStatsLastPlayedFmt",
+              { value: "N/A" },
+              "Last Played: N/A",
+            );
+          }
         }
       }
 
@@ -3936,7 +4112,11 @@
             name: entry,
             displayName: entry,
             appid: null,
+            platform: null,
             blacklisted: false,
+            executable: null,
+            arguments: "",
+            process_name: "",
           };
         }
         const name = entry.name || entry.configName || "";
@@ -3946,7 +4126,11 @@
           displayName:
             entry.displayName || entry.title || entry.name || entry.configName,
           appid: entry.appid ? String(entry.appid) : null,
+          platform: entry.platform || null,
           blacklisted: !!entry.blacklisted,
+          executable: entry.executable || null,
+          arguments: entry.arguments || "",
+          process_name: entry.process_name || entry.processName || "",
         };
       }
 
@@ -4172,11 +4356,19 @@
       const confirmCheckboxLabel = document.getElementById(
         "appConfirmCheckboxLabel",
       );
+      const confirmCheckboxRow2 = document.getElementById(
+        "appConfirmCheckboxRow2",
+      );
+      const confirmCheckbox2 = document.getElementById("appConfirmCheckbox2");
+      const confirmCheckboxLabel2 = document.getElementById(
+        "appConfirmCheckboxLabel2",
+      );
       const confirmOkBtn = document.getElementById("appConfirmOkBtn");
       const confirmCancelBtn = document.getElementById("appConfirmCancelBtn");
       let confirmResolve = null;
       let confirmLastFocus = null;
       let confirmCheckboxValue = false;
+      let confirmCheckboxValue2 = false;
       const tUi = (key, fallback) =>
         window.i18nUi && typeof window.i18nUi.getString === "function"
           ? window.i18nUi.getString(key, fallback)
@@ -4191,7 +4383,9 @@
         confirmModal.inert = false;
         document.body.classList.remove("modal-open");
         if (confirmCheckboxRow && confirmCheckbox) {
-          confirmCheckboxValue = !confirmCheckboxRow.classList.contains("hidden")
+          confirmCheckboxValue = !confirmCheckboxRow.classList.contains(
+            "hidden",
+          )
             ? confirmCheckbox.checked === true
             : false;
           confirmCheckboxRow.classList.add("hidden");
@@ -4199,6 +4393,18 @@
           if (confirmCheckboxLabel) confirmCheckboxLabel.textContent = "";
         } else {
           confirmCheckboxValue = false;
+        }
+        if (confirmCheckboxRow2 && confirmCheckbox2) {
+          confirmCheckboxValue2 = !confirmCheckboxRow2.classList.contains(
+            "hidden",
+          )
+            ? confirmCheckbox2.checked === true
+            : false;
+          confirmCheckboxRow2.classList.add("hidden");
+          confirmCheckbox2.checked = false;
+          if (confirmCheckboxLabel2) confirmCheckboxLabel2.textContent = "";
+        } else {
+          confirmCheckboxValue2 = false;
         }
         if (confirmLastFocus && typeof confirmLastFocus.focus === "function") {
           try {
@@ -4248,6 +4454,17 @@
             confirmCheckboxRow.classList.add("hidden");
             confirmCheckbox.checked = false;
             confirmCheckboxLabel.textContent = "";
+          }
+        }
+        if (confirmCheckboxRow2 && confirmCheckbox2 && confirmCheckboxLabel2) {
+          if (opts.checkboxLabel2) {
+            confirmCheckboxLabel2.textContent = opts.checkboxLabel2;
+            confirmCheckbox2.checked = opts.checkboxDefault2 === true;
+            confirmCheckboxRow2.classList.remove("hidden");
+          } else {
+            confirmCheckboxRow2.classList.add("hidden");
+            confirmCheckbox2.checked = false;
+            confirmCheckboxLabel2.textContent = "";
           }
         }
         confirmModal.inert = false;
@@ -4328,8 +4545,13 @@
         try {
           const result = await showAppConfirm(opts);
           const checked = confirmCheckboxValue === true;
-          logUiEvent("info", "ui:confirm:result", { result, checked });
-          return { confirmed: result === true, checked };
+          const checked2 = confirmCheckboxValue2 === true;
+          logUiEvent("info", "ui:confirm:result", {
+            result,
+            checked,
+            checked2,
+          });
+          return { confirmed: result === true, checked, checked2 };
         } catch (err) {
           logUiEvent("warn", "ui:confirm-failed", {
             message: err?.message || String(err),
@@ -4339,9 +4561,13 @@
           const message = opts?.message || "Are you sure?";
           const result = window.confirm(message);
           logUiEvent("info", "ui:confirm:fallback-result", { result });
-          return { confirmed: result === true, checked: false };
+          return {
+            confirmed: result === true,
+            checked: false,
+            checked2: false,
+          };
         } catch {
-          return { confirmed: false, checked: false };
+          return { confirmed: false, checked: false, checked2: false };
         }
       }
 
@@ -4458,6 +4684,10 @@
             "confirm.deleteConfig.deleteExtras",
             "Do you want to delete also the Schema, Cache and Images?",
           ),
+          checkboxLabel2: tUi(
+            "confirm.deleteConfig.deleteSave",
+            "Do you want to delete save data from the save path?",
+          ),
         });
         if (!confirmDelete?.confirmed) return;
 
@@ -4467,6 +4697,7 @@
           const wasSelected = configList?.value === configName;
           const response = await window.api.deleteConfig(configName, {
             deleteExtras: confirmDelete.checked === true,
+            deleteSaveFiles: confirmDelete.checked2 === true,
           });
           if (response?.success) {
             if (typeof reloadConfigsDropdown === "function") {
@@ -4594,6 +4825,9 @@
             tUi("log.configLoadError", "Config Load Error:"),
             error,
           );
+        } finally {
+          window.__uiConfigsReady = true;
+          window.__markUiDataReady?.();
         }
 
         function formatTimestamp(timestamp) {
@@ -4604,6 +4838,20 @@
 
         configList.addEventListener("change", async () => {
           const selectedConfig = configList.value;
+          if (!selectedConfig) {
+            lastSelectedConfigMeta = null;
+            updateBlacklistButtonState(null);
+            const tableBody = document.querySelector("#achievementsTableBody");
+            if (tableBody) tableBody.innerHTML = "";
+            const achStats = document.getElementById("achStats");
+            if (achStats) achStats.style.display = "none";
+            const playBtn = document.getElementById("playBtn");
+            if (playBtn) playBtn.style.display = "none";
+            setAchievementsHeaderVisible(false);
+            window.__showFallbackLogo?.();
+            updateMuteProgressUI().catch(() => {});
+            return;
+          }
           const cachedMeta = configMetaIndex.get(selectedConfig) || null;
           const blocked =
             !!cachedMeta?.appid &&
@@ -4661,21 +4909,32 @@
           }
 
           if (achievementsDataObj.error) {
+            setAchievementsHeaderVisible(false);
             alert(achievementsDataObj.error);
             return;
           }
 
           if (!Array.isArray(achievementsDataObj.achievements)) {
+            setAchievementsHeaderVisible(false);
             if (achievementsDataObj.achievements == null) {
               const achStats = document.getElementById("achStats");
               if (achStats) achStats.style.display = "none";
               const playtimeLabel = document.getElementById("achStatsPlaytime");
+              const lastPlayedLabel =
+                document.getElementById("achStatsLastPlayed");
               if (playtimeLabel)
                 playtimeLabel.textContent = tUiFmt(
                   "achStatsPlaytimeFmt",
                   { value: "0m" },
                   "Playtime: 0m",
                 );
+              if (lastPlayedLabel) {
+                lastPlayedLabel.textContent = tUiFmt(
+                  "achStatsLastPlayedFmt",
+                  { value: "N/A" },
+                  "Last Played: N/A",
+                );
+              }
               return;
             }
             console.warn(
@@ -4759,6 +5018,9 @@
             tUi("log.presetsLoadError", "Error loading presets:"),
             error,
           );
+        } finally {
+          window.__uiPresetsReady = true;
+          window.__markUiDataReady?.();
         }
       });
 
@@ -5160,6 +5422,7 @@
           hide("muteProgressRow");
           const tableBody = document.getElementById("achievementsTableBody");
           if (tableBody) tableBody.innerHTML = "";
+          setAchievementsHeaderVisible(false);
 
           try {
             window.api.updateConfig({
@@ -5221,6 +5484,11 @@
           await loadPreferencesCached();
 
           const prefs = getCachedPreferences();
+          try {
+            window.__dashboardShowOnStart = !!prefs.showDashboardOnStart;
+            window.__prepareDashboardForStartup?.();
+            window.__markUiDataReady?.();
+          } catch {}
 
           const sounds = await window.api.getSounds();
 
@@ -5274,6 +5542,8 @@
           }
         } catch (err) {
           console.error(tUi("log.soundLoadError", "Sound Load Error:"), err);
+        } finally {
+          window.__markUiDataReady?.();
         }
       };
 
@@ -5806,6 +6076,12 @@
             tUi("log.settingsLoadFailed", "Settings cannot be loaded:"),
             e,
           );
+          try {
+            window.__dashboardShowOnStart = false;
+            if (typeof window.__maybeHideBootLoading === "function") {
+              window.__maybeHideBootLoading();
+            }
+          } catch {}
         }
       });
 
@@ -5920,6 +6196,9 @@
             await window.api.savePreferences({
               showDashboardOnStart: e.target.checked,
             });
+            window.__dashboardShowOnStart = !!e.target.checked;
+            window.__prepareDashboardForStartup?.();
+            window.__markUiDataReady?.();
             console.log(
               e.target.checked
                 ? tUi(
@@ -5935,8 +6214,7 @@
         }
 
         if (prefs.showDashboardOnStart) {
-          const btn = document.getElementById("toggleDashboardBtn");
-          setTimeout(() => btn?.click(), 0);
+          window.__prepareDashboardForStartup?.();
         }
       });
       window.api.onPlaytimeUpdate?.((payload = {}) => {
@@ -5946,11 +6224,19 @@
 
         if (activeSafe && payloadSafe && activeSafe === payloadSafe) {
           const label = document.getElementById("achStatsPlaytime");
+          const lastPlayedLabel = document.getElementById("achStatsLastPlayed");
           if (label) {
             label.textContent = tUiFmt(
               "achStatsPlaytimeFmt",
               { value: formatPlaytimeLabel(payload.totalMs) },
               `Playtime: ${formatPlaytimeLabel(payload.totalMs)}`,
+            );
+          }
+          if (lastPlayedLabel) {
+            lastPlayedLabel.textContent = tUiFmt(
+              "achStatsLastPlayedFmt",
+              { value: formatLastPlayed(payload.updatedAt) },
+              `Last Played: ${formatLastPlayed(payload.updatedAt)}`,
             );
           }
         }
@@ -6142,6 +6428,7 @@
         } else {
           lastSelectedConfigMeta = null;
           updateBlacklistButtonState(null);
+          setAchievementsHeaderVisible(false);
         }
       }
 
@@ -7465,8 +7752,11 @@
               if (res?.ok) renderFoldersList(res.folders);
               else
                 alert(
-                  res?.error ||
-                    tUi("alert.folderRemoveFailed", "Failed to remove folder"),
+                  resolveFolderError(
+                    res,
+                    "alert.folderRemoveFailed",
+                    "Failed to remove folder",
+                  ),
                 );
             });
             if (isDefault) {
@@ -7493,6 +7783,13 @@
           }
         }
 
+        function resolveFolderError(res, fallbackKey, fallbackText) {
+          if (res && res.errorCode) {
+            return tUi(`alert.${res.errorCode}`, res?.error || fallbackText);
+          }
+          return res?.error || tUi(fallbackKey, fallbackText);
+        }
+
         addBtn.addEventListener("click", async () => {
           try {
             const dir = await (window.api?.selectFolder?.() ||
@@ -7502,8 +7799,11 @@
             if (res?.ok) renderFoldersList(res.folders || []);
             else
               alert(
-                res?.error ||
-                  tUi("alert.folderAddFailed", "Failed to add folder"),
+                resolveFolderError(
+                  res,
+                  "alert.folderAddFailed",
+                  "Failed to add folder",
+                ),
               );
           } catch (e) {
             console.error(tUi("log.folderAddError", "Add folder error:"), e);
@@ -7517,11 +7817,11 @@
               renderFoldersList(res.folders || []);
             } else {
               alert(
-                res?.error ||
-                  tUi(
-                    "alert.watcherRestartFailed",
-                    "Failed to restart watchers",
-                  ),
+                resolveFolderError(
+                  res,
+                  "alert.watcherRestartFailed",
+                  "Failed to restart watchers",
+                ),
               );
             }
           } catch (e) {
@@ -7635,11 +7935,147 @@
             ? window.requestIdleCallback
             : (cb) => setTimeout(cb, 16);
 
+        const runWithConcurrency = async (items, limit, worker) => {
+          const list = Array.isArray(items) ? items : [];
+          const max = Math.max(
+            1,
+            Math.min(Number(limit) || 1, list.length || 1),
+          );
+          const results = new Array(list.length);
+          let nextIndex = 0;
+
+          const runOne = async () => {
+            for (;;) {
+              const idx = nextIndex++;
+              if (idx >= list.length) return;
+              try {
+                const value = await worker(list[idx], idx);
+                results[idx] = { status: "fulfilled", value };
+              } catch (err) {
+                results[idx] = { status: "rejected", reason: err };
+              }
+            }
+          };
+
+          const workers = Array.from({ length: max }, () => runOne());
+          await Promise.all(workers);
+          return results;
+        };
+
+        const runWithBatching = async (items, batchSize, limit, worker) => {
+          const list = Array.isArray(items) ? items : [];
+          const size = Math.max(1, Number(batchSize) || 1);
+          const out = [];
+          for (let i = 0; i < list.length; i += size) {
+            const batch = list.slice(i, i + size);
+            const batchResults = await runWithConcurrency(batch, limit, worker);
+            out.push(...batchResults);
+            if (i + size < list.length && DASH_DETAIL_BATCH_PAUSE_MS > 0) {
+              await new Promise((resolve) =>
+                setTimeout(resolve, DASH_DETAIL_BATCH_PAUSE_MS),
+              );
+            }
+          }
+          return out;
+        };
+
         const DASH_PROGRESS_PREFIX = "dashboard:lastProgress:";
         const dashboardConfigCache = new Map();
         const dashboardImageCache = new Map();
         let dashboardLazyObserver = null;
         const IMG_CACHE_PREFIX = "dashboard:lastImage:";
+        const DASH_DETAIL_CONCURRENCY = 3;
+        const DASH_DETAIL_BATCH_SIZE = 24;
+        const DASH_DETAIL_BATCH_PAUSE_MS = 25;
+        const DASH_BOOT_IMG_BATCH = 10;
+        const dashImgQueue = [];
+        const dashImgQueued = new Set();
+        let dashImgFlushScheduled = false;
+        let detailJobsSeedReady = window.__bootManualSeedComplete === true;
+        const detailJobsSeedWaiters = [];
+
+        const resolveDetailJobsSeedWaiters = () => {
+          while (detailJobsSeedWaiters.length) {
+            const resolve = detailJobsSeedWaiters.shift();
+            try {
+              resolve?.();
+            } catch {}
+          }
+        };
+
+        window.__onBootManualSeedComplete = () => {
+          if (detailJobsSeedReady) return;
+          detailJobsSeedReady = true;
+          resolveDetailJobsSeedWaiters();
+        };
+
+        const waitForDetailJobsSeedReady = async (timeoutMs = 20000) => {
+          if (detailJobsSeedReady || window.__bootManualSeedComplete === true) {
+            detailJobsSeedReady = true;
+            return;
+          }
+          const ms = Math.max(0, Number(timeoutMs) || 0);
+          await new Promise((resolve) => {
+            let done = false;
+            const finish = () => {
+              if (done) return;
+              done = true;
+              if (timer) clearTimeout(timer);
+              const idx = detailJobsSeedWaiters.indexOf(finish);
+              if (idx >= 0) detailJobsSeedWaiters.splice(idx, 1);
+              resolve();
+            };
+            const timer = setTimeout(finish, ms);
+            detailJobsSeedWaiters.push(finish);
+          });
+          if (window.__bootManualSeedComplete === true) {
+            detailJobsSeedReady = true;
+          }
+        };
+
+        const isDashboardBooting = () =>
+          document.body.classList.contains("booting") ||
+          window.__bootDone !== true;
+
+        const queueDashboardImageLoad = (img, src) => {
+          if (!img || !src) return;
+          img.dataset.src = src;
+          if (!isDashboardBooting()) {
+            img.src = src;
+            return;
+          }
+          if (dashImgQueued.has(img)) return;
+          dashImgQueued.add(img);
+          dashImgQueue.push(img);
+          if (!dashImgFlushScheduled) {
+            dashImgFlushScheduled = true;
+            requestAnimationFrame(flushDashboardImageQueue);
+          }
+        };
+
+        const flushDashboardImageQueue = (force = false) => {
+          dashImgFlushScheduled = false;
+          let count = 0;
+          while (count < DASH_BOOT_IMG_BATCH && dashImgQueue.length) {
+            const img = dashImgQueue.shift();
+            dashImgQueued.delete(img);
+            const src = img?.dataset?.src;
+            if (src) img.src = src;
+            count += 1;
+          }
+          if (dashImgQueue.length && (force || isDashboardBooting())) {
+            dashImgFlushScheduled = true;
+            requestAnimationFrame(() => flushDashboardImageQueue(force));
+          }
+        };
+
+        const drainDashboardImageQueue = () => {
+          if (!dashImgQueue.length) return;
+          if (dashImgFlushScheduled) return;
+          dashImgFlushScheduled = true;
+          requestAnimationFrame(() => flushDashboardImageQueue(true));
+        };
+        window.__drainDashboardImageQueue = drainDashboardImageQueue;
 
         const ensureLazyObserver = () => {
           if (dashboardLazyObserver) return dashboardLazyObserver;
@@ -7653,9 +8089,7 @@
                   dashboardLazyObserver.unobserve(img);
                   const src = img.dataset.src;
                   if (src)
-                    scheduleIdle(() => {
-                      img.src = src;
-                    });
+                    scheduleIdle(() => queueDashboardImageLoad(img, src));
                 }
               },
               { rootMargin: "80px" },
@@ -7665,7 +8099,7 @@
               observe(img) {
                 scheduleIdle(() => {
                   const src = img.dataset?.src;
-                  if (src) img.src = src;
+                  if (src) queueDashboardImageLoad(img, src);
                 });
               },
               unobserve() {},
@@ -7884,7 +8318,11 @@
             window.api?.setDashboardOpen?.(true);
           } catch {}
           setBackgroundInert(true);
-          await buildDashboard();
+          const needsBuild =
+            window.__dashboardReady !== true || !gridEl?.children?.length;
+          if (needsBuild) {
+            await buildDashboard();
+          }
           enableDashboardHoverSync();
           requestAnimationFrame(() => {
             try {
@@ -7916,15 +8354,75 @@
         window.closeDashboard = closeDashboard;
         window.dashboardFocusCardAt = focusCardAt;
 
+        let startupDashboardAutoOpenPending = false;
+        let startupDashboardOpenTriggered = false;
+
+        function shouldAutoOpenDashboardOnStartup() {
+          return window.__dashboardShowOnStart === true;
+        }
+
+        function maybePrepareDashboardForStartup() {
+          if (!shouldAutoOpenDashboardOnStartup()) {
+            startupDashboardAutoOpenPending = false;
+            startupDashboardOpenTriggered = false;
+            return;
+          }
+          if (
+            window.__uiConfigsReady !== true ||
+            window.__uiPresetsReady !== true
+          ) {
+            return;
+          }
+          startupDashboardAutoOpenPending = true;
+        }
+
+        function maybeOpenDashboardAfterStartupPrepare() {
+          if (!startupDashboardAutoOpenPending) return;
+          if (!shouldAutoOpenDashboardOnStartup()) {
+            startupDashboardAutoOpenPending = false;
+            startupDashboardOpenTriggered = false;
+            return;
+          }
+          if (window.__bootDone !== true) return;
+          // Open dashboard only after boot overlay is gone.
+          if (document.body.classList.contains("booting")) return;
+          if (window.__dashboardOpen) {
+            startupDashboardOpenTriggered = true;
+            startupDashboardAutoOpenPending = false;
+            return;
+          }
+          if (startupDashboardOpenTriggered) return;
+          startupDashboardOpenTriggered = true;
+          startupDashboardAutoOpenPending = false;
+          setTimeout(() => {
+            window.openDashboard?.();
+          }, 0);
+        }
+
+        window.__prepareDashboardForStartup = maybePrepareDashboardForStartup;
+        window.__maybeOpenStartupDashboard =
+          maybeOpenDashboardAfterStartupPrepare;
+
         // polling to refresh card progress in near-real-time
         const DASH_POLL_DEFAULT_MS = 4000;
         const DASH_POLL_SLOW_MS = 12000;
+        const DASH_POLL_BATCH_SIZE = 20;
+        const DASH_POLL_YIELD_MS = 0;
         let __dashboardPollId = null;
         let __dashboardPollActive = false;
         let __dashboardPollPaused = false;
         let __dashboardPollInterval = DASH_POLL_DEFAULT_MS;
         let __dashboardPollSkipped = false;
         window.__notificationBusy = false;
+        async function yieldDashboardPoll() {
+          if (DASH_POLL_YIELD_MS > 0) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, DASH_POLL_YIELD_MS),
+            );
+            return;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
         function startDashboardPoll() {
           if (__dashboardPollPaused) return;
           if (__dashboardPollId) return;
@@ -7938,7 +8436,12 @@
               }
               let anyChange = false;
               const cards = Array.from(gridEl.querySelectorAll(".dash-card"));
+              let processed = 0;
               for (const card of cards) {
+                if (!window.__dashboardOpen || window.__notificationBusy) {
+                  __dashboardPollSkipped = true;
+                  break;
+                }
                 const cfgName = card.getAttribute("data-name");
                 if (!cfgName) continue;
                 try {
@@ -7953,6 +8456,10 @@
                   }
                 } catch (e) {
                   // ignore per-card errors
+                }
+                processed += 1;
+                if (processed % DASH_POLL_BATCH_SIZE === 0) {
+                  await yieldDashboardPoll();
                 }
               }
               if (anyChange) {
@@ -8177,19 +8684,61 @@
         async function updateDashboardCounts(items, softStats = null) {
           const gamesEl = document.getElementById("gamesTotal");
           const perfectEl = document.getElementById("perfectTotal");
-          if (gamesEl) gamesEl.textContent = String(items.length);
+          const list = Array.isArray(items) ? items : [];
+          if (gamesEl) gamesEl.textContent = String(list.length);
           if (!perfectEl) return;
-          const results = await Promise.all(
-            items.map(async (it) => {
-              try {
-                const p = await computeCardProgress(it.name);
-                return p.total > 0 && p.unlocked === p.total;
-              } catch {
-                return false;
-              }
-            }),
-          );
-          perfectEl.textContent = String(results.filter(Boolean).length);
+
+          const isPerfect = (p) => {
+            const total = Number(p?.total) || 0;
+            const unlocked = Number(p?.unlocked) || 0;
+            return total > 0 && unlocked === total;
+          };
+
+          const normalizeProgress = (entry) => {
+            if (!entry || typeof entry !== "object") return null;
+            if (entry.progress && typeof entry.progress === "object") {
+              return entry.progress;
+            }
+            if (
+              Object.prototype.hasOwnProperty.call(entry, "total") ||
+              Object.prototype.hasOwnProperty.call(entry, "unlocked")
+            ) {
+              return entry;
+            }
+            return null;
+          };
+
+          const stats = Array.isArray(softStats) ? softStats : [];
+          const namesSeen = new Set();
+          let perfectCount = 0;
+
+          for (const stat of stats) {
+            const name = String(stat?.name || "").trim();
+            if (name) namesSeen.add(name);
+            const p = normalizeProgress(stat);
+            if (p && isPerfect(p)) perfectCount += 1;
+          }
+
+          const allCovered =
+            namesSeen.size > 0 && namesSeen.size >= list.length;
+          if (allCovered) {
+            perfectEl.textContent = String(perfectCount);
+            return;
+          }
+
+          const missing = list.filter((it) => {
+            const name = String(it?.name || "").trim();
+            return name && !namesSeen.has(name);
+          });
+
+          if (!missing.length) {
+            perfectEl.textContent = String(perfectCount);
+            return;
+          }
+
+          // Defer missing computation until detail jobs finish to avoid spikes.
+          perfectEl.textContent = String(perfectCount);
+          return;
         }
 
         function setupDashboardSearch(gridEl) {
@@ -8290,6 +8839,24 @@
 
         window.applyDashboardSortAndFilter = applyDashboardSortAndFilter;
 
+        let __dashboardReadySent = false;
+        function signalDashboardReady() {
+          if (__dashboardReadySent) return;
+          __dashboardReadySent = true;
+          try {
+            window.__dashboardReady = true;
+          } catch {}
+          try {
+            window.__markUiDataReady?.();
+          } catch {}
+          try {
+            window.api?.dashboardReady?.();
+          } catch {}
+          try {
+            window.__maybeOpenStartupDashboard?.();
+          } catch {}
+        }
+
         function clearDashboardSearch() {
           const input = document.getElementById("dashboardSearchInput");
           if (!input) return;
@@ -8310,407 +8877,489 @@
         }
         window.clearDashboardSearch = clearDashboardSearch;
 
+        let __dashboardBuildPromise = null;
+        let __dashboardBuildRequested = false;
         async function buildDashboard() {
+          __dashboardBuildRequested = true;
+          if (__dashboardBuildPromise) return __dashboardBuildPromise;
+          __dashboardBuildPromise = (async () => {
+            while (__dashboardBuildRequested) {
+              __dashboardBuildRequested = false;
+              await buildDashboardOnce();
+            }
+          })().finally(() => {
+            __dashboardBuildPromise = null;
+          });
+          return __dashboardBuildPromise;
+        }
+
+        async function buildDashboardOnce() {
           if (!gridEl || !window.api) return;
-          await syncBlacklistList();
+          try {
+            await syncBlacklistList();
 
-          // load configs and enrich with basic metadata
-          let items = normalizeConfigList(await window.api.loadConfigs());
-          cacheConfigMeta(items);
-          if (!blacklistState.showBlacklisted) {
-            items = items.filter((cfg) => !isAppIdInBlacklist(cfg.appid));
-          }
-
-          const quickCards = items.map((it) => {
-            const key = DASH_PROGRESS_PREFIX + it.name;
-            let stored = null;
-            try {
-              stored = JSON.parse(localStorage.getItem(key) || "null");
-            } catch {
-              stored = null;
-            }
-            const normalized = {
-              pct: Number(stored?.pct) || 0,
-              unlocked: Number(stored?.unlocked) || 0,
-              total: Number(stored?.total) || 0,
-              updated: Number(stored?.updated) || 0,
-            };
-            const imgCacheKey = IMG_CACHE_PREFIX + it.name;
-            const cachedImg = localStorage.getItem(imgCacheKey);
-
-            return {
-              name: it.name,
-              displayName: it.displayName || it.name,
-              appid: it.appid || null,
-              blacklisted: it.appid ? isAppIdInBlacklist(it.appid) : false,
-              progress: normalized,
-              img: cachedImg || fallbackIcon,
-              hasCachedImg: Boolean(cachedImg),
-            };
-          });
-
-          gridEl.innerHTML = "";
-          const cardMeta = new Map();
-
-          quickCards.forEach((cardData) => {
-            const card = document.createElement("div");
-            card.className = "dash-card";
-            card.tabIndex = 0;
-            card.setAttribute("role", "button");
-            card.setAttribute(
-              "aria-label",
-              `${cardData.displayName} – ${cardData.progress.pct}% complete`,
-            );
-            card.dataset.name = cardData.name;
-            card.dataset.display = cardData.displayName;
-            card.dataset.pct = String(cardData.progress.pct);
-            card.dataset.unlocked = String(cardData.progress.unlocked);
-            card.dataset.total = String(cardData.progress.total);
-            card.dataset.updated = String(cardData.progress.updated);
-            card.dataset.blacklisted = cardData.blacklisted ? "1" : "0";
-
-            const pill = document.createElement("div");
-            pill.className = "dash-progresspill";
-            pill.textContent = tUiFmt(
-              "dashboardCompletePct",
-              { pct: cardData.progress.pct },
-              `${cardData.progress.pct}% Complete`,
-            );
-
-            const img = document.createElement("img");
-            img.className = "dash-thumb";
-            img.loading = "lazy";
-            img.decoding = "async";
-            img.alt = cardData.displayName;
-            img.src = cardData.img;
-            if (!cardData.hasCachedImg) {
-              img.dataset.src = cardData.img || fallbackIcon;
-              ensureLazyObserver().observe(img);
+            // load configs and enrich with basic metadata
+            let items = normalizeConfigList(await window.api.loadConfigs());
+            cacheConfigMeta(items);
+            if (!blacklistState.showBlacklisted) {
+              items = items.filter((cfg) => !isAppIdInBlacklist(cfg.appid));
             }
 
-            const nameWrap = document.createElement("div");
-            nameWrap.className = "dash-name";
-            const title = document.createElement("div");
-            title.className = "dash-title";
-            title.title = cardData.displayName;
-            title.textContent = cardData.displayName;
-            const bar = document.createElement("div");
-            bar.className = "dash-progressbar";
-            const span = document.createElement("span");
-            span.style.width = `${cardData.progress.pct}%`;
-            bar.appendChild(span);
-
-            nameWrap.appendChild(title);
-            nameWrap.appendChild(bar);
-
-            card.appendChild(pill);
-            card.appendChild(img);
-            card.appendChild(nameWrap);
-            gridEl.appendChild(card);
-
-            cardMeta.set(cardData.name, {
-              element: card,
-              pill,
-              bar: span,
-              img,
-              data: { ...cardData },
-            });
-          });
-
-          setupDashboardSearch(gridEl);
-          updateDashboardCounts(items, quickCards);
-          updateSortIconsUI();
-          applyDashboardSortAndFilter();
-
-          const detailJobs = items.map(async (it) => {
-            const meta = cardMeta.get(it.name);
-            if (!meta) return null;
-
-            const cfg = await getConfigCached(it.name);
-            const appid = cfg?.appid ? String(cfg.appid) : null;
-            if (appid) {
-              meta.element.dataset.appid = appid;
-              meta.data.appid = appid;
-            }
-            const platform = cfg?.platform || null;
-            const cardBlacklisted = appid && isAppIdInBlacklist(appid);
-            meta.element.dataset.blacklisted = cardBlacklisted ? "1" : "0";
-            meta.data.blacklisted = cardBlacklisted;
-            if (platform) {
-              meta.data.platform = platform;
-              meta.element.dataset.platform = platform;
-            }
-            let imgSrc = null;
-            if (appid) {
-              if (dashboardImageCache.has(appid)) {
-                imgSrc = dashboardImageCache.get(appid);
-              } else {
-                try {
-                  const p = await window.api.checkLocalGameImage(
-                    appid,
-                    platform || null,
-                  );
-                  imgSrc = p ? fileUrl(p) : null;
-                } catch {
-                  imgSrc = null;
-                }
-                if (imgSrc) {
-                  dashboardImageCache.set(appid, imgSrc);
-                  localStorage.setItem(IMG_CACHE_PREFIX + it.name, imgSrc);
-                  meta.img.dataset.src = imgSrc;
-                  meta.img.src = imgSrc;
-                  ensureLazyObserver().observe(meta.img);
-                } else {
-                  dashboardImageCache.delete(appid);
-                  localStorage.removeItem(IMG_CACHE_PREFIX + it.name);
-                  meta.img.dataset.src = fallbackIcon;
-                  meta.img.src = fallbackIcon;
-                }
-              }
-
-              if (imgSrc) {
-                meta.img.dataset.src = imgSrc;
-                meta.img.src = imgSrc;
-                ensureLazyObserver().observe(meta.img);
-                localStorage.setItem(IMG_CACHE_PREFIX + it.name, imgSrc);
-              }
-              const cardImg = meta.img;
-              if (cardImg) {
-                cardImg.addEventListener("error", () => {
-                  cardImg.src = fallbackIcon;
-                  localStorage.removeItem(IMG_CACHE_PREFIX + it.name);
-                });
-              }
-            }
-
-            async function refreshDashboardImage(appid) {
-              const cards = Array.from(
-                gridEl.querySelectorAll(`.dash-card[data-appid="${appid}"]`),
-              );
-              if (!cards.length) return;
-
-              let imgSrc = null;
+            const quickCards = items.map((it) => {
+              const key = DASH_PROGRESS_PREFIX + it.name;
+              let stored = null;
               try {
-                const localPath = await window.api.checkLocalGameImage(
-                  appid,
-                  platform || null,
-                );
-                if (localPath) imgSrc = fileUrl(localPath);
+                stored = JSON.parse(localStorage.getItem(key) || "null");
               } catch {
-                /* ignore */
+                stored = null;
               }
-
-              if (imgSrc) {
-                dashboardImageCache.set(appid, imgSrc);
-                localStorage.setItem(IMG_CACHE_PREFIX + it.name, imgSrc);
-                meta.img.dataset.src = imgSrc;
-                meta.img.src = imgSrc;
-                ensureLazyObserver().observe(meta.img);
-              } else {
-                dashboardImageCache.delete(appid);
-                cards.forEach((card) => {
-                  localStorage.removeItem(IMG_CACHE_PREFIX + card.dataset.name);
-                });
-                imgSrc = fallbackIcon;
-              }
-              for (const card of cards) {
-                const img = card.querySelector(".dash-thumb");
-                if (!img) continue;
-                img.dataset.src = imgSrc;
-                img.src = imgSrc;
-              }
-            }
-
-            if (!window.__dashboardImageListenerAttached) {
-              window.api.onImageUpdate(async (payload) => {
-                const appid =
-                  typeof payload === "object" && payload?.appid
-                    ? String(payload.appid)
-                    : /^\d+$/.test(String(payload))
-                      ? String(payload)
-                      : null;
-                if (!appid) return;
-                await refreshDashboardImage(appid);
-              });
-              window.__dashboardImageListenerAttached = true;
-            }
-
-            const progress = await computeCardProgress(it.name);
-            localStorage.setItem(
-              DASH_PROGRESS_PREFIX + it.name,
-              JSON.stringify(progress),
-            );
-
-            meta.bar.style.width = `${progress.pct}%`;
-            meta.pill.textContent = tUiFmt(
-              "dashboardCompletePct",
-              { pct: progress.pct },
-              `${progress.pct}% Complete`,
-            );
-            meta.element.dataset.pct = String(progress.pct);
-            meta.element.dataset.unlocked = String(progress.unlocked);
-            meta.element.dataset.total = String(progress.total);
-            meta.element.dataset.updated = String(progress.updated || 0);
-            meta.data.progress = progress;
-
-            return meta.data;
-          });
-
-          Promise.allSettled(detailJobs).then((resolved) => {
-            const ready = resolved
-              .map((r) => (r.status === "fulfilled" ? r.value : null))
-              .filter((it) => it && it.progress);
-            if (ready.length) {
-              updateDashboardCounts(items, ready);
-              scheduleIdle(() => updateDashboardCounts(items));
-              applyDashboardSortAndFilter();
-            }
-          });
-
-          (async function injectPlayButtons() {
-            const cards = Array.from(gridEl.querySelectorAll(".dash-card"));
-            const names = cards.map((c) => c.dataset.name).filter(Boolean);
-            const configs = await Promise.all(names.map(getConfigCached));
-
-            cards.forEach((card, idx) => {
-              const cfgName = names[idx];
-              const cfg = configs[idx];
-              if (!cfg) return;
-
-              const exe = cfg.executable || null;
-              const args = cfg.arguments || "";
-              if (card.querySelector(".dash-play")) return;
-
-              const btn = document.createElement("button");
-              btn.className = "dash-play";
-              btn.setAttribute("aria-label", tUi("dashboard.play", "Play"));
-              btn.title = exe
-                ? tUi("dashboard.play", "Play")
-                : tUi("dashboard.noExecutable", "No executable set");
-              btn.innerHTML = '<i class="fas fa-play"></i>';
-
-              if (!exe) {
-                btn.classList.add("is-disabled");
-                btn.setAttribute("aria-disabled", "true");
-                btn.setAttribute("tabindex", "-1");
-              }
-
-              const swallowIfDisabled = (e) => {
-                if (btn.classList.contains("is-disabled")) {
-                  e.preventDefault();
-                  e.stopImmediatePropagation();
-                  return false;
-                }
+              const normalized = {
+                pct: Number(stored?.pct) || 0,
+                unlocked: Number(stored?.unlocked) || 0,
+                total: Number(stored?.total) || 0,
+                updated: Number(stored?.updated) || 0,
               };
-              [
-                "click",
-                "pointerdown",
-                "pointerup",
-                "mousedown",
-                "mouseup",
-              ].forEach((t) =>
-                btn.addEventListener(t, swallowIfDisabled, true),
-              );
+              const imgCacheKey = IMG_CACHE_PREFIX + it.name;
+              const cachedImg = localStorage.getItem(imgCacheKey);
 
-              btn.addEventListener("click", async (ev) => {
-                ev.preventDefault();
-                ev.stopPropagation();
-                if (btn.classList.contains("is-disabled")) return;
-
-                try {
-                  const preset =
-                    document.getElementById("presetDropdown")?.value;
-                  const position =
-                    document.getElementById("positionDropdown")?.value;
-
-                  await window.api.updateConfig({
-                    configName: cfgName,
-                    preset,
-                    position,
-                  });
-
-                  const sel = document.getElementById("configList");
-                  if (sel) {
-                    sel.value = cfgName;
-                    sel.dispatchEvent(new Event("change", { bubbles: true }));
-                  }
-                } catch {}
-                closeDashboard?.();
-
-                const container = document.getElementById("buttonContainer");
-                const toggleBtn = document.getElementById("toggleBtn");
-                if (container) {
-                  container.classList.remove("hidden");
-                  container.style.display = "flex";
-                }
-                if (toggleBtn)
-                  toggleBtn.textContent = tUi(
-                    "ui.toggle.hideOptions",
-                    "Hide Options",
-                  );
-
-                if (exe) window.api.launchExecutable(exe, args);
-              });
-
-              const appidValue = cfg.appid ? String(cfg.appid) : null;
-              const cardBlacklisted =
-                appidValue && isAppIdInBlacklist(appidValue);
-              card.dataset.blacklisted = cardBlacklisted ? "1" : "0";
-
-              const blockBtn = document.createElement("button");
-              blockBtn.className = "dash-block";
-              const removing =
-                blacklistState.showBlacklisted && cardBlacklisted;
-              blockBtn.setAttribute(
-                "aria-label",
-                removing
-                  ? tUi(
-                      "dashboard.blacklistRemoveLabel",
-                      "Remove from blacklist",
-                    )
-                  : tUi("dashboard.blacklistIgnoreLabel", "Ignore game"),
-              );
-              blockBtn.title = removing
-                ? tUi(
-                    "dashboard.blacklistRemoveTitle",
-                    "Remove this game from blacklist",
-                  )
-                : tUi(
-                    "dashboard.blacklistIgnoreTitle",
-                    "Stop tracking this game",
-                  );
-              blockBtn.innerHTML = removing
-                ? '<i class="fa-solid fa-check"></i>'
-                : '<i class="fa-solid fa-ban"></i>';
-              blockBtn.addEventListener("click", async (ev) => {
-                ev.preventDefault();
-                ev.stopPropagation();
-                try {
-                  if (!appidValue) return;
-                  const removeMode =
-                    blacklistState.showBlacklisted && cardBlacklisted;
-                  await handleDashboardBlacklistAction(
-                    cfgName,
-                    appidValue,
-                    removeMode,
-                  );
-                } catch (err) {
-                  logUiError("ui:blacklist-dashboard-failed", err);
-                  alert(
-                    tUi(
-                      "alert.blacklistUpdateFailedDetails",
-                      "Failed to update blacklist. See logs for details.",
-                    ),
-                  );
-                }
-              });
-
-              card.appendChild(blockBtn);
-              card.appendChild(btn);
+              return {
+                name: it.name,
+                displayName: it.displayName || it.name,
+                appid: it.appid || null,
+                executable: it.executable || null,
+                arguments: it.arguments || "",
+                blacklisted: it.appid ? isAppIdInBlacklist(it.appid) : false,
+                progress: normalized,
+                img: cachedImg || fallbackIcon,
+                hasCachedImg: Boolean(cachedImg),
+              };
             });
-          })();
-          computeGridCols();
-          const cards = getDashCards();
+
+            gridEl.innerHTML = "";
+            const cardMeta = new Map();
+            const shouldChunkDashboard = () =>
+              document.body.classList.contains("booting") ||
+              window.__bootDone !== true;
+            const bootChunkMode = shouldChunkDashboard();
+
+            const buildDashCard = (cardData, container) => {
+              const card = document.createElement("div");
+              card.className = "dash-card";
+              card.tabIndex = 0;
+              card.setAttribute("role", "button");
+              card.setAttribute(
+                "aria-label",
+                `${cardData.displayName} – ${cardData.progress.pct}% complete`,
+              );
+              card.dataset.name = cardData.name;
+              card.dataset.display = cardData.displayName;
+              card.dataset.pct = String(cardData.progress.pct);
+              card.dataset.unlocked = String(cardData.progress.unlocked);
+              card.dataset.total = String(cardData.progress.total);
+              card.dataset.updated = String(cardData.progress.updated);
+              card.dataset.blacklisted = cardData.blacklisted ? "1" : "0";
+              if (cardData.appid) {
+                card.dataset.appid = String(cardData.appid);
+              }
+
+              const pill = document.createElement("div");
+              pill.className = "dash-progresspill";
+              pill.textContent = tUiFmt(
+                "dashboardCompletePct",
+                { pct: cardData.progress.pct },
+                `${cardData.progress.pct}% Complete`,
+              );
+
+              const img = document.createElement("img");
+              img.className = "dash-thumb";
+              img.loading = "lazy";
+              img.decoding = "async";
+              img.alt = cardData.displayName;
+              img.src = bootChunkMode ? fallbackIcon : cardData.img;
+              if (cardData.img) {
+                img.dataset.src = cardData.img;
+              }
+              ensureLazyObserver().observe(img);
+
+              const nameWrap = document.createElement("div");
+              nameWrap.className = "dash-name";
+              const title = document.createElement("div");
+              title.className = "dash-title";
+              title.title = cardData.displayName;
+              title.textContent = cardData.displayName;
+              const bar = document.createElement("div");
+              bar.className = "dash-progressbar";
+              const span = document.createElement("span");
+              span.style.width = `${cardData.progress.pct}%`;
+              bar.appendChild(span);
+
+              nameWrap.appendChild(title);
+              nameWrap.appendChild(bar);
+
+              card.appendChild(pill);
+              card.appendChild(img);
+              card.appendChild(nameWrap);
+              (container || gridEl).appendChild(card);
+
+              return {
+                element: card,
+                pill,
+                bar: span,
+                img,
+                data: { ...cardData },
+              };
+            };
+
+            if (!bootChunkMode) {
+              quickCards.forEach((cardData) => {
+                const meta = buildDashCard(cardData);
+                cardMeta.set(cardData.name, meta);
+              });
+            } else {
+              const chunkSize = 20;
+              for (let i = 0; i < quickCards.length; i += chunkSize) {
+                const frag = document.createDocumentFragment();
+                const max = Math.min(i + chunkSize, quickCards.length);
+                for (let j = i; j < max; j += 1) {
+                  const cardData = quickCards[j];
+                  const meta = buildDashCard(cardData, frag);
+                  cardMeta.set(cardData.name, meta);
+                }
+                gridEl.appendChild(frag);
+                await new Promise(requestAnimationFrame);
+              }
+            }
+
+            // image loading is handled by IntersectionObserver + boot queue
+
+            setupDashboardSearch(gridEl);
+            updateDashboardCounts(items, quickCards);
+            updateSortIconsUI();
+            applyDashboardSortAndFilter();
+
+            (async () => {
+              await waitForDetailJobsSeedReady(20000);
+              const resolved = await runWithBatching(
+                items,
+                DASH_DETAIL_BATCH_SIZE,
+                DASH_DETAIL_CONCURRENCY,
+                async (it) => {
+                  const meta = cardMeta.get(it.name);
+                  if (!meta) return null;
+
+                  const cfg = await getConfigCached(it.name);
+                  const appid = cfg?.appid ? String(cfg.appid) : null;
+                  if (appid) {
+                    meta.element.dataset.appid = appid;
+                    meta.data.appid = appid;
+                  }
+                  const platform = cfg?.platform || null;
+                  const cardBlacklisted = appid && isAppIdInBlacklist(appid);
+                  meta.element.dataset.blacklisted = cardBlacklisted
+                    ? "1"
+                    : "0";
+                  meta.data.blacklisted = cardBlacklisted;
+                  if (platform) {
+                    meta.data.platform = platform;
+                    meta.element.dataset.platform = platform;
+                  }
+                  const applyDashboardImg = (img, src) => {
+                    if (!img || !src) return;
+                    img.dataset.src = src;
+                    ensureLazyObserver().observe(img);
+                    if (!bootChunkMode) {
+                      img.src = src;
+                    }
+                  };
+                  let imgSrc = null;
+                  if (appid) {
+                    if (meta.data?.hasCachedImg && meta.data?.img) {
+                      imgSrc = meta.data.img;
+                      dashboardImageCache.set(appid, imgSrc);
+                    } else if (dashboardImageCache.has(appid)) {
+                      imgSrc = dashboardImageCache.get(appid);
+                    } else {
+                      try {
+                        const p = await window.api.checkLocalGameImage(
+                          appid,
+                          platform || null,
+                        );
+                        imgSrc = p ? fileUrl(p) : null;
+                      } catch {
+                        imgSrc = null;
+                      }
+                      if (imgSrc) {
+                        dashboardImageCache.set(appid, imgSrc);
+                        localStorage.setItem(
+                          IMG_CACHE_PREFIX + it.name,
+                          imgSrc,
+                        );
+                      } else {
+                        dashboardImageCache.delete(appid);
+                        localStorage.removeItem(IMG_CACHE_PREFIX + it.name);
+                      }
+                    }
+
+                    if (imgSrc) {
+                      applyDashboardImg(meta.img, imgSrc);
+                      localStorage.setItem(IMG_CACHE_PREFIX + it.name, imgSrc);
+                    } else {
+                      applyDashboardImg(meta.img, fallbackIcon);
+                    }
+                    const cardImg = meta.img;
+                    if (cardImg) {
+                      cardImg.addEventListener("error", () => {
+                        applyDashboardImg(cardImg, fallbackIcon);
+                        localStorage.removeItem(IMG_CACHE_PREFIX + it.name);
+                      });
+                    }
+                  }
+
+                  async function refreshDashboardImage(appid) {
+                    const cards = Array.from(
+                      gridEl.querySelectorAll(
+                        `.dash-card[data-appid="${appid}"]`,
+                      ),
+                    );
+                    if (!cards.length) return;
+
+                    let imgSrc = null;
+                    try {
+                      const localPath = await window.api.checkLocalGameImage(
+                        appid,
+                        platform || null,
+                      );
+                      if (localPath) imgSrc = fileUrl(localPath);
+                    } catch {
+                      /* ignore */
+                    }
+
+                    if (imgSrc) {
+                      dashboardImageCache.set(appid, imgSrc);
+                      localStorage.setItem(IMG_CACHE_PREFIX + it.name, imgSrc);
+                    } else {
+                      dashboardImageCache.delete(appid);
+                      cards.forEach((card) => {
+                        localStorage.removeItem(
+                          IMG_CACHE_PREFIX + card.dataset.name,
+                        );
+                      });
+                      imgSrc = fallbackIcon;
+                    }
+                    for (const card of cards) {
+                      const img = card.querySelector(".dash-thumb");
+                      if (!img) continue;
+                      applyDashboardImg(img, imgSrc);
+                    }
+                  }
+
+                  if (!window.__dashboardImageListenerAttached) {
+                    window.api.onImageUpdate(async (payload) => {
+                      const appid =
+                        typeof payload === "object" && payload?.appid
+                          ? String(payload.appid)
+                          : /^\d+$/.test(String(payload))
+                            ? String(payload)
+                            : null;
+                      if (!appid) return;
+                      await refreshDashboardImage(appid);
+                    });
+                    window.__dashboardImageListenerAttached = true;
+                  }
+
+                  const progress = await computeCardProgress(it.name);
+                  localStorage.setItem(
+                    DASH_PROGRESS_PREFIX + it.name,
+                    JSON.stringify(progress),
+                  );
+
+                  meta.bar.style.width = `${progress.pct}%`;
+                  meta.pill.textContent = tUiFmt(
+                    "dashboardCompletePct",
+                    { pct: progress.pct },
+                    `${progress.pct}% Complete`,
+                  );
+                  meta.element.dataset.pct = String(progress.pct);
+                  meta.element.dataset.unlocked = String(progress.unlocked);
+                  meta.element.dataset.total = String(progress.total);
+                  meta.element.dataset.updated = String(progress.updated || 0);
+                  meta.data.progress = progress;
+
+                  return meta.data;
+                },
+              );
+              const ready = resolved
+                .map((r) => (r.status === "fulfilled" ? r.value : null))
+                .filter((it) => it && it.progress);
+              if (ready.length) {
+                updateDashboardCounts(items, ready);
+                scheduleIdle(() => updateDashboardCounts(items, ready));
+                applyDashboardSortAndFilter();
+              }
+              signalDashboardReady();
+            })().catch(() => {
+              signalDashboardReady();
+            });
+
+            (async function injectPlayButtons() {
+              const cards = Array.from(gridEl.querySelectorAll(".dash-card"));
+              const names = cards.map((c) => c.dataset.name).filter(Boolean);
+
+              const chunkButtons = bootChunkMode && cards.length > 30;
+              const processCard = (card, idx) => {
+                const cfgName = names[idx];
+                const meta = cardMeta.get(cfgName);
+                const data = meta?.data || {};
+                const exe = data.executable || null;
+                const args = data.arguments || "";
+                if (card.querySelector(".dash-play")) return;
+
+                const btn = document.createElement("button");
+                btn.className = "dash-play";
+                btn.setAttribute("aria-label", tUi("dashboard.play", "Play"));
+                btn.title = exe
+                  ? tUi("dashboard.play", "Play")
+                  : tUi("dashboard.noExecutable", "No executable set");
+                btn.innerHTML = '<i class="fas fa-play"></i>';
+
+                if (!exe) {
+                  btn.classList.add("is-disabled");
+                  btn.setAttribute("aria-disabled", "true");
+                  btn.setAttribute("tabindex", "-1");
+                }
+
+                const swallowIfDisabled = (e) => {
+                  if (btn.classList.contains("is-disabled")) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    return false;
+                  }
+                };
+                [
+                  "click",
+                  "pointerdown",
+                  "pointerup",
+                  "mousedown",
+                  "mouseup",
+                ].forEach((t) =>
+                  btn.addEventListener(t, swallowIfDisabled, true),
+                );
+
+                btn.addEventListener("click", async (ev) => {
+                  ev.preventDefault();
+                  ev.stopPropagation();
+                  if (btn.classList.contains("is-disabled")) return;
+
+                  try {
+                    const preset =
+                      document.getElementById("presetDropdown")?.value;
+                    const position =
+                      document.getElementById("positionDropdown")?.value;
+
+                    await window.api.updateConfig({
+                      configName: cfgName,
+                      preset,
+                      position,
+                    });
+
+                    const sel = document.getElementById("configList");
+                    if (sel) {
+                      sel.value = cfgName;
+                      sel.dispatchEvent(new Event("change", { bubbles: true }));
+                    }
+                  } catch {}
+                  closeDashboard?.();
+
+                  const container = document.getElementById("buttonContainer");
+                  const toggleBtn = document.getElementById("toggleBtn");
+                  if (container) {
+                    container.classList.remove("hidden");
+                    container.style.display = "flex";
+                  }
+                  if (toggleBtn)
+                    toggleBtn.textContent = tUi(
+                      "ui.toggle.hideOptions",
+                      "Hide Options",
+                    );
+
+                  if (exe) window.api.launchExecutable(exe, args);
+                });
+
+                const appidValue = data.appid ? String(data.appid) : null;
+                const cardBlacklisted =
+                  appidValue && isAppIdInBlacklist(appidValue);
+                card.dataset.blacklisted = cardBlacklisted ? "1" : "0";
+
+                const blockBtn = document.createElement("button");
+                blockBtn.className = "dash-block";
+                const removing =
+                  blacklistState.showBlacklisted && cardBlacklisted;
+                blockBtn.setAttribute(
+                  "aria-label",
+                  removing
+                    ? tUi(
+                        "dashboard.blacklistRemoveLabel",
+                        "Remove from blacklist",
+                      )
+                    : tUi("dashboard.blacklistIgnoreLabel", "Ignore game"),
+                );
+                blockBtn.title = removing
+                  ? tUi(
+                      "dashboard.blacklistRemoveTitle",
+                      "Remove this game from blacklist",
+                    )
+                  : tUi(
+                      "dashboard.blacklistIgnoreTitle",
+                      "Stop tracking this game",
+                    );
+                blockBtn.innerHTML = removing
+                  ? '<i class="fa-solid fa-check"></i>'
+                  : '<i class="fa-solid fa-ban"></i>';
+                blockBtn.addEventListener("click", async (ev) => {
+                  ev.preventDefault();
+                  ev.stopPropagation();
+                  try {
+                    if (!appidValue) return;
+                    const removeMode =
+                      blacklistState.showBlacklisted && cardBlacklisted;
+                    await handleDashboardBlacklistAction(
+                      cfgName,
+                      appidValue,
+                      removeMode,
+                    );
+                  } catch (err) {
+                    logUiError("ui:blacklist-dashboard-failed", err);
+                    alert(
+                      tUi(
+                        "alert.blacklistUpdateFailedDetails",
+                        "Failed to update blacklist. See logs for details.",
+                      ),
+                    );
+                  }
+                });
+
+                card.appendChild(blockBtn);
+                card.appendChild(btn);
+              };
+
+              if (!chunkButtons) {
+                cards.forEach(processCard);
+              } else {
+                const chunkSize = 20;
+                for (let i = 0; i < cards.length; i += chunkSize) {
+                  const max = Math.min(i + chunkSize, cards.length);
+                  for (let j = i; j < max; j += 1) {
+                    processCard(cards[j], j);
+                  }
+                  await new Promise(requestAnimationFrame);
+                }
+              }
+            })();
+            computeGridCols();
+            const cards = getDashCards();
+          } finally {
+            // no-op: loop in buildDashboard handles pending rebuilds
+          }
         }
 
         if (dashboardContextMenu && !window.__dashboardContextMenuWired) {
@@ -9233,10 +9882,36 @@
         );
         window.api?.on?.("refresh-achievements-table", () => {});
         const bootLoadingEl = document.getElementById("bootLoading");
+        let bootImageDrainTimer = null;
+        const scheduleBootImageDrain = () => {
+          if (bootImageDrainTimer) return;
+          bootImageDrainTimer = setTimeout(() => {
+            bootImageDrainTimer = null;
+            const runDrain = () => {
+              try {
+                window.__drainDashboardImageQueue?.();
+              } catch {}
+            };
+            if (typeof window.requestIdleCallback === "function") {
+              window.requestIdleCallback(runDrain, { timeout: 1200 });
+            } else {
+              setTimeout(runDrain, 0);
+            }
+          }, 450);
+        };
         const setBootLoading = (visible) => {
           if (!bootLoadingEl) return;
+          document.body.classList.toggle("booting", !!visible);
           bootLoadingEl.classList.toggle("hidden", !visible);
           bootLoadingEl.setAttribute("aria-hidden", visible ? "false" : "true");
+          if (visible) {
+            if (bootImageDrainTimer) {
+              clearTimeout(bootImageDrainTimer);
+              bootImageDrainTimer = null;
+            }
+            return;
+          }
+          scheduleBootImageDrain();
         };
         setBootLoading(true);
         const bootTitleEl = document.querySelector(
@@ -9257,23 +9932,72 @@
         window.refreshBootLoadingText = refreshBootLoadingText;
         refreshBootLoadingText();
         let bootNoticeShown = false;
+        window.__bootUiReady = false;
+        window.__bootDone = false;
+        window.__bootManualSeedComplete = false;
+        window.__uiDataReady = false;
+        window.__uiConfigsReady = false;
+        window.__uiPresetsReady = false;
+        if (window.__dashboardReady !== true) {
+          window.__dashboardReady = false;
+        }
+        if (window.__dashboardShowOnStart === undefined) {
+          window.__dashboardShowOnStart = null;
+        }
+        const maybeHideBootLoading = () => {
+          if (bootNoticeShown) return;
+          if (!window.__uiDataReady) return;
+          bootNoticeShown = true;
+          setBootLoading(false);
+          try {
+            window.api?.bootOverlayHidden?.();
+          } catch {}
+          window.__maybeOpenStartupDashboard?.();
+        };
+        window.__maybeHideBootLoading = maybeHideBootLoading;
+        window.__markUiDataReady = () => {
+          if (window.__uiDataReady) return;
+          const dashPref = window.__dashboardShowOnStart;
+          if (dashPref === null) return;
+          if (!window.__uiConfigsReady || !window.__uiPresetsReady) return;
+          if (window.__bootDone !== true) return;
+          window.__prepareDashboardForStartup?.();
+          window.__uiDataReady = true;
+          maybeHideBootLoading();
+        };
         window.api
           ?.getBootStatus?.()
           .then((status) => {
-            if (status?.bootDone) {
-              bootNoticeShown = true;
-              setBootLoading(false);
+            if (status?.uiReady) {
+              window.__bootUiReady = true;
             }
+            if (status?.bootDone) {
+              window.__bootDone = true;
+            }
+            if (status?.bootManualSeedComplete) {
+              window.__bootManualSeedComplete = true;
+              window.__onBootManualSeedComplete?.();
+            }
+            window.__prepareDashboardForStartup?.();
+            window.__markUiDataReady?.();
+            maybeHideBootLoading();
           })
           .catch(() => {});
+        window.api?.on?.("boot:ui-ready", () => {
+          window.__bootUiReady = true;
+        });
         window.api?.on?.("boot:complete", () => {
-          if (bootNoticeShown) return;
-          bootNoticeShown = true;
-          setBootLoading(false);
+          window.__bootDone = true;
           showNotification(
             tUi("notify.bootComplete", "Boot Complete!"),
             "#4CAF50",
           );
+          window.__prepareDashboardForStartup?.();
+          window.__markUiDataReady?.();
+        });
+        window.api?.on?.("boot:manual-seed-complete", () => {
+          window.__bootManualSeedComplete = true;
+          window.__onBootManualSeedComplete?.();
         });
         window.api?.on?.("dashboard:poll-pause", (state) => {
           if (state) {
@@ -9644,7 +10368,34 @@
           return { left: frameLeft, right: frameLeft + frameW, width: frameW };
         }
 
+        let bootGatingActive = true;
+        let bootUpdateDone = false;
+        let bootCompleteHandled = false;
+
+        const isBootingNow = () =>
+          document.body.classList.contains("booting") ||
+          window.__bootUiReady === false;
+
+        const allowBootUpdate = () => {
+          if (!bootGatingActive) return true;
+          if (bootUpdateDone) return false;
+          bootUpdateDone = true;
+          return true;
+        };
+
+        const runPostBootUpdates = () => {
+          if (bootCompleteHandled) return;
+          bootCompleteHandled = true;
+          bootGatingActive = false;
+          bootUpdateDone = false;
+          requestAnimationFrame(() => {
+            update();
+            setTimeout(update, 100);
+          });
+        };
+
         function update() {
+          if (!allowBootUpdate()) return;
           try {
             // Keep same behavior in both windowed + maximized; we only restrict to avoid overlap
             const frame = getFrame();
@@ -9686,12 +10437,28 @@
 
         // Expose and schedule safely so first layout has happened
         window.__updateAchStatsResponsive = update;
-        // Run after paint and again after load for fresh measurements
-        requestAnimationFrame(() => {
-          update();
-          setTimeout(update, 60);
-        });
-        window.addEventListener("load", () => setTimeout(update, 0));
+
+        if (isBootingNow()) {
+          requestAnimationFrame(() => update());
+        } else {
+          requestAnimationFrame(() => {
+            update();
+            setTimeout(update, 60);
+          });
+          window.addEventListener("load", () => setTimeout(update, 0), {
+            once: true,
+          });
+        }
+
+        window.api?.on?.("boot:complete", runPostBootUpdates);
+        window.api
+          ?.getBootStatus?.()
+          .then((status) => {
+            if (status?.bootDone) {
+              runPostBootUpdates();
+            }
+          })
+          .catch(() => {});
       })();
 
       function sanitizeConfigName(raw) {
@@ -10833,6 +11600,17 @@
           if (action === A.OPTIONS) return toggleOptions();
           if (action === A.CONFIG) return openConfig();
           if (action === A.PLAY) return tryPlay();
+          if (action === A.SEARCH) {
+            if (overlay === "dashboard") {
+              window.focusDashboardSearch?.(true);
+              return;
+            }
+            if (overlay === "main") {
+              window.focusAchievementsSearch?.(true);
+              return;
+            }
+            return;
+          }
           if (action === A.MENU) {
             if (overlay === "dashboard") {
               return window.openDashboardContextMenuFromFocus?.();
@@ -10919,14 +11697,6 @@
               return dashArrow("End");
             }
             if (action === A.CONFIRM) return dashboardEnter();
-            if (action === A.SEARCH) {
-              if (window.__dashboardOpen) window.focusDashboardSearch?.(true);
-              else {
-                window.openDashboard?.();
-                setTimeout(() => window.focusDashboardSearch?.(true), 0);
-              }
-              return;
-            }
             return;
           }
 

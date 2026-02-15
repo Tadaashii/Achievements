@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "Peliaika: 0m",
   "achStatsPlaytimeFmt": "Peliaika: {value}",
+  "achStatsLastPlayed": "Viimeksi pelattu: N/A",
+  "achStatsLastPlayedFmt": "Viimeksi pelattu: {value}",
   "achStatsProgress": "Edistyminen: {unlocked} / {total}",
   "achStatsText": "Edistyminen: 0 / 0",
   "alert.altAppIdNoImage": "AppID -vaihtoehdolle ei ole kuvaa saatavilla.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "Jotain meni pieleen konfiguraation lataamisen aikana.",
   "alert.configNotFound": "Asetuksia ei löytynyt!",
   "alert.folderAddFailed": "Kansion lisääminen epäonnistui",
+  "alert.folderNotFound": "Kansiota ei löydy",
+  "alert.folderBlocked": "Kansio on estetty",
+  "alert.folderPathInvalid": "Virheellinen kansion polku",
+  "alert.rescanBusy": "Uudelleenskannaus on jo käynnissä",
   "alert.folderRemoveFailed": "Kansiota ei voitu poistaa",
   "alert.folderReplaceAddFailed": "Kansion korvaaminen epäonnistui (lisää vaihe).",
   "alert.folderReplaceRemoveFailed": "Kansion korvaaminen epäonnistui (poista vaihe).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "Nollaa musta lista",
   "confirm.deleteConfig.message": "Haluatko poistaa: {name}?",
   "confirm.deleteConfig.deleteExtras": "Haluatko poistaa myös skeeman, välimuistin ja kuvat?",
+  "confirm.deleteConfig.deleteSave": "Haluatko poistaa tallennustiedot tallennuspolusta?",
   "confirm.deleteConfig.title": "Poista asetukset",
   "confirm.steamApiRemove.message": "Poista tallennettu Steam API -avain?",
   "confirm.steamApiRemove.title": "Poista Steam API -avain",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "Overlay-vuorovaikutusnäppäin",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "Vaihda vuorovaikutus: paina kerran ottaaksesi vedon/selauksen käyttöön, paina uudelleen palataksesi läpiklikkaukseen. Vaatii ei-modifioivan näppäimen (esim. \\).",
-  "aria.overlay-interact-shortcut-info": "Vaihda vuorovaikutus: paina kerran ottaaksesi vedon/selauksen käyttöön, paina uudelleen palataksesi läpiklikkaukseen. Vaatii ei-modifioivan näppäimen (esim. \\)."
+  "aria.overlay-interact-shortcut-info": "Vaihda vuorovaikutus: paina kerran ottaaksesi vedon/selauksen käyttöön, paina uudelleen palataksesi läpiklikkaukseen. Vaatii ei-modifioivan näppäimen (esim. \\).",
+  "placeholder.achievementsSearchInput": "Hae saavutuksia…",
+  "title.achievementsSearchToggle": "Hae saavutuksia (Ctrl+F)"
 }
-
-
 

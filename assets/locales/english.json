@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "Playtime: 0m",
   "achStatsPlaytimeFmt": "Playtime: {value}",
+  "achStatsLastPlayed": "Last Played: N/A",
+  "achStatsLastPlayedFmt": "Last Played: {value}",
   "achStatsProgress": "Progress: {unlocked} / {total}",
   "achStatsText": "Progress: 0 / 0",
   "alert.altAppIdNoImage": "No image available for the alternate AppID.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "Something went wrong loading the config.",
   "alert.configNotFound": "Config not found!",
   "alert.folderAddFailed": "Failed to add folder",
+  "alert.folderNotFound": "Folder not found",
+  "alert.folderBlocked": "Folder is blocked",
+  "alert.folderPathInvalid": "Folder path invalid",
+  "alert.rescanBusy": "Rescan already running",
   "alert.folderRemoveFailed": "Failed to remove folder",
   "alert.folderReplaceAddFailed": "Failed to replace folder (add step).",
   "alert.folderReplaceRemoveFailed": "Failed to replace folder (remove step).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "Reset blacklist",
   "confirm.deleteConfig.message": "Do you want to delete: {name}?",
   "confirm.deleteConfig.deleteExtras": "Do you want to delete also the Schema, Cache and Images?",
+  "confirm.deleteConfig.deleteSave": "Do you want to delete save data from the save path?",
   "confirm.deleteConfig.title": "Delete config",
   "confirm.steamApiRemove.message": "Remove the stored Steam API key?",
   "confirm.steamApiRemove.title": "Remove Steam API key",
@@ -431,8 +438,8 @@
   "main.message.schemaPs4Rescan": "PS4 schemas are generated from trophy files. Rescan the folder instead.",
   "main.message.schemaSteamOfficialRescan": "Steam (Official) schemas are generated from appcache stats. Rescan the stats folder instead.",
   "boot.loading.title": "Booting…",
-  "boot.loading.sub": "Preparing achievements cache"
+  "boot.loading.sub": "Preparing achievements cache",
+  "placeholder.achievementsSearchInput": "Search achievements…",
+  "title.achievementsSearchToggle": "Search achievements (Ctrl+F)"
 }
-
-
 

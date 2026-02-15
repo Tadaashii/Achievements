@@ -27,16 +27,15 @@ body {
   padding: 48px 20px 20px 20px;
   height: 100vh;
   min-height: 100vh;
-  overflow-y: auto;
+  overflow: hidden;
   -webkit-app-region: no-drag;
   user-select: none;
   scrollbar-width: none;
-
   -ms-overflow-style: none;
 }
 
 html {
-  scrollbar-width: none;
+  /* scrollbar-width: none; */
   overscroll-behavior-y: auto;
 }
 
@@ -520,8 +519,92 @@ select {
   border-radius: 10px;
 }
 
+.ach-header {
+  width: min(1100px, calc(100vw - 80px));
+  margin: 10px auto 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 10px 12px;
+  background-color: transparent;
+  border-radius: 8px;
+  border: none;
+}
+
+.ach-header-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ach-search-btn {
+  height: 32px;
+  width: 32px;
+  margin: 0;
+  padding: 0;
+  border-radius: 6px;
+  border: none;
+  background-color: transparent;
+  color: var(--dracula-cyan);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.ach-search-btn:hover {
+  border-color: transparent;
+}
+
+.ach-search-input {
+  width: 0;
+  height: 32px;
+  padding: 0;
+  margin: 0;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background-color: var(--dracula-background);
+  color: var(--dracula-foreground);
+  box-sizing: border-box;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    width 0.18s ease,
+    opacity 0.18s ease,
+    padding 0.18s ease;
+  box-shadow: none;
+}
+
+.ach-header-search.open .ach-search-input {
+  width: min(300px, 40vw);
+  padding: 6px 10px;
+  border-color: var(--dracula-comment);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ach-search-input:focus {
+  outline: none;
+  border-color: transparent;
+  box-shadow: none;
+}
+
 .scroll-container {
   -webkit-app-region: no-drag;
+}
+
+#mainScroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 98%;
+  box-sizing: border-box;
+  scrollbar-gutter: stable;
+  -ms-overflow-style: auto;
+  margin-right: -10px;
+  margin-top: 5px;
+  padding-right: 6px;
 }
 
 .hidden {
@@ -543,11 +626,7 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(
-    135deg,
-    rgba(40, 42, 54, 0.95),
-    rgba(22, 22, 30, 0.98)
-  );
+  background: linear-gradient(135deg, #282a36, #16161e);
   color: var(--dracula-foreground, #f8f8f2);
   gap: 18px;
   text-align: center;
@@ -557,9 +636,9 @@ select {
 #bootLoading .boot-loading-card {
   padding: 20px 26px;
   border-radius: 14px;
-  background: rgba(68, 71, 90, 0.4);
-  border: 1px solid rgba(189, 147, 249, 0.35);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  background: var(--dracula-current-line);
+  border: 1px solid rgba(189, 147, 249, 0.6);
+  /* box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -584,6 +663,31 @@ select {
 #bootLoading .boot-loading-sub {
   font-size: 12px;
   opacity: 0.8;
+}
+
+body.booting #bootLoading,
+body.booting #bootLoading * {
+  pointer-events: auto;
+}
+
+body.booting #dashboardOverlay,
+body.booting #dashboardOverlay * {
+  pointer-events: none !important;
+}
+
+body.booting #dashboardGrid .dash-card,
+body.booting #dashboardGrid .dash-card * {
+  transition: none !important;
+}
+
+body.booting #dashboardGrid .dash-card:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+body.booting #dashboardGrid .dash-play {
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 @keyframes bootSpin {
@@ -625,9 +729,33 @@ select {
   background: var(--dracula-pink);
 }
 
+/* Custom scrollbar for main scroll container */
+#mainScroll::-webkit-scrollbar,
+.scroll-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+#mainScroll::-webkit-scrollbar-track,
+.scroll-container::-webkit-scrollbar-track {
+  background: var(--dracula-background);
+}
+
+#mainScroll::-webkit-scrollbar-thumb,
+.scroll-container::-webkit-scrollbar-thumb {
+  background: var(--dracula-purple);
+  border-radius: 4px;
+}
+
+#mainScroll::-webkit-scrollbar-thumb:hover,
+.scroll-container::-webkit-scrollbar-thumb:hover {
+  background: var(--dracula-pink);
+}
+
 /* Hide scrollbar but keep functionality */
 body::-webkit-scrollbar {
-  width: 8px;
+  width: 0;
+  height: 0;
 }
 
 /* Improve achievement stats display */
@@ -1668,15 +1796,16 @@ body.window-maximized #left-controls,
 
 html,
 body {
-  height: auto !important;
+  height: 100dvh !important;
   min-height: 100dvh !important;
-  overflow-x: hidden !important;
-  overflow-y: auto !important;
-  -ms-overflow-style: auto !important;
+  overflow: hidden !important;
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
 }
 
 body::-webkit-scrollbar {
-  width: 10px !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 body::-webkit-scrollbar-track {

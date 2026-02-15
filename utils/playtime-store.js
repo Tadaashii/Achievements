@@ -53,13 +53,23 @@ function accumulatePlaytime(configName, millis) {
 }
 
 function getPlaytimeTotal(configName) {
+  const info = getPlaytimeInfo(configName);
+  return info.totalMs;
+}
+
+function getPlaytimeInfo(configName) {
   const key = sanitizeKey(configName);
   const store = readStore();
-  return Number(store[key]?.totalMs) || 0;
+  const entry = store[key] || {};
+  return {
+    totalMs: Number(entry.totalMs) || 0,
+    updatedAt: Number(entry.updatedAt) || 0,
+  };
 }
 
 module.exports = {
   accumulatePlaytime,
   getPlaytimeTotal,
+  getPlaytimeInfo,
   sanitizeConfigName: sanitizeKey,
 };

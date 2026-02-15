@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "游戏时间：0m",
   "achStatsPlaytimeFmt": "游戏时间：{value}",
+  "achStatsLastPlayed": "上次游玩: N/A",
+  "achStatsLastPlayedFmt": "上次游玩: {value}",
   "achStatsProgress": "进展：{unlocked} / {total}",
   "achStatsText": "进度：0 / 0",
   "alert.altAppIdNoImage": "无法为备用网址 AppID 提供图片。",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "加载配置时出错了。",
   "alert.configNotFound": "配置文件未找到！",
   "alert.folderAddFailed": "添加文件夹失败",
+  "alert.folderNotFound": "未找到文件夹",
+  "alert.folderBlocked": "文件夹已被阻止",
+  "alert.folderPathInvalid": "文件夹路径无效",
+  "alert.rescanBusy": "重新扫描已在进行中",
   "alert.folderRemoveFailed": "无法删除文件夹",
   "alert.folderReplaceAddFailed": "替换文件夹失败（添加步骤）。",
   "alert.folderReplaceRemoveFailed": "替换文件夹失败（移除步骤）。",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "重置黑名单",
   "confirm.deleteConfig.message": "您是否要删除：{name}？",
   "confirm.deleteConfig.deleteExtras": "也要删除架构、缓存和图片吗？",
+  "confirm.deleteConfig.deleteSave": "是否从保存路径中删除保存数据？",
   "confirm.deleteConfig.title": "删除配置",
   "confirm.steamApiRemove.message": "删除已存储的Steam API密钥？",
   "confirm.steamApiRemove.title": "移除Steam API密钥",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "叠加层交互键",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "切换交互：按一次启用拖动/滚动，再按一次恢复点击穿透。需要非修饰键（例如 \\）。",
-  "aria.overlay-interact-shortcut-info": "切换交互：按一次启用拖动/滚动，再按一次恢复点击穿透。需要非修饰键（例如 \\）。"
+  "aria.overlay-interact-shortcut-info": "切换交互：按一次启用拖动/滚动，再按一次恢复点击穿透。需要非修饰键（例如 \\）。",
+  "placeholder.achievementsSearchInput": "搜索成就…",
+  "title.achievementsSearchToggle": "搜索成就 (Ctrl+F)"
 }
-
-
 

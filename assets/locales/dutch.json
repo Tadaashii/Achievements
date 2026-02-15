@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "Speeltijd: 0m",
   "achStatsPlaytimeFmt": "Speeltijd: {value}",
+  "achStatsLastPlayed": "Laatst gespeeld: N/A",
+  "achStatsLastPlayedFmt": "Laatst gespeeld: {value}",
   "achStatsProgress": "Voortgang: {unlocked} / {total}",
   "achStatsText": "Voortgang: 0 / 0",
   "alert.altAppIdNoImage": "Er is geen afbeelding beschikbaar voor de alternatieve AppID.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "Er is iets misgegaan bij het laden van de configuratie.",
   "alert.configNotFound": "Configuratie niet gevonden!",
   "alert.folderAddFailed": "Kan map niet toevoegen",
+  "alert.folderNotFound": "Map niet gevonden",
+  "alert.folderBlocked": "Map is geblokkeerd",
+  "alert.folderPathInvalid": "Ongeldig mappad",
+  "alert.rescanBusy": "Opnieuw scannen is al bezig",
   "alert.folderRemoveFailed": "Kan map niet verwijderen",
   "alert.folderReplaceAddFailed": "Kan map niet vervangen (stap toevoegen).",
   "alert.folderReplaceRemoveFailed": "Kan map niet vervangen (stap verwijderen).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "Zwarte lijst resetten",
   "confirm.deleteConfig.message": "Wilt u verwijderen: {name}?",
   "confirm.deleteConfig.deleteExtras": "Wilt u ook het schema, de cache en de afbeeldingen verwijderen?",
+  "confirm.deleteConfig.deleteSave": "Wil je de opgeslagen gegevens uit het opslagpad verwijderen?",
   "confirm.deleteConfig.title": "Configuratie verwijderen",
   "confirm.steamApiRemove.message": "De opgeslagen Steam API-sleutel verwijderen?",
   "confirm.steamApiRemove.title": "Steam API-sleutel verwijderen",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "Overlay-interactietoets",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "Interactie schakelen: druk eenmaal om slepen/scrollen te activeren, druk opnieuw om terug te keren naar doorklikken. Vereist een niet-modificatietoets (bijv. \\).",
-  "aria.overlay-interact-shortcut-info": "Interactie schakelen: druk eenmaal om slepen/scrollen te activeren, druk opnieuw om terug te keren naar doorklikken. Vereist een niet-modificatietoets (bijv. \\)."
+  "aria.overlay-interact-shortcut-info": "Interactie schakelen: druk eenmaal om slepen/scrollen te activeren, druk opnieuw om terug te keren naar doorklikken. Vereist een niet-modificatietoets (bijv. \\).",
+  "placeholder.achievementsSearchInput": "Zoek prestaties…",
+  "title.achievementsSearchToggle": "Zoek prestaties (Ctrl+F)"
 }
-
-
 

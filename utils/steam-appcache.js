@@ -250,7 +250,7 @@ function buildSnapshotFromAppcache(schemaEntries, userStats) {
       : null;
     snap[a.api] = {
       earned,
-      earned_time: earned ? ts || 0 : null,
+      earned_time: earned ? ts || 0 : 0,
     };
   }
   return snap;

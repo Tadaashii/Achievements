@@ -246,6 +246,38 @@ function readJsonSafe(fp) {
     return null;
   }
 }
+function normalizeSavePath(p) {
+  if (!p) return "";
+  return String(p)
+    .trim()
+    .replace(/[\\/]+/g, "\\")
+    .replace(/\\+$/g, "")
+    .toLowerCase();
+}
+function findExistingConfigBySavePath(index, appid, expectedSavePath) {
+  const key = sanitizeAppId(appid);
+  if (!key) return null;
+  const normalizedExpected = normalizeSavePath(expectedSavePath);
+  if (!normalizedExpected) return null;
+  const bucket = index.get(key);
+  if (!bucket) return null;
+  for (const entry of bucket.values()) {
+    if (!entry?.filePath) continue;
+    const cfg = readJsonSafe(entry.filePath);
+    if (!cfg) continue;
+    const cfgSavePath = normalizeSavePath(
+      cfg.save_path || cfg.savePath || ""
+    );
+    if (cfgSavePath && cfgSavePath === normalizedExpected) {
+      return {
+        filePath: entry.filePath,
+        name: cfg.name || entry.name || null,
+        config: cfg,
+      };
+    }
+  }
+  return null;
+}
 async function maybeSeedAchCache({
   appid,
   configName,
@@ -466,10 +498,15 @@ async function getEpicTitle(appid) {
         ? data.pages
             .map((p) => p?.data?.hero || p?.hero)
             .find(
-              (h) => h && (h.portraitBackgroundImageUrl || h.backgroundImageUrl)
+              (h) =>
+                h &&
+                (h.portraitBackgroundImageUrl ||
+                  h.backgroundImageUrl ||
+                  h.title)
             )
         : null);
     if (hero) {
+      if (typeof hero.title === "string") candidates.push(hero.title);
       try {
         const imagesRoot = path.join(
           userDataDir,
@@ -728,14 +765,39 @@ async function generateGameConfigs(folderPath, outputDir, opts = {}) {
       : mappingForRun?.steam_appid && mappingForRun.steam_appid !== uplayId
       ? String(mapping.steam_appid)
       : appid;
+    let gameSaveDir =
+      opts.savePathOverride && opts.savePathOverride.trim()
+        ? opts.savePathOverride
+        : path.join(folderPath);
+    const maybeRemote = path.join(folderPath, "remote", appid);
+    if (
+      folderPath.toLowerCase().includes("empress") &&
+      fs.existsSync(maybeRemote)
+    ) {
+      gameSaveDir = maybeRemote;
+    }
+    const existingByPath = findExistingConfigBySavePath(
+      configVariantIndex,
+      uplayId,
+      gameSaveDir
+    );
+    let name = existingByPath?.name || null;
     autoConfigLogger.info("scan:processing-appid", {
       appid,
       nameAppId: nameSourceId,
     });
-    const name = await getGameName(nameSourceId, {
-      platform: forcedPlatform,
-      preferredName: opts.preferredName || "",
-    });
+    if (name) {
+      autoConfigLogger.info("scan:skip-name-lookup", {
+        appid: uplayId,
+        savePath: gameSaveDir,
+        configName: name,
+      });
+    } else {
+      name = await getGameName(nameSourceId, {
+        platform: forcedPlatform,
+        preferredName: opts.preferredName || "",
+      });
+    }
     const effectiveSteamId =
       mappingForRun?.steam_appid && mappingForRun.steam_appid !== uplayId
         ? String(mapping.steam_appid)
@@ -751,6 +813,13 @@ async function generateGameConfigs(folderPath, outputDir, opts = {}) {
       mapping: mappingForRun,
       forcePlatform: forcedPlatform,
     });
+    const existingPlatform = normalizePlatform(existingByPath?.config?.platform);
+    if (existingPlatform && !forcedPlatform) {
+      platformMeta.platform = existingPlatform;
+      if (existingByPath?.config?.steamAppId && !platformMeta.steamAppId) {
+        platformMeta.steamAppId = String(existingByPath.config.steamAppId);
+      }
+    }
     if (isHexId && !forcedPlatform) {
       platformMeta.platform = "epic";
       platformMeta.steamAppId = "";
@@ -778,18 +847,6 @@ async function generateGameConfigs(folderPath, outputDir, opts = {}) {
     });
     safeName = targetInfo.name;
     const filePath = targetInfo.filePath;
-    //const gameSaveDir = path.join(folderPath);   // <folderPath>/
-    let gameSaveDir =
-      opts.savePathOverride && opts.savePathOverride.trim()
-        ? opts.savePathOverride
-        : path.join(folderPath);
-    const maybeRemote = path.join(folderPath, "remote", appid);
-    if (
-      folderPath.toLowerCase().includes("empress") &&
-      fs.existsSync(maybeRemote)
-    ) {
-      gameSaveDir = maybeRemote;
-    }
     const storagePlatform =
       platformMeta.platform === "uplay"
         ? "uplay"
@@ -957,7 +1014,6 @@ async function generateGameConfigs(folderPath, outputDir, opts = {}) {
           });
           updated++;
         } else {
-          autoConfigLogger.info("config:unchanged", { appid, name: safeName });
           skipped++;
         }
         registerConfigVariant(

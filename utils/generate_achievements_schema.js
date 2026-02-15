@@ -257,6 +257,7 @@ const verbose = ARGS.includes("--verbose");
 const langsArg = getFlag("--langs", null);
 const appsConcurrency = parseInt(getFlag("--apps-concurrency", "1"), 10);
 const inlineKey = (getFlag("--key", "") || "").trim();
+const steamSourceArg = (getFlag("--steam-source", "") || "").trim();
 const OUT_BASE = getFlag("--out", null);
 const USERDATA_DIR = getFlag("--user-data-dir", "");
 configureUplayMapping(USERDATA_DIR);
@@ -281,10 +282,24 @@ const resolvedAppIds = buildResolvedAppIds(APPIDS, EFFECTIVE_PLATFORM_MODE);
 
 if (!APPIDS.length) {
   error(
-    "Usage: node generate_achievements_schema.js <APPID...> [--headed] [--verbose] [--apps-concurrency=2] [--langs=english,german,...] [--key=XXXXX] [--out=ABS_OR_REL_PATH] [--platform=steam|uplay|epic|gog] [--gog] [--gog-user=email --gog-pass=pass] [--gog-tokens-file=PATH]",
+    "Usage: node generate_achievements_schema.js <APPID...> [--headed] [--verbose] [--apps-concurrency=2] [--langs=english,german,...] [--key=XXXXX] [--out=ABS_OR_REL_PATH] [--platform=steam|uplay|epic|gog] [--steam-source=auto|steamdb|steamhunters] [--gog] [--gog-user=email --gog-pass=pass] [--gog-tokens-file=PATH]",
   );
   process.exit(1);
 }
+
+function normalizeSteamSource(value) {
+  const raw = String(value || "")
+    .trim()
+    .toLowerCase();
+  if (!raw) return "auto";
+  if (raw === "steamdb") return "steamdb";
+  if (raw === "steamhunters" || raw === "steam-hunters" || raw === "hunters")
+    return "steamhunters";
+  if (raw === "auto") return "auto";
+  return "auto";
+}
+
+const STEAM_SCRAPE_SOURCE = normalizeSteamSource(steamSourceArg);
 
 /* ---------- langs ---------- */
 const DEFAULT_LANGS = [
@@ -333,6 +348,7 @@ info("achschema:start", {
   verbose,
   langs: LANGS,
   output: OUT_BASE,
+  steamSource: STEAM_SCRAPE_SOURCE,
 });
 
 /* ---------- utils ---------- */
@@ -706,38 +722,20 @@ async function processGogApp(productId, outBaseDir) {
 }
 
 /* ---------- Epic helpers ---------- */
-const LANG_MAP = {
-  arabic: "ar",
-  bulgarian: "bg",
-  schinese: "zh-CN",
-  tchinese: "zh-TW",
-  czech: "cs",
-  danish: "da",
-  dutch: "nl",
+const EPIC_LOCALE_MAP = {
   english: "en",
-  finnish: "fi",
   french: "fr",
   german: "de",
-  greek: "el",
-  hungarian: "hu",
-  indonesian: "id",
   italian: "it",
   japanese: "ja",
   koreana: "ko",
-  norwegian: "no",
   polish: "pl",
-  portuguese: "pt",
   brazilian: "pt-BR",
-  romanian: "ro",
   russian: "ru",
-  spanish: "es",
-  latam: "es-419",
-  LATAM: "es-419",
-  swedish: "sv",
-  thai: "th",
-  turkish: "tr",
-  ukrainian: "uk",
-  vietnamese: "vi",
+  spanish: "es-ES",
+  latam: "es-MX",
+  schinese: "zh-CN",
+  tchinese: "zh-TW",
 };
 
 function epicLocaleForLang(lang) {
@@ -1534,11 +1532,15 @@ async function scrapeSteamHunters(appid, sharedSession = null) {
   const { page } = session;
   await page.goto(url, { waitUntil: "domcontentloaded" });
 
-  // a<href="/apps/<appid>/achievements/...">
+  const SH_ROWS_SELECTOR = "#collapse0 > li > div";
+  const SH_NAME_SELECTOR = "p.achievement-name > a";
+  const SH_DESC_SELECTOR = "div.media-body.media-middle > p.small";
+  const SH_IMG_SELECTOR = "div.media-left.check-toggle > div > span > img";
+  const SH_API_SPAN_SELECTOR = "div.media-left.check-toggle > div > span";
+  const SH_TITLE_SELECTOR = "h1 > a > span.flex-link-underline";
+
   await page
-    .waitForSelector('a[href*="/achievements/"][href*="/apps/"]', {
-      timeout: 10000,
-    })
+    .waitForSelector(SH_NAME_SELECTOR, { timeout: 10000 })
     .catch(() => {});
 
   function extractSteamHuntersFromHtml(html, baseUrl) {
@@ -1557,15 +1559,16 @@ async function scrapeSteamHunters(appid, sharedSession = null) {
       }
     };
 
-    const links = $('a[href*="/achievements/"][href*="/apps/"]');
-    links.each((_, el) => {
-      const $a = $(el);
-      const displayName = safeText($a.text());
-      const row = $a.closest("tr, li, div");
+    const rows = $(SH_ROWS_SELECTOR);
+    rows.each((_, el) => {
+      const row = $(el);
+      const nameEl = row.find(SH_NAME_SELECTOR).first();
+      const displayName = safeText(nameEl.text());
+      if (!displayName) return;
 
-      const descEN = safeText(row.find("p.small").first().text());
+      const descEN = safeText(row.find(SH_DESC_SELECTOR).first().text());
 
-      const img = row.find("span.image img, img").first();
+      const img = row.find(SH_IMG_SELECTOR).first();
       let iconUrl =
         img.attr("src") ||
         img.attr("data-src") ||
@@ -1574,11 +1577,12 @@ async function scrapeSteamHunters(appid, sharedSession = null) {
         "";
       iconUrl = abs(iconUrl);
 
-      const span = row.find("span.image").first();
+      const span = row.find(SH_API_SPAN_SELECTOR).first();
       const title =
         span.attr("title") || span.attr("data-original-title") || "";
+      const titleText = safeText(span.text());
       let apiName = "";
-      const m = /API Name:\s*([^\s<>"']+)/i.exec(title);
+      const m = /API Name:\s*([^\s<>"']+)/i.exec(title || titleText);
       if (m) apiName = m[1];
 
       const key = apiName || displayName;
@@ -1595,7 +1599,7 @@ async function scrapeSteamHunters(appid, sharedSession = null) {
       });
     });
 
-    const title = safeText($("h1").first().text());
+    const title = safeText($(SH_TITLE_SELECTOR).first().text());
     return { rows: out, title };
   }
 
@@ -1614,8 +1618,8 @@ async function scrapeSteamHunters(appid, sharedSession = null) {
 
   if (!rows.length) {
     rows = await page.$$eval(
-      'a[href*="/achievements/"][href*="/apps/"]',
-      (links) => {
+      SH_ROWS_SELECTOR,
+      (rows) => {
         const safeText = (s) => (s || "").replace(/\u00A0/g, " ").trim();
         const takeFromSrcset = (ss) => {
           if (!ss) return "";
@@ -1638,17 +1642,19 @@ async function scrapeSteamHunters(appid, sharedSession = null) {
         };
 
         const out = [];
-        for (const a of links) {
-          const displayName = safeText(a.textContent);
-          const row = a.closest("tr") || a.closest("li") || a.closest("div");
+        for (const row of rows || []) {
+          const nameEl = row.querySelector("p.achievement-name > a");
+          const displayName = safeText(nameEl ? nameEl.textContent : "");
+          if (!displayName) continue;
 
-          const descEl = row && row.querySelector("p.small");
+          const descEl = row.querySelector(
+            "div.media-body.media-middle > p.small",
+          );
           const descEN = safeText(descEl ? descEl.textContent : "");
 
-          // icon (<span class="image ..."><img ...>)
-          const img =
-            row &&
-            (row.querySelector("span.image img") || row.querySelector("img"));
+          const img = row.querySelector(
+            "div.media-left.check-toggle > div > span > img",
+          );
           let iconUrl = "";
           if (img) {
             iconUrl =
@@ -1660,15 +1666,15 @@ async function scrapeSteamHunters(appid, sharedSession = null) {
             iconUrl = abs(iconUrl);
           }
 
-          // API Name  title/data-original-title
-          const span = row && row.querySelector("span.image");
+          const span = row.querySelector("div.media-left.check-toggle > div > span");
           const title =
             (span &&
               (span.getAttribute("title") ||
                 span.getAttribute("data-original-title"))) ||
             "";
+          const titleText = safeText(span ? span.textContent : "");
           let apiName = "";
-          const m = /API Name:\s*([^\s<>"']+)/i.exec(title);
+          const m = /API Name:\s*([^\s<>"']+)/i.exec(title || titleText);
           if (m) apiName = m[1];
 
           out.push({
@@ -1698,7 +1704,7 @@ async function scrapeSteamHunters(appid, sharedSession = null) {
   if (!gameTitle) {
     gameTitle = safeText(
       await page
-        .locator("h1")
+        .locator(SH_TITLE_SELECTOR)
         .first()
         .textContent()
         .catch(() => ""),
@@ -1726,7 +1732,7 @@ async function buildAchievementsFromScrape(
   let scraped = [];
   let scrapedTitle = "";
   const session = sharedSession;
-  try {
+  const runSteamDb = async () => {
     const data = session
       ? await scrapeSteamDB(appid, session)
       : await scrapeSteamDB(appid);
@@ -1737,29 +1743,41 @@ async function buildAchievementsFromScrape(
       scraped = data?.rows || [];
       scrapedTitle = data?.title || "";
     }
+  };
+  const runSteamHunters = async () => {
+    const data = await scrapeSteamHunters(appid, session);
+    emit("info", "steam-scrape:source", { appid, source: "steamhunters" });
+    if (Array.isArray(data)) {
+      scraped = data;
+    } else {
+      scraped = data?.rows || [];
+      scrapedTitle = data?.title || scrapedTitle;
+    }
+  };
+  try {
+    if (STEAM_SCRAPE_SOURCE === "steamhunters") {
+      await runSteamHunters();
+    } else if (STEAM_SCRAPE_SOURCE === "steamdb") {
+      await runSteamDb();
+    } else {
+      try {
+        await runSteamDb();
+      } catch (e) {
+        warn(
+          `[${appid}] SteamDB failed: ${String(
+            e?.message || e,
+          )} -> trying SteamHunters`,
+        );
+        await runSteamHunters();
+      }
+    }
   } catch (e) {
     warn(
-      `[${appid}] SteamDB failed: ${String(
+      `[${appid}] SteamHunters failed: ${String(
         e?.message || e,
-      )} -> trying SteamHunters`,
+      )} -> continue`,
     );
-    try {
-      const data = await scrapeSteamHunters(appid, session);
-      emit("info", "steam-scrape:source", { appid, source: "steamhunters" });
-      if (Array.isArray(data)) {
-        scraped = data;
-      } else {
-        scraped = data?.rows || [];
-        scrapedTitle = data?.title || scrapedTitle;
-      }
-    } catch (e2) {
-      warn(
-        `[${appid}] SteamHunters failed: ${String(
-          e2?.message || e2,
-        )} -> continue`,
-      );
-      scraped = [];
-    }
+    scraped = [];
   }
 
   const results = [];
@@ -1913,7 +1931,7 @@ async function processOneApp(appMeta, apiKey, outBaseDir) {
       return processGogApp(folderId, outBaseDir);
     }
     if (wantsEpic) {
-      const langsToFetch = uniqueLangsWithEnglish(STEAM_LANGS);
+      const langsToFetch = uniqueLangsWithEnglish(Object.keys(EPIC_LOCALE_MAP));
       const perLangByApi = {};
 
       await Promise.all(
@@ -2176,10 +2194,13 @@ async function processOneApp(appMeta, apiKey, outBaseDir) {
     if (meta.platform === "rpcs3") {
       const title = meta.title || meta.name || folderId;
       const baseVariants = buildExophaseSlugVariants(title);
-      const slugCandidates = [
-        ...baseVariants,
-        ...baseVariants.map((s) => `${s}-ps3`),
-      ];
+      const slugCandidates = Array.from(
+        new Set([
+          ...baseVariants,
+          ...baseVariants.map((s) => `${s}-ps3`),
+          ...baseVariants.map((s) => `${s}-psn`),
+        ]),
+      );
       emit("info", "rpcs3:exophase:start", {
         appid: folderId,
         slug: slugCandidates[0],

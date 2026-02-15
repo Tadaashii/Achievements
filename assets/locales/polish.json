@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "Czas gry: 0m",
   "achStatsPlaytimeFmt": "Czas gry: {value}",
+  "achStatsLastPlayed": "Ostatnio grano: N/A",
+  "achStatsLastPlayedFmt": "Ostatnio grano: {value}",
   "achStatsProgress": "Postępy: {unlocked} / {total}",
   "achStatsText": "Postęp: 0 / 0",
   "alert.altAppIdNoImage": "Brak obrazu dla alternatywnego identyfikatora AppID.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "Wystąpił błąd podczas ładowania konfiguracji.",
   "alert.configNotFound": "Nie znaleziono konfiguracji!",
   "alert.folderAddFailed": "Nie udało się dodać folderu",
+  "alert.folderNotFound": "Nie znaleziono folderu",
+  "alert.folderBlocked": "Folder jest zablokowany",
+  "alert.folderPathInvalid": "Nieprawidłowa ścieżka folderu",
+  "alert.rescanBusy": "Ponowne skanowanie już trwa",
   "alert.folderRemoveFailed": "Nie udało się usunąć folderu",
   "alert.folderReplaceAddFailed": "Nie udało się zastąpić folderu (dodaj krok).",
   "alert.folderReplaceRemoveFailed": "Nie udało się zastąpić folderu (usuń krok).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "Zresetuj czarną listę",
   "confirm.deleteConfig.message": "Czy chcesz usunąć: {name}?",
   "confirm.deleteConfig.deleteExtras": "Czy chcesz usunąć również schemat, pamięć podręczną i obrazy?",
+  "confirm.deleteConfig.deleteSave": "Czy chcesz usunąć dane zapisu ze ścieżki zapisu?",
   "confirm.deleteConfig.title": "Usuń konfigurację",
   "confirm.steamApiRemove.message": "Usunąć zapisany klucz API Steam?",
   "confirm.steamApiRemove.title": "Usuń klucz API Steam",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "Klawisz interakcji nakładki",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "Przełącz interakcję: naciśnij raz, aby włączyć przeciąganie/przewijanie, naciśnij ponownie, aby wrócić do kliknięć przez. Wymaga klawisza niemodyfikującego (np. \\).",
-  "aria.overlay-interact-shortcut-info": "Przełącz interakcję: naciśnij raz, aby włączyć przeciąganie/przewijanie, naciśnij ponownie, aby wrócić do kliknięć przez. Wymaga klawisza niemodyfikującego (np. \\)."
+  "aria.overlay-interact-shortcut-info": "Przełącz interakcję: naciśnij raz, aby włączyć przeciąganie/przewijanie, naciśnij ponownie, aby wrócić do kliknięć przez. Wymaga klawisza niemodyfikującego (np. \\).",
+  "placeholder.achievementsSearchInput": "Szukaj osiągnięć…",
+  "title.achievementsSearchToggle": "Szukaj osiągnięć (Ctrl+F)"
 }
-
-
 

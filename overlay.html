@@ -36,6 +36,11 @@
         height: 100vh;
       }
 
+      body.overlay-hidden .overlay-shell {
+        opacity: 0.01;
+        pointer-events: none;
+      }
+
       /* Custom scrollbar (global) */
       *::-webkit-scrollbar {
         width: var(--scrollbar-size) !important;
@@ -73,8 +78,8 @@
         scrollbar-color: var(--dracula-purple) var(--dracula-background);
         background-color: rgba(40, 42, 54, 0.85);
         border-radius: 0 0 12px 12px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-        backdrop-filter: blur(8px);
+        /* box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(8px); */
         border: 1px solid var(--dracula-purple);
         border-top: 0;
         position: relative;
@@ -103,12 +108,12 @@
         flex: 0 0 auto;
         z-index: 10;
         background: rgba(40, 42, 54, 0.88);
-        backdrop-filter: blur(8px);
+        /* backdrop-filter: blur(8px); */
         pointer-events: auto;
         border-radius: 12px 12px 0 0;
         border: 1px solid var(--dracula-purple);
         border-bottom: 0;
-        cursor: move;
+        cursor: default;
         touch-action: none;
       }
 
@@ -122,6 +127,7 @@
         border-top-left-radius: 12px;
         border-top-right-radius: 12px;
         z-index: 3;
+        cursor: move;
       }
 
       .overlay-header h2 {
@@ -276,7 +282,7 @@
     </style>
   </head>
 
-  <body>
+  <body class="overlay-hidden">
     <div class="overlay-shell">
       <div class="overlay-top">
         <div class="overlay-header">
@@ -294,20 +300,23 @@
             <span id="completion-percentage" class="value">0%</span>
           </div>
           <div class="progress-bar">
-            <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+            <div
+              id="progress-fill"
+              class="progress-fill"
+              style="width: 0%"
+            ></div>
           </div>
         </div>
       </div>
       <div class="overlay-container">
-
-      <div id="empty-state" class="empty-state">
-        <i class="fas fa-gamepad"></i>
-        <div id="overlayEmptyMessage" class="empty-state-message">
-          Select a game configuration to view achievements
+        <div id="empty-state" class="empty-state">
+          <i class="fas fa-gamepad"></i>
+          <div id="overlayEmptyMessage" class="empty-state-message">
+            Select a game configuration to view achievements
+          </div>
         </div>
-      </div>
 
-      <ul id="achievements-list" class="achievements-list"></ul>
+        <ul id="achievements-list" class="achievements-list"></ul>
       </div>
     </div>
 
@@ -483,15 +492,15 @@
           const lang = overlayLang;
           const prefs = await loadOverlayPrefs();
 
-        if (!Array.isArray(achievementsDataObj.achievements)) {
-          emptyState.style.display = "flex";
-          achievementsList.style.display = "none";
-          updateStats([], null);
-          document.body.classList.add("overlay-compact");
-          currentConfigName = configName;
-          currentDataHash = null;
-          return;
-        }
+          if (!Array.isArray(achievementsDataObj.achievements)) {
+            emptyState.style.display = "flex";
+            achievementsList.style.display = "none";
+            updateStats([], null);
+            document.body.classList.add("overlay-compact");
+            currentConfigName = configName;
+            currentDataHash = null;
+            return;
+          }
 
           const newHash = computeAchievementsHash(
             achievementsDataObj.achievements,
@@ -687,7 +696,9 @@
 
       window.api.on("overlay-preferences-updated", (payload) => {
         if (!payload || typeof payload !== "object") return;
-        if (Object.prototype.hasOwnProperty.call(payload, "showHiddenDescription")) {
+        if (
+          Object.prototype.hasOwnProperty.call(payload, "showHiddenDescription")
+        ) {
           overlayPrefs = {
             ...(overlayPrefs || {}),
             showHiddenDescription: payload.showHiddenDescription === true,
@@ -700,91 +711,140 @@
         }
       });
 
+      function setOverlayVisible(visible) {
+        document.body.classList.toggle("overlay-hidden", !visible);
+      }
+
+      window.api.on("overlay:set-visible", (payload) => {
+        const visible =
+          payload && typeof payload === "object" ? payload.visible : payload;
+        setOverlayVisible(!!visible);
+      });
+
       function setupOverlayDrag() {
-        const dragHandle = document.querySelector(".overlay-top");
+        const dragHandle = document.querySelector(".overlay-header");
         if (!dragHandle) return;
         if (
           !window.api ||
           typeof window.api.getWindowPosition !== "function" ||
-          typeof window.api.setWindowPosition !== "function"
+          typeof window.api.setWindowPosition !== "function" ||
+          typeof window.api.startOverlayDrag !== "function" ||
+          typeof window.api.endOverlayDrag !== "function"
         ) {
           return;
         }
 
-        let dragState = null;
-        let pendingMove = null;
-        let rafId = null;
+        let dragActive = false;
+
+        const endDrag = () => {
+          if (!dragActive) return;
+          dragActive = false;
+          window.api.endOverlayDrag();
+          try {
+            window.removeEventListener("mouseup", endDrag, true);
+            document.removeEventListener("mouseup", endDrag, true);
+          } catch {}
+        };
 
         const startDrag = async (event) => {
-          if (dragState) {
-            dragHandle.releasePointerCapture?.(dragState.pointerId);
-            dragState = null;
-            pendingMove = null;
-            if (rafId !== null) {
-              window.cancelAnimationFrame(rafId);
-              rafId = null;
-            }
-          }
           if (event.button !== 0) return;
           event.preventDefault();
-          window.api?.requestOverlayFocus?.();
-          const pointerId = event.pointerId;
-          dragHandle.setPointerCapture?.(pointerId);
-          const pos = await window.api.getWindowPosition();
-          if (!Array.isArray(pos) || pos.length < 2) {
-            dragHandle.releasePointerCapture?.(pointerId);
-            return;
-          }
-          dragState = {
-            pointerId,
-            startX: event.screenX,
-            startY: event.screenY,
-            winX: pos[0],
-            winY: pos[1],
-          };
+          if (dragActive) return;
+
+          let winX = Number(window.screenX);
+          let winY = Number(window.screenY);
+          try {
+            const pos = await window.api.getWindowPosition();
+            if (Array.isArray(pos) && pos.length >= 2) {
+              const px = Number(pos[0]);
+              const py = Number(pos[1]);
+              if (Number.isFinite(px) && Number.isFinite(py)) {
+                winX = px;
+                winY = py;
+              }
+            }
+          } catch {}
+
+          if (!Number.isFinite(winX) || !Number.isFinite(winY)) return;
+
+          const sx = Number(event.screenX);
+          const sy = Number(event.screenY);
+          const cx = Number(event.clientX);
+          const cy = Number(event.clientY);
+          const screenX = Number.isFinite(sx) ? sx : winX + cx;
+          const screenY = Number.isFinite(sy) ? sy : winY + cy;
+
+          if (!Number.isFinite(screenX) || !Number.isFinite(screenY)) return;
+
+          const offsetX = screenX - winX;
+          const offsetY = screenY - winY;
+          if (!Number.isFinite(offsetX) || !Number.isFinite(offsetY)) return;
+
+          dragActive = true;
+          window.api.startOverlayDrag({ offsetX, offsetY });
+          window.addEventListener("mouseup", endDrag, true);
+          document.addEventListener("mouseup", endDrag, true);
         };
 
-        const moveDrag = (event) => {
-          if (!dragState) return;
-          if (event.pointerId !== dragState.pointerId) {
+        dragHandle.addEventListener("mousedown", startDrag, true);
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) endDrag();
+        });
+      }
+
+      function setupOverlayKeyboardScroll() {
+        if (!window.api || typeof window.api.on !== "function") return;
+        const container = document.querySelector(".overlay-container");
+        if (!container) return;
+
+        window.api.on("overlay:scroll-page", (payload) => {
+          const dir =
+            payload && typeof payload === "object"
+              ? payload.direction
+              : payload;
+          const direction = String(dir || "").toLowerCase();
+          const page = Math.max(120, Math.round(container.clientHeight * 0.85));
+          if (direction === "up") {
+            container.scrollBy({ top: -page, behavior: "smooth" });
             return;
           }
-          event.preventDefault();
-          pendingMove = { screenX: event.screenX, screenY: event.screenY };
-          if (rafId !== null) return;
-          rafId = window.requestAnimationFrame(() => {
-            rafId = null;
-            if (!dragState || !pendingMove) return;
-            const dx = pendingMove.screenX - dragState.startX;
-            const dy = pendingMove.screenY - dragState.startY;
-            pendingMove = null;
-            window.api.setWindowPosition(dragState.winX + dx, dragState.winY + dy);
-          });
-        };
-
-        const endDrag = (event) => {
-          if (!dragState) return;
-          if (event.pointerId !== dragState.pointerId) {
-            return;
+          if (direction === "down") {
+            container.scrollBy({ top: page, behavior: "smooth" });
           }
-          dragHandle.releasePointerCapture?.(event.pointerId);
-          dragState = null;
-          pendingMove = null;
-          if (rafId !== null) {
-            window.cancelAnimationFrame(rafId);
-            rafId = null;
+        });
+      }
+
+      function setupOverlayDragRegion() {
+        if (
+          !window.api ||
+          typeof window.api.setOverlayDragRegionHeight !== "function"
+        ) {
+          return;
+        }
+        const top = document.querySelector(".overlay-top");
+        if (!top) return;
+
+        const sendHeight = () => {
+          const rect = top.getBoundingClientRect();
+          if (rect && rect.height) {
+            window.api.setOverlayDragRegionHeight(Math.round(rect.height));
           }
         };
 
-        dragHandle.addEventListener("pointerdown", startDrag);
-        window.addEventListener("pointermove", moveDrag);
-        window.addEventListener("pointerup", endDrag);
-        window.addEventListener("pointercancel", endDrag);
+        try {
+          const ro = new ResizeObserver(() => sendHeight());
+          ro.observe(top);
+        } catch {
+          window.addEventListener("resize", sendHeight);
+        }
+
+        sendHeight();
       }
 
       window.onload = () => {
         window.api.requestCurrentConfig?.();
-        setupOverlayDrag();
+        setupOverlayKeyboardScroll();
+        setupOverlayDragRegion();
       };
     </script>
   </body>

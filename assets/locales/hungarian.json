@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "Játékidő: 0 perc",
   "achStatsPlaytimeFmt": "Játékidő: {value}",
+  "achStatsLastPlayed": "Legutóbb játszva: N/A",
+  "achStatsLastPlayedFmt": "Legutóbb játszva: {value}",
   "achStatsProgress": "Előrehaladás: {unlocked} / {total}",
   "achStatsText": "Haladás: 0 / 0",
   "alert.altAppIdNoImage": "Az alternatív AppID kép nem elérhető.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "Valami probléma történt a konfiguráció betöltése közben.",
   "alert.configNotFound": "Konfiguráció nem található!",
   "alert.folderAddFailed": "A mappa hozzáadása nem sikerült",
+  "alert.folderNotFound": "A mappa nem található",
+  "alert.folderBlocked": "A mappa blokkolva van",
+  "alert.folderPathInvalid": "Érvénytelen mappaútvonal",
+  "alert.rescanBusy": "Az újraszkennelés már folyamatban van",
   "alert.folderRemoveFailed": "A mappa eltávolítása nem sikerült",
   "alert.folderReplaceAddFailed": "A mappa cseréje nem sikerült (lépés hozzáadása).",
   "alert.folderReplaceRemoveFailed": "A mappa cseréje nem sikerült (lépés eltávolítása).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "Feketelista visszaállítása",
   "confirm.deleteConfig.message": "Törölni szeretné: {name}?",
   "confirm.deleteConfig.deleteExtras": "Szeretnéd a sémát, a gyorsítótárat és a képeket is törölni?",
+  "confirm.deleteConfig.deleteSave": "Szeretnéd törölni a mentési adatokat a mentési útvonalról?",
   "confirm.deleteConfig.title": "Konfiguráció törlése",
   "confirm.steamApiRemove.message": "Távolítsa el a tárolt Steam API kulcsot?",
   "confirm.steamApiRemove.title": "Steam API kulcs eltávolítása",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "Overlay interakciós billentyű",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "Interakció váltása: nyomd meg egyszer a húzás/görgetés engedélyezéséhez, nyomd meg újra a kattintás-átengedéshez. Nem módosító billentyű szükséges (pl. \\).",
-  "aria.overlay-interact-shortcut-info": "Interakció váltása: nyomd meg egyszer a húzás/görgetés engedélyezéséhez, nyomd meg újra a kattintás-átengedéshez. Nem módosító billentyű szükséges (pl. \\)."
+  "aria.overlay-interact-shortcut-info": "Interakció váltása: nyomd meg egyszer a húzás/görgetés engedélyezéséhez, nyomd meg újra a kattintás-átengedéshez. Nem módosító billentyű szükséges (pl. \\).",
+  "placeholder.achievementsSearchInput": "Eredmények keresése…",
+  "title.achievementsSearchToggle": "Eredmények keresése (Ctrl+F)"
 }
-
-
 

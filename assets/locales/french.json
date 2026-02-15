@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "Temps de jeu : 0m",
   "achStatsPlaytimeFmt": "Temps de jeu : {value}",
+  "achStatsLastPlayed": "Dernière fois joué : N/A",
+  "achStatsLastPlayedFmt": "Dernière fois joué : {value}",
   "achStatsProgress": "Progrès : {unlocked} / {total}",
   "achStatsText": "Progrès : 0 / 0",
   "alert.altAppIdNoImage": "Aucune image disponible pour l'AppID alternative.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "Une erreur s'est produite lors du chargement de la configuration.",
   "alert.configNotFound": "Configuration introuvable !",
   "alert.folderAddFailed": "Échec de l'ajout du dossier",
+  "alert.folderNotFound": "Dossier introuvable",
+  "alert.folderBlocked": "Le dossier est bloqué",
+  "alert.folderPathInvalid": "Chemin du dossier invalide",
+  "alert.rescanBusy": "Le rescannage est déjà en cours",
   "alert.folderRemoveFailed": "Échec de la suppression du dossier",
   "alert.folderReplaceAddFailed": "Échec du remplacement du dossier (étape supplémentaire).",
   "alert.folderReplaceRemoveFailed": "Échec du remplacement du dossier (étape de suppression).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "Réinitialiser la liste noire",
   "confirm.deleteConfig.message": "Voulez-vous supprimer : {name} ?",
   "confirm.deleteConfig.deleteExtras": "Voulez-vous aussi supprimer le schéma, le cache et les images ?",
+  "confirm.deleteConfig.deleteSave": "Voulez-vous supprimer les données de sauvegarde du chemin de sauvegarde ?",
   "confirm.deleteConfig.title": "Supprimer la configuration",
   "confirm.steamApiRemove.message": "Supprimer la clé API Steam enregistrée ?",
   "confirm.steamApiRemove.title": "Supprimer la clé API Steam",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "Touche d'interaction de l'overlay",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "Basculer l'interaction : appuyez une fois pour activer le glisser/défilement, appuyez à nouveau pour revenir au clic à travers. Nécessite une touche non modificatrice (ex. \\).",
-  "aria.overlay-interact-shortcut-info": "Basculer l'interaction : appuyez une fois pour activer le glisser/défilement, appuyez à nouveau pour revenir au clic à travers. Nécessite une touche non modificatrice (ex. \\)."
+  "aria.overlay-interact-shortcut-info": "Basculer l'interaction : appuyez une fois pour activer le glisser/défilement, appuyez à nouveau pour revenir au clic à travers. Nécessite une touche non modificatrice (ex. \\).",
+  "placeholder.achievementsSearchInput": "Rechercher des succès…",
+  "title.achievementsSearchToggle": "Rechercher des succès (Ctrl+F)"
 }
-
-
 

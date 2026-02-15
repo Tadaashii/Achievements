@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "Waktu bermain: 0 menit",
   "achStatsPlaytimeFmt": "Waktu Bermain: {value}",
+  "achStatsLastPlayed": "Terakhir dimainkan: N/A",
+  "achStatsLastPlayedFmt": "Terakhir dimainkan: {value}",
   "achStatsProgress": "Progres: {unlocked} / {total}",
   "achStatsText": "Progres: 0 / 0",
   "alert.altAppIdNoImage": "Tidak ada gambar yang tersedia untuk alternatif AppID.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "Ada masalah saat memuat konfigurasi.",
   "alert.configNotFound": "Konfigurasi tidak ditemukan!",
   "alert.folderAddFailed": "Gagal menambahkan folder",
+  "alert.folderNotFound": "Folder tidak ditemukan",
+  "alert.folderBlocked": "Folder diblokir",
+  "alert.folderPathInvalid": "Jalur folder tidak valid",
+  "alert.rescanBusy": "Pemindaian ulang sudah berjalan",
   "alert.folderRemoveFailed": "Gagal menghapus folder",
   "alert.folderReplaceAddFailed": "Gagal mengganti folder (tambahkan langkah).",
   "alert.folderReplaceRemoveFailed": "Gagal mengganti folder (hapus langkah).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "Reset daftar hitam",
   "confirm.deleteConfig.message": "Apakah Anda ingin menghapus: {name}?",
   "confirm.deleteConfig.deleteExtras": "Apakah Anda juga ingin menghapus skema, cache, dan gambar?",
+  "confirm.deleteConfig.deleteSave": "Apakah Anda ingin menghapus data simpan dari jalur penyimpanan?",
   "confirm.deleteConfig.title": "Hapus konfigurasi",
   "confirm.steamApiRemove.message": "Hapus kunci API Steam yang disimpan?",
   "confirm.steamApiRemove.title": "Hapus Kunci API Steam",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "Tombol Interaksi Overlay",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "Alihkan interaksi: tekan sekali untuk mengaktifkan seret/gulir, tekan lagi untuk kembali ke klik tembus. Memerlukan tombol non-modifier (mis. \\).",
-  "aria.overlay-interact-shortcut-info": "Alihkan interaksi: tekan sekali untuk mengaktifkan seret/gulir, tekan lagi untuk kembali ke klik tembus. Memerlukan tombol non-modifier (mis. \\)."
+  "aria.overlay-interact-shortcut-info": "Alihkan interaksi: tekan sekali untuk mengaktifkan seret/gulir, tekan lagi untuk kembali ke klik tembus. Memerlukan tombol non-modifier (mis. \\).",
+  "placeholder.achievementsSearchInput": "Cari pencapaian…",
+  "title.achievementsSearchToggle": "Cari pencapaian (Ctrl+F)"
 }
-
-
 

@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "Speltid: 0 min",
   "achStatsPlaytimeFmt": "Speltid: {value}",
+  "achStatsLastPlayed": "Senast spelad: N/A",
+  "achStatsLastPlayedFmt": "Senast spelad: {value}",
   "achStatsProgress": "Framsteg: {unlocked} / {total}",
   "achStatsText": "Framsteg: 0 / 0",
   "alert.altAppIdNoImage": "Ingen bild tillgänglig för det alternativa AppID.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "Något gick fel vid laddningen av konfigurationen.",
   "alert.configNotFound": "Konfiguration hittades inte!",
   "alert.folderAddFailed": "Det gick inte att lägga till mappen",
+  "alert.folderNotFound": "Mappen hittades inte",
+  "alert.folderBlocked": "Mappen är blockerad",
+  "alert.folderPathInvalid": "Ogiltig mappsökväg",
+  "alert.rescanBusy": "Omskanning pågår redan",
   "alert.folderRemoveFailed": "Det gick inte att ta bort mappen",
   "alert.folderReplaceAddFailed": "Det gick inte att ersätta mappen (lägg till steg).",
   "alert.folderReplaceRemoveFailed": "Det gick inte att ersätta mappen (ta bort steg).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "Återställ svartlista",
   "confirm.deleteConfig.message": "Vill du ta bort: {name}?",
   "confirm.deleteConfig.deleteExtras": "Vill du även ta bort schemat, cachen och bilderna?",
+  "confirm.deleteConfig.deleteSave": "Vill du radera sparade data från lagringssökvägen?",
   "confirm.deleteConfig.title": "Ta bort konfiguration",
   "confirm.steamApiRemove.message": "Ta bort den lagrade Steam API-nyckeln?",
   "confirm.steamApiRemove.title": "Ta bort Steam API-nyckel",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "Overlay-interaktionstangent",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "Växla interaktion: tryck en gång för att aktivera dra/scrolla, tryck igen för att återgå till klick-igenom. Kräver en icke-modifierande tangent (t.ex. \\).",
-  "aria.overlay-interact-shortcut-info": "Växla interaktion: tryck en gång för att aktivera dra/scrolla, tryck igen för att återgå till klick-igenom. Kräver en icke-modifierande tangent (t.ex. \\)."
+  "aria.overlay-interact-shortcut-info": "Växla interaktion: tryck en gång för att aktivera dra/scrolla, tryck igen för att återgå till klick-igenom. Kräver en icke-modifierande tangent (t.ex. \\).",
+  "placeholder.achievementsSearchInput": "Sök efter prestationer…",
+  "title.achievementsSearchToggle": "Sök efter prestationer (Ctrl+F)"
 }
-
-
 

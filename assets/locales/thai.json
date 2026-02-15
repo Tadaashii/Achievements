@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "เวลาเล่น: 0 นาที",
   "achStatsPlaytimeFmt": "เวลาเล่น: {value}",
+  "achStatsLastPlayed": "เล่นล่าสุด: N/A",
+  "achStatsLastPlayedFmt": "เล่นล่าสุด: {value}",
   "achStatsProgress": "ความคืบหน้า: {unlocked} / {total}",
   "achStatsText": "ความคืบหน้า: 0 / 0",
   "alert.altAppIdNoImage": "ไม่มีภาพสำหรับ AppID อื่น",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "เกิดข้อผิดพลาดในการโหลดการตั้งค่า",
   "alert.configNotFound": "ไม่พบการกำหนดค่า!",
   "alert.folderAddFailed": "ไม่สามารถเพิ่มโฟลเดอร์ได้",
+  "alert.folderNotFound": "ไม่พบโฟลเดอร์",
+  "alert.folderBlocked": "โฟลเดอร์ถูกบล็อก",
+  "alert.folderPathInvalid": "พาธโฟลเดอร์ไม่ถูกต้อง",
+  "alert.rescanBusy": "กำลังสแกนใหม่อยู่แล้ว",
   "alert.folderRemoveFailed": "ไม่สามารถลบโฟลเดอร์ได้",
   "alert.folderReplaceAddFailed": "ไม่สามารถแทนที่โฟลเดอร์ได้ (เพิ่มขั้นตอน)",
   "alert.folderReplaceRemoveFailed": "ไม่สามารถแทนที่โฟลเดอร์ได้ (ขั้นตอนลบ)",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "รีเซ็ตบัญชีดำ",
   "confirm.deleteConfig.message": "คุณต้องการลบ: {name} หรือไม่?",
   "confirm.deleteConfig.deleteExtras": "ต้องการลบสคีมา แคช และรูปภาพด้วยหรือไม่?",
+  "confirm.deleteConfig.deleteSave": "ต้องการลบข้อมูลบันทึกจากเส้นทางบันทึกหรือไม่?",
   "confirm.deleteConfig.title": "ลบการตั้งค่า",
   "confirm.steamApiRemove.message": "ลบคีย์ Steam API ที่เก็บไว้หรือไม่?",
   "confirm.steamApiRemove.title": "ลบคีย์ API ของ Steam",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "ปุ่มโต้ตอบของโอเวอร์เลย์",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "สลับการโต้ตอบ: กดหนึ่งครั้งเพื่อเปิดลาก/เลื่อน กดอีกครั้งเพื่อกลับไปเป็นคลิกทะลุ ต้องใช้ปุ่มที่ไม่ใช่ตัวปรับ (เช่น \\).",
-  "aria.overlay-interact-shortcut-info": "สลับการโต้ตอบ: กดหนึ่งครั้งเพื่อเปิดลาก/เลื่อน กดอีกครั้งเพื่อกลับไปเป็นคลิกทะลุ ต้องใช้ปุ่มที่ไม่ใช่ตัวปรับ (เช่น \\)."
+  "aria.overlay-interact-shortcut-info": "สลับการโต้ตอบ: กดหนึ่งครั้งเพื่อเปิดลาก/เลื่อน กดอีกครั้งเพื่อกลับไปเป็นคลิกทะลุ ต้องใช้ปุ่มที่ไม่ใช่ตัวปรับ (เช่น \\).",
+  "placeholder.achievementsSearchInput": "ค้นหาความสำเร็จ…",
+  "title.achievementsSearchToggle": "ค้นหาความสำเร็จ (Ctrl+F)"
 }
-
-
 

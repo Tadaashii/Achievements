@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "وقت اللعب: 0 دقيقة",
   "achStatsPlaytimeFmt": "وقت اللعب: {value}",
+  "achStatsLastPlayed": "آخر لعب: N/A",
+  "achStatsLastPlayedFmt": "آخر لعب: {value}",
   "achStatsProgress": "التقدم المحرز: {unlocked} / {total}",
   "achStatsText": "التقدم: 0 / 0",
   "alert.altAppIdNoImage": "لا توجد صورة متاحة للبديل AppID.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "حدث خطأ أثناء تحميل التكوين.",
   "alert.configNotFound": "لم يتم العثور على التكوين!",
   "alert.folderAddFailed": "فشل إضافة المجلد",
+  "alert.folderNotFound": "لم يتم العثور على المجلد",
+  "alert.folderBlocked": "المجلد محظور",
+  "alert.folderPathInvalid": "مسار المجلد غير صالح",
+  "alert.rescanBusy": "إعادة الفحص قيد التشغيل بالفعل",
   "alert.folderRemoveFailed": "فشل في إزالة المجلد",
   "alert.folderReplaceAddFailed": "فشل استبدال المجلد (إضافة خطوة).",
   "alert.folderReplaceRemoveFailed": "فشل استبدال المجلد (إزالة الخطوة).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "إعادة تعيين القائمة السوداء",
   "confirm.deleteConfig.message": "هل تريد حذف: {name}؟",
   "confirm.deleteConfig.deleteExtras": "هل تريد أيضًا حذف المخطط وذاكرة التخزين المؤقت والصور؟",
+  "confirm.deleteConfig.deleteSave": "هل تريد حذف بيانات الحفظ من مسار الحفظ؟",
   "confirm.deleteConfig.title": "حذف التكوين",
   "confirm.steamApiRemove.message": "إزالة مفتاح API Steam المخزن؟",
   "confirm.steamApiRemove.title": "إزالة مفتاح API Steam",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "مفتاح تفاعل التراكب",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "تبديل التفاعل: اضغط مرة واحدة لتفعيل السحب/التمرير، واضغط مرة أخرى للعودة إلى النقر عبر النافذة. يتطلب مفتاحًا غير مُعدِّل (مثل \\).",
-  "aria.overlay-interact-shortcut-info": "تبديل التفاعل: اضغط مرة واحدة لتفعيل السحب/التمرير، واضغط مرة أخرى للعودة إلى النقر عبر النافذة. يتطلب مفتاحًا غير مُعدِّل (مثل \\)."
+  "aria.overlay-interact-shortcut-info": "تبديل التفاعل: اضغط مرة واحدة لتفعيل السحب/التمرير، واضغط مرة أخرى للعودة إلى النقر عبر النافذة. يتطلب مفتاحًا غير مُعدِّل (مثل \\).",
+  "placeholder.achievementsSearchInput": "ابحث عن الإنجازات…",
+  "title.achievementsSearchToggle": "ابحث عن الإنجازات (Ctrl+F)"
 }
-
-
 

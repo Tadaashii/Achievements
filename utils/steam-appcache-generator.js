@@ -3,6 +3,7 @@ const path = require("path");
 const https = require("https");
 const axios = require("axios");
 const { createLogger } = require("./logger");
+const { sanitizeConfigName } = require("./playtime-store");
 const {
   parseKVBinary,
   extractSchemaAchievements,
@@ -15,7 +16,7 @@ const autoConfigLogger = createLogger("autoconfig");
 const schemaLogger = createLogger("achschema");
 
 function sanitizeFileName(name) {
-  return String(name || "").replace(/[<>:"/\\|?*]+/g, "_");
+  return sanitizeConfigName(name);
 }
 
 const steamStoreCache = new Map();
@@ -319,15 +320,18 @@ function updateSchemaFromAppcache(appid, entries, schemaDir) {
   if (updated) {
     fs.writeFileSync(schemaPath, JSON.stringify(cur, null, 2), "utf8");
   }
-  schemaLogger.info("steam-appcache:schema:updated", {
-    appid: String(appid),
-    dir: schemaDir,
-    updated,
-    added,
-    changed,
-    total: cur.length,
-    incoming: entries.length,
-  });
+  const hasSchemaChanges = updated || added > 0 || changed > 0;
+  if (hasSchemaChanges) {
+    schemaLogger.info("steam-appcache:schema:updated", {
+      appid: String(appid),
+      dir: schemaDir,
+      updated,
+      added,
+      changed,
+      total: cur.length,
+      incoming: entries.length,
+    });
+  }
   return { updated, added, changed, entries: cur };
 }
 
@@ -402,12 +406,13 @@ async function generateConfigFromAppcacheBin(statsDir, schemaBinPath, configsDir
   const resolvedBase = storeName || String(appid || "");
   const defaultCfgName = `${resolvedBase} (Steam)`;
   const existing = findExistingSteamOfficialConfig(configsDir, appid);
+  const desiredFileBase = sanitizeFileName(defaultCfgName);
   const cfgPath = existing?.path
     ? existing.path
-    : path.join(configsDir, `${sanitizeFileName(defaultCfgName)}.json`);
-  const cfgName = existing?.data?.name || path.basename(cfgPath, ".json");
+    : path.join(configsDir, `${desiredFileBase}.json`);
+  const cfgName = path.basename(cfgPath, ".json");
   const payload = {
-    name: defaultCfgName,
+    name: cfgName,
     displayName: defaultCfgName,
     appid: String(appid),
     platform: "steam-official",
@@ -420,13 +425,21 @@ async function generateConfigFromAppcacheBin(statsDir, schemaBinPath, configsDir
     try {
       const existingData =
         existing?.data || JSON.parse(fs.readFileSync(cfgPath, "utf8"));
-      const existingDisplay =
-        existingData?.displayName || existingData?.name || "";
+      let dirty = false;
+      if (existingData?.name !== cfgName) {
+        existingData.name = cfgName;
+        dirty = true;
+      }
+      if (existingData?.displayName == null) {
+        existingData.displayName = defaultCfgName;
+        dirty = true;
+      }
+      const existingDisplay = existingData?.displayName || existingData?.name || "";
       if (storeName && typeof storeName === "string") {
         const desiredDisplay = `${storeName} (Steam)`;
         if (desiredDisplay && desiredDisplay !== existingDisplay) {
           existingData.displayName = desiredDisplay;
-          fs.writeFileSync(cfgPath, JSON.stringify(existingData, null, 2));
+          dirty = true;
           autoConfigLogger.info("steam-appcache:config:display-updated", {
             appid,
             name: existingData?.name || cfgName,
@@ -435,12 +448,15 @@ async function generateConfigFromAppcacheBin(statsDir, schemaBinPath, configsDir
           });
         }
       }
+      if (dirty) {
+        fs.writeFileSync(cfgPath, JSON.stringify(existingData, null, 2));
+      }
     } catch {}
   } else {
     fs.writeFileSync(cfgPath, JSON.stringify(payload, null, 2));
     autoConfigLogger.info("steam-appcache:config:created", {
       appid,
-      name: defaultCfgName,
+      name: cfgName,
       filePath: cfgPath,
     });
   }

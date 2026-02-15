@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "Tempo de jogo: 0m",
   "achStatsPlaytimeFmt": "Tempo de jogo: {value}",
+  "achStatsLastPlayed": "Jogado pela última vez: N/A",
+  "achStatsLastPlayedFmt": "Jogado pela última vez: {value}",
   "achStatsProgress": "Progresso: {unlocked} / {total}",
   "achStatsText": "Progresso: 0 / 0",
   "alert.altAppIdNoImage": "Não há imagem disponível para o AppID alternativo.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "Ocorreu um problema ao carregar a configuração.",
   "alert.configNotFound": "Configuração não encontrada!",
   "alert.folderAddFailed": "Falha ao adicionar pasta",
+  "alert.folderNotFound": "Pasta não encontrada",
+  "alert.folderBlocked": "A pasta está bloqueada",
+  "alert.folderPathInvalid": "Caminho da pasta inválido",
+  "alert.rescanBusy": "A nova verificação já está em andamento",
   "alert.folderRemoveFailed": "Falha ao remover a pasta",
   "alert.folderReplaceAddFailed": "Falha ao substituir a pasta (adicionar etapa).",
   "alert.folderReplaceRemoveFailed": "Falha ao substituir a pasta (etapa de remoção).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "Redefinir lista negra",
   "confirm.deleteConfig.message": "Deseja excluir: {name}?",
   "confirm.deleteConfig.deleteExtras": "Deseja excluir também o esquema, o cache e as imagens?",
+  "confirm.deleteConfig.deleteSave": "Deseja excluir os dados de salvamento do caminho de salvamento?",
   "confirm.deleteConfig.title": "Excluir configuração",
   "confirm.steamApiRemove.message": "Remover a chave API Steam armazenada?",
   "confirm.steamApiRemove.title": "Remover chave API Steam",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "Tecla de interação do overlay",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "Alternar interação: pressione uma vez para ativar arrastar/rolar, pressione novamente para voltar ao clique através. Requer uma tecla não modificadora (ex.: \\).",
-  "aria.overlay-interact-shortcut-info": "Alternar interação: pressione uma vez para ativar arrastar/rolar, pressione novamente para voltar ao clique através. Requer uma tecla não modificadora (ex.: \\)."
+  "aria.overlay-interact-shortcut-info": "Alternar interação: pressione uma vez para ativar arrastar/rolar, pressione novamente para voltar ao clique através. Requer uma tecla não modificadora (ex.: \\).",
+  "placeholder.achievementsSearchInput": "Pesquisar conquistas…",
+  "title.achievementsSearchToggle": "Pesquisar conquistas (Ctrl+F)"
 }
-
-
 

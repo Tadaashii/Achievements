@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "Время игры: 0 м",
   "achStatsPlaytimeFmt": "Время игры: {value}",
+  "achStatsLastPlayed": "Последний раз играли: N/A",
+  "achStatsLastPlayedFmt": "Последний раз играли: {value}",
   "achStatsProgress": "Прогресс: {unlocked} / {total}",
   "achStatsText": "Прогресс: 0 / 0",
   "alert.altAppIdNoImage": "Изображение для альтернативного AppID недоступно.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "Произошла ошибка при загрузке конфигурации.",
   "alert.configNotFound": "Конфигурация не найдена!",
   "alert.folderAddFailed": "Не удалось добавить папку",
+  "alert.folderNotFound": "Папка не найдена",
+  "alert.folderBlocked": "Папка заблокирована",
+  "alert.folderPathInvalid": "Неверный путь к папке",
+  "alert.rescanBusy": "Повторное сканирование уже выполняется",
   "alert.folderRemoveFailed": "Не удалось удалить папку",
   "alert.folderReplaceAddFailed": "Не удалось заменить папку (добавить шаг).",
   "alert.folderReplaceRemoveFailed": "Не удалось заменить папку (удалить шаг).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "Сбросить черный список",
   "confirm.deleteConfig.message": "Вы хотите удалить: {name}?",
   "confirm.deleteConfig.deleteExtras": "Удалить также схему, кэш и изображения?",
+  "confirm.deleteConfig.deleteSave": "Удалить данные сохранения из пути сохранения?",
   "confirm.deleteConfig.title": "Удалить конфигурацию",
   "confirm.steamApiRemove.message": "Удалить сохраненный ключ API Steam?",
   "confirm.steamApiRemove.title": "Удалить ключ API Steam",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "Клавиша взаимодействия оверлея",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "Переключение взаимодействия: нажмите один раз, чтобы включить перетаскивание/прокрутку, нажмите снова, чтобы вернуться к клику сквозь. Требуется немодифицирующая клавиша (например, \\).",
-  "aria.overlay-interact-shortcut-info": "Переключение взаимодействия: нажмите один раз, чтобы включить перетаскивание/прокрутку, нажмите снова, чтобы вернуться к клику сквозь. Требуется немодифицирующая клавиша (например, \\)."
+  "aria.overlay-interact-shortcut-info": "Переключение взаимодействия: нажмите один раз, чтобы включить перетаскивание/прокрутку, нажмите снова, чтобы вернуться к клику сквозь. Требуется немодифицирующая клавиша (например, \\).",
+  "placeholder.achievementsSearchInput": "Искать достижения…",
+  "title.achievementsSearchToggle": "Искать достижения (Ctrl+F)"
 }
-
-
 

@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "Oyun süresi: 0m",
   "achStatsPlaytimeFmt": "Oyun süresi: {value}",
+  "achStatsLastPlayed": "Son oynanma: N/A",
+  "achStatsLastPlayedFmt": "Son oynanma: {value}",
   "achStatsProgress": "İlerleme: {unlocked} / {total}",
   "achStatsText": "İlerleme: 0 / 0",
   "alert.altAppIdNoImage": "Alternatif AppID için görüntü mevcut değil.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "Yapılandırmayı yüklerken bir sorun oluştu.",
   "alert.configNotFound": "Yapılandırma bulunamadı!",
   "alert.folderAddFailed": "Klasör eklenemedi",
+  "alert.folderNotFound": "Klasör bulunamadı",
+  "alert.folderBlocked": "Klasör engellendi",
+  "alert.folderPathInvalid": "Geçersiz klasör yolu",
+  "alert.rescanBusy": "Yeniden tarama zaten çalışıyor",
   "alert.folderRemoveFailed": "Klasör silinemedi",
   "alert.folderReplaceAddFailed": "Klasörü değiştiremedi (adım ekle).",
   "alert.folderReplaceRemoveFailed": "Klasörü değiştiremedi (adımı kaldır).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "Kara listeyi sıfırla",
   "confirm.deleteConfig.message": "{name} öğesini silmek istiyor musunuz?",
   "confirm.deleteConfig.deleteExtras": "Şemayı, önbelleği ve görselleri de silmek istiyor musunuz?",
+  "confirm.deleteConfig.deleteSave": "Kayıt yolundaki kayıt verilerini silmek istiyor musunuz?",
   "confirm.deleteConfig.title": "Yapılandırmayı sil",
   "confirm.steamApiRemove.message": "Saklanan Steam API anahtarını silmek ister misiniz?",
   "confirm.steamApiRemove.title": "Steam API anahtarını kaldır",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "Overlay Etkileşim Tuşu",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "Etkileşimi değiştir: sürükle/kaydırmayı etkinleştirmek için bir kez bas, tekrar basarak tıklama-geçişe dön. Değiştirici olmayan bir tuş gerekir (örn. \\).",
-  "aria.overlay-interact-shortcut-info": "Etkileşimi değiştir: sürükle/kaydırmayı etkinleştirmek için bir kez bas, tekrar basarak tıklama-geçişe dön. Değiştirici olmayan bir tuş gerekir (örn. \\)."
+  "aria.overlay-interact-shortcut-info": "Etkileşimi değiştir: sürükle/kaydırmayı etkinleştirmek için bir kez bas, tekrar basarak tıklama-geçişe dön. Değiştirici olmayan bir tuş gerekir (örn. \\).",
+  "placeholder.achievementsSearchInput": "Başarıları ara…",
+  "title.achievementsSearchToggle": "Başarıları ara (Ctrl+F)"
 }
-
-
 

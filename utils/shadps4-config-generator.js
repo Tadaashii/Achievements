@@ -195,15 +195,18 @@ function updateSchemaFromPs4(schemaDir, parsed) {
     fs.writeFileSync(schemaPath, JSON.stringify(entries, null, 2), "utf8");
   }
 
-  schemaLogger.info("ps4:schema:updated", {
-    appid: String(parsed.appid || ""),
-    dir: schemaDir,
-    updated,
-    added,
-    changed,
-    total: entries.length,
-    incoming: incoming.length,
-  });
+  const hasSchemaChanges = updated || added > 0 || changed > 0;
+  if (hasSchemaChanges) {
+    schemaLogger.info("ps4:schema:updated", {
+      appid: String(parsed.appid || ""),
+      dir: schemaDir,
+      updated,
+      added,
+      changed,
+      total: entries.length,
+      incoming: incoming.length,
+    });
+  }
 
   return { updated, added, entries };
 }
@@ -232,11 +235,6 @@ async function generateConfigFromPs4Dir(trophyDir, configsDir, options = {}) {
   const appidFromDir = path.basename(
     path.dirname(path.dirname(trophyDir)) || trophyDir
   );
-  autoConfigLogger.info("ps4:trophy:parse:start", {
-    appid: appidFromDir,
-    path: trophyDir,
-  });
-
   let parsed;
   try {
     parsed = parsePs4TrophySetDir(trophyDir);
@@ -258,19 +256,7 @@ async function generateConfigFromPs4Dir(trophyDir, configsDir, options = {}) {
   const schemaRoot = options.schemaRoot || path.join(configsDir, "schema");
   const schemaDir = path.join(schemaRoot, "shadps4", String(baseAppId));
 
-  autoConfigLogger.info("ps4:trophy:parse:success", {
-    appid: baseAppId,
-    title,
-    trophies: trophyCount,
-  });
-
   if (trophyCount === 0) {
-    autoConfigLogger.info("ps4:trophy:skip", {
-      appid,
-      title,
-      path: trophyDir,
-      reason: "no-trophies",
-    });
     return { skipped: true, appid, title, reason: "no-trophies" };
   }
 
@@ -334,13 +320,6 @@ async function generateConfigFromPs4Dir(trophyDir, configsDir, options = {}) {
     if (hasConfigChanges(existing.data, merged)) {
       fs.writeFileSync(existing.filePath, JSON.stringify(merged, null, 2));
       autoConfigLogger.info("ps4:config:updated", {
-        appid: baseAppId,
-        name: merged.name,
-        filePath: existing.filePath,
-        schemaDir,
-      });
-    } else {
-      autoConfigLogger.info("ps4:config:unchanged", {
         appid: baseAppId,
         name: merged.name,
         filePath: existing.filePath,

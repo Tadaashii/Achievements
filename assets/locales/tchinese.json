@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "播放時間：0分鐘",
   "achStatsPlaytimeFmt": "遊玩時間：{value}",
+  "achStatsLastPlayed": "上次遊玩: N/A",
+  "achStatsLastPlayedFmt": "上次遊玩: {value}",
   "achStatsProgress": "進度：{unlocked} / {total}",
   "achStatsText": "進度：0 / 0",
   "alert.altAppIdNoImage": "無法為替代 AppID 提供圖片。",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "載入設定檔時發生錯誤。",
   "alert.configNotFound": "設定檔未找到！",
   "alert.folderAddFailed": "新增資料夾失敗",
+  "alert.folderNotFound": "找不到資料夾",
+  "alert.folderBlocked": "資料夾已被封鎖",
+  "alert.folderPathInvalid": "資料夾路徑無效",
+  "alert.rescanBusy": "重新掃描已在進行中",
   "alert.folderRemoveFailed": "無法移除資料夾",
   "alert.folderReplaceAddFailed": "未能替換資料夾（新增步驟）。",
   "alert.folderReplaceRemoveFailed": "未能替換資料夾（移除步驟）。",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "重置黑名單",
   "confirm.deleteConfig.message": "您是否要刪除：{name}？",
   "confirm.deleteConfig.deleteExtras": "也要刪除架構、快取和圖片嗎？",
+  "confirm.deleteConfig.deleteSave": "是否從保存路徑中刪除存檔資料？",
   "confirm.deleteConfig.title": "刪除設定檔",
   "confirm.steamApiRemove.message": "移除儲存的 Steam API 金鑰？",
   "confirm.steamApiRemove.title": "移除 Steam API 金鑰",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "覆蓋層互動鍵",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "切換互動：按一次啟用拖曳/捲動，再按一次恢復點擊穿透。需要非修飾鍵（例如 \\）。",
-  "aria.overlay-interact-shortcut-info": "切換互動：按一次啟用拖曳/捲動，再按一次恢復點擊穿透。需要非修飾鍵（例如 \\）。"
+  "aria.overlay-interact-shortcut-info": "切換互動：按一次啟用拖曳/捲動，再按一次恢復點擊穿透。需要非修飾鍵（例如 \\）。",
+  "placeholder.achievementsSearchInput": "搜尋成就…",
+  "title.achievementsSearchToggle": "搜尋成就 (Ctrl+F)"
 }
-
-
 

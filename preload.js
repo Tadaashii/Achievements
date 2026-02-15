@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld("api", {
   regenerateSchema: (payload) =>
     ipcRenderer.invoke("schema:regenerate", payload),
   loadConfigs: () => ipcRenderer.invoke("loadConfigs"),
+  loadDashboardSummary: () => ipcRenderer.invoke("dashboard:summary"),
   selectFolder: () => ipcRenderer.invoke("selectFolder"),
   deleteConfig: (configName, options = {}) => {
     if (configName && typeof configName === "object") {
@@ -146,6 +147,8 @@ contextBridge.exposeInMainWorld("api", {
   getWindowPosition: () => ipcRenderer.invoke("window:get-position"),
   setWindowPosition: (x, y) =>
     ipcRenderer.send("window:set-position", { x, y }),
+  setOverlayDragRegionHeight: (height) =>
+    ipcRenderer.send("overlay:drag-region", { height }),
   requestOverlayFocus: () => ipcRenderer.send("overlay:request-focus"),
   // language
   refreshUILanguage: (language) =>
@@ -158,6 +161,7 @@ contextBridge.exposeInMainWorld("api", {
   onAutoSelectConfig: (handler) =>
     ipcRenderer.on("auto-select-config", (_e, name) => handler(name)),
   getBootStatus: () => ipcRenderer.invoke("boot:status"),
+  bootOverlayHidden: () => ipcRenderer.send("boot:overlay-hidden"),
   getSteamDbCover: (appid) => ipcRenderer.invoke("covers:steamdb", appid),
   getSteamGridDbCover: (payload) =>
     ipcRenderer.invoke("covers:steamgriddb", payload),
@@ -170,6 +174,7 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("playtime:get-total", configName),
   setDashboardOpen: (state) => ipcRenderer.invoke("dashboard:set-open", state),
   isDashboardOpen: () => ipcRenderer.invoke("dashboard:is-open"),
+  dashboardReady: () => ipcRenderer.send("dashboard:ready"),
   onDashboardPollPause: (handler) =>
     ipcRenderer.on("dashboard:poll-pause", (_e, state) => handler(state)),
   onPlaytimeUpdate: (callback) => {

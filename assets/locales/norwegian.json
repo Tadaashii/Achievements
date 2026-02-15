@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "Spilletid: 0m",
   "achStatsPlaytimeFmt": "Spilletid: {value}",
+  "achStatsLastPlayed": "Sist spilt: N/A",
+  "achStatsLastPlayedFmt": "Sist spilt: {value}",
   "achStatsProgress": "Fremgang: {unlocked} / {total}",
   "achStatsText": "Fremgang: 0 / 0",
   "alert.altAppIdNoImage": "Ingen bilder tilgjengelig for den alternative AppID-en.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "Det oppstod en feil under innlasting av konfigurasjonen.",
   "alert.configNotFound": "Konfigurasjon ikke funnet!",
   "alert.folderAddFailed": "Kunne ikke legge til mappe",
+  "alert.folderNotFound": "Mappen ble ikke funnet",
+  "alert.folderBlocked": "Mappen er blokkert",
+  "alert.folderPathInvalid": "Ugyldig mappebane",
+  "alert.rescanBusy": "Omskanning pågår allerede",
   "alert.folderRemoveFailed": "Kunne ikke fjerne mappen",
   "alert.folderReplaceAddFailed": "Kunne ikke erstatte mappen (legg til trinn).",
   "alert.folderReplaceRemoveFailed": "Kunne ikke erstatte mappen (fjern trinn).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "Tilbakestill svarteliste",
   "confirm.deleteConfig.message": "Vil du slette: {name}?",
   "confirm.deleteConfig.deleteExtras": "Vil du også slette skjemaet, cachen og bildene?",
+  "confirm.deleteConfig.deleteSave": "Vil du slette lagringsdata fra lagringsbanen?",
   "confirm.deleteConfig.title": "Slett konfigurasjon",
   "confirm.steamApiRemove.message": "Fjerne den lagrede Steam API-nøkkelen?",
   "confirm.steamApiRemove.title": "Fjern Steam API-nøkkel",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "Overlay-interaksjonstast",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "Bytt interaksjon: trykk én gang for å aktivere dra/scroll, trykk igjen for å gå tilbake til klikk-gjennom. Krever en ikke-modifikatortast (f.eks. \\).",
-  "aria.overlay-interact-shortcut-info": "Bytt interaksjon: trykk én gang for å aktivere dra/scroll, trykk igjen for å gå tilbake til klikk-gjennom. Krever en ikke-modifikatortast (f.eks. \\)."
+  "aria.overlay-interact-shortcut-info": "Bytt interaksjon: trykk én gang for å aktivere dra/scroll, trykk igjen for å gå tilbake til klikk-gjennom. Krever en ikke-modifikatortast (f.eks. \\).",
+  "placeholder.achievementsSearchInput": "Søk etter prestasjoner…",
+  "title.achievementsSearchToggle": "Søk etter prestasjoner (Ctrl+F)"
 }
-
-
 

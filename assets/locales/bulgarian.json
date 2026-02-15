@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "Време за игра: 0 м",
   "achStatsPlaytimeFmt": "Време за игра: {value}",
+  "achStatsLastPlayed": "Последно играно: N/A",
+  "achStatsLastPlayedFmt": "Последно играно: {value}",
   "achStatsProgress": "Напредък: {unlocked} / {total}",
   "achStatsText": "Напредък: 0 / 0",
   "alert.altAppIdNoImage": "Няма налична картинка за алтернативния вариант на AppID.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "Нещо се обърка при зареждането на конфигурацията.",
   "alert.configNotFound": "Конфигурацията не е намерена!",
   "alert.folderAddFailed": "Неуспешно добавяне на папка",
+  "alert.folderNotFound": "Папката не е намерена",
+  "alert.folderBlocked": "Папката е блокирана",
+  "alert.folderPathInvalid": "Невалиден път към папката",
+  "alert.rescanBusy": "Повторното сканиране вече се изпълнява",
   "alert.folderRemoveFailed": "Неуспешно премахване на папка",
   "alert.folderReplaceAddFailed": "Неуспешно заместване на папка (добави стъпка).",
   "alert.folderReplaceRemoveFailed": "Неуспешно заместване на папка (премахване на стъпка).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "Нулиране на черния списък",
   "confirm.deleteConfig.message": "Искате ли да изтриете: {name}?",
   "confirm.deleteConfig.deleteExtras": "Искате ли да изтриете също схемата, кеша и изображенията?",
+  "confirm.deleteConfig.deleteSave": "Искате ли да изтриете данните за запис от пътя за запис?",
   "confirm.deleteConfig.title": "Изтрий конфигурацията",
   "confirm.steamApiRemove.message": "Да премахнете съхранения Steam API ключ?",
   "confirm.steamApiRemove.title": "Премахване на Steam API ключ",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "Клавиш за взаимодействие на overlay",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "Превключване на взаимодействието: натиснете веднъж, за да активирате влачене/скрол, натиснете отново, за да се върнете към клик-през. Изисква немодифициращ клавиш (напр. \\).",
-  "aria.overlay-interact-shortcut-info": "Превключване на взаимодействието: натиснете веднъж, за да активирате влачене/скрол, натиснете отново, за да се върнете към клик-през. Изисква немодифициращ клавиш (напр. \\)."
+  "aria.overlay-interact-shortcut-info": "Превключване на взаимодействието: натиснете веднъж, за да активирате влачене/скрол, натиснете отново, за да се върнете към клик-през. Изисква немодифициращ клавиш (напр. \\).",
+  "placeholder.achievementsSearchInput": "Търси постижения…",
+  "title.achievementsSearchToggle": "Търси постижения (Ctrl+F)"
 }
-
-
 

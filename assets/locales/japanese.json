@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "プレイ時間: 0分",
   "achStatsPlaytimeFmt": "プレイ時間: {value}",
+  "achStatsLastPlayed": "最終プレイ: N/A",
+  "achStatsLastPlayedFmt": "最終プレイ: {value}",
   "achStatsProgress": "進捗状況: {unlocked} / {total}",
   "achStatsText": "進捗: 0 / 0",
   "alert.altAppIdNoImage": "代替AppIDの画像は利用できません。",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "設定の読み込み中に問題が発生しました。",
   "alert.configNotFound": "設定が見つかりません！",
   "alert.folderAddFailed": "フォルダの追加に失敗しました",
+  "alert.folderNotFound": "フォルダが見つかりません",
+  "alert.folderBlocked": "フォルダはブロックされています",
+  "alert.folderPathInvalid": "フォルダのパスが無効です",
+  "alert.rescanBusy": "再スキャンはすでに実行中です",
   "alert.folderRemoveFailed": "フォルダーの削除に失敗しました",
   "alert.folderReplaceAddFailed": "フォルダの置換に失敗しました（ステップの追加）。",
   "alert.folderReplaceRemoveFailed": "フォルダの置換に失敗しました（削除ステップ）。",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "ブラックリストをリセット",
   "confirm.deleteConfig.message": "{name} を削除しますか？",
   "confirm.deleteConfig.deleteExtras": "スキーマ、キャッシュ、画像も削除しますか？",
+  "confirm.deleteConfig.deleteSave": "保存パスからセーブデータを削除しますか？",
   "confirm.deleteConfig.title": "設定を削除",
   "confirm.steamApiRemove.message": "保存されたSteam APIキーを削除しますか？",
   "confirm.steamApiRemove.title": "Steam API キーを削除する",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "オーバーレイ操作キー",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "操作の切り替え: 1回押すとドラッグ/スクロールを有効化、もう一度押すとクリック透過に戻ります。修飾キー以外が必要です（例: \\）。",
-  "aria.overlay-interact-shortcut-info": "操作の切り替え: 1回押すとドラッグ/スクロールを有効化、もう一度押すとクリック透過に戻ります。修飾キー以外が必要です（例: \\）。"
+  "aria.overlay-interact-shortcut-info": "操作の切り替え: 1回押すとドラッグ/スクロールを有効化、もう一度押すとクリック透過に戻ります。修飾キー以外が必要です（例: \\）。",
+  "placeholder.achievementsSearchInput": "実績を検索…",
+  "title.achievementsSearchToggle": "実績を検索 (Ctrl+F)"
 }
-
-
 

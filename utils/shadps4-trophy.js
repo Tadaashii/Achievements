@@ -175,9 +175,15 @@ function buildSnapshotFromPs4(parsed, prev = {}) {
           earned_time: ts || prevEntry.earned_time || null,
         };
       } else if (!snapshot[key]) {
-        snapshot[key] = { earned: false, earned_time: null };
+        snapshot[key] = { earned: false, earned_time: 0 };
       }
     });
+  }
+  for (const [key, entry] of Object.entries(snapshot)) {
+    if (!entry || typeof entry !== "object") continue;
+    if (entry.earned_time == null) {
+      snapshot[key] = { ...entry, earned_time: 0 };
+    }
   }
   return snapshot;
 }

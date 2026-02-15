@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "Χρόνος παιχνιδιού: 0m",
   "achStatsPlaytimeFmt": "Χρόνος παιχνιδιού: {value}",
+  "achStatsLastPlayed": "Τελευταία φορά που παίχτηκε: N/A",
+  "achStatsLastPlayedFmt": "Τελευταία φορά που παίχτηκε: {value}",
   "achStatsProgress": "Πρόοδος: {unlocked} / {total}",
   "achStatsText": "Πρόοδος: 0 / 0",
   "alert.altAppIdNoImage": "Δεν υπάρχει διαθέσιμη εικόνα για την εναλλακτική διεύθυνση AppID.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "Κάτι πήγε στραβά κατά τη φόρτωση της διαμόρφωσης.",
   "alert.configNotFound": "Δεν βρέθηκε η διαμόρφωση!",
   "alert.folderAddFailed": "Αποτυχία προσθήκης φακέλου",
+  "alert.folderNotFound": "Ο φάκελος δεν βρέθηκε",
+  "alert.folderBlocked": "Ο φάκελος είναι αποκλεισμένος",
+  "alert.folderPathInvalid": "Μη έγκυρη διαδρομή φακέλου",
+  "alert.rescanBusy": "Η επανασάρωση εκτελείται ήδη",
   "alert.folderRemoveFailed": "Αποτυχία κατά την αφαίρεση του φακέλου",
   "alert.folderReplaceAddFailed": "Αποτυχία αντικατάστασης φακέλου (προσθήκη βήματος).",
   "alert.folderReplaceRemoveFailed": "Αποτυχία αντικατάστασης φακέλου (αφαίρεση βήματος).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "Επαναφορά μαύρης λίστας",
   "confirm.deleteConfig.message": "Θέλετε να διαγράψετε: {name};",
   "confirm.deleteConfig.deleteExtras": "Θέλετε επίσης να διαγράψετε το σχήμα, την cache και τις εικόνες;",
+  "confirm.deleteConfig.deleteSave": "Θέλετε να διαγράψετε τα δεδομένα αποθήκευσης από τη διαδρομή αποθήκευσης;",
   "confirm.deleteConfig.title": "Διαγραφή ρυθμίσεων",
   "confirm.steamApiRemove.message": "Να διαγράψετε το αποθηκευμένο κλειδί API Steam;",
   "confirm.steamApiRemove.title": "Κατάργηση κλειδιού API Steam",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "Πλήκτρο αλληλεπίδρασης overlay",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "Εναλλαγή αλληλεπίδρασης: πατήστε μία φορά για ενεργοποίηση σύρσιμου/κύλισης, πατήστε ξανά για επιστροφή στο κλικ μέσω. Απαιτείται μη τροποποιητικό πλήκτρο (π.χ. \\).",
-  "aria.overlay-interact-shortcut-info": "Εναλλαγή αλληλεπίδρασης: πατήστε μία φορά για ενεργοποίηση σύρσιμου/κύλισης, πατήστε ξανά για επιστροφή στο κλικ μέσω. Απαιτείται μη τροποποιητικό πλήκτρο (π.χ. \\)."
+  "aria.overlay-interact-shortcut-info": "Εναλλαγή αλληλεπίδρασης: πατήστε μία φορά για ενεργοποίηση σύρσιμου/κύλισης, πατήστε ξανά για επιστροφή στο κλικ μέσω. Απαιτείται μη τροποποιητικό πλήκτρο (π.χ. \\).",
+  "placeholder.achievementsSearchInput": "Αναζήτηση επιτευγμάτων…",
+  "title.achievementsSearchToggle": "Αναζήτηση επιτευγμάτων (Ctrl+F)"
 }
-
-
 

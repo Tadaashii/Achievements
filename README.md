@@ -75,8 +75,8 @@ A desktop application built with Electron that monitors running games and displa
 | `utils/watched-folders.js`              | Watcher + auto-select + auto-config                  |
 | `utils/steam-appcache*.js`              | Steam official appcache parsing + schema build       |
 | `utils/exophase-scraper.js`             | Multi-language scraping from Exophase                |
-| `utils/xenia-*`                         | Xenia parsing + schema generation                     |
-| `utils/rpcs3-*`                         | RPCS3 parsing + schema generation                     |
+| `utils/xenia-*`                         | Xenia parsing + schema generation                    |
+| `utils/rpcs3-*`                         | RPCS3 parsing + schema generation                    |
 | `utils/shadps4-*`                       | PS4 trophy parsing + schema generation               |
 | `utils/paths.js`, etc.                  | Other utility modules                                |
 | `presets/`                              | Scalable and non-scalable notification themes        |
@@ -144,6 +144,11 @@ Creates a standalone `.exe` installer in the `dist/` folder.
 - `ps-list` (via `utils/pslist-wrapper.mjs`) provides process snapshots for auto-selection and playtime tracking
 - Interval timers (~2s) keep dashboard cards and playtime state up to date
 
+## ☕ Support
+
+If you’d like to support the project further, you can buy me a coffee on Ko-fi:
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/V7V81U42NF)
+
 ## 🎮 Setup & Configuration
 
 ### Quick Start (Tutorial)
@@ -169,6 +174,7 @@ Creates a standalone `.exe` installer in the `dist/` folder.
    - _Note_: Names are sanitized (illegal filename characters removed, condensed spacing) before saving; the sanitized name is used on disk and for playtime totals.
 
 **Config JSON fields (reference):**
+
 - `appid` (string) – game id
 - `platform` (string) – steam/uplay/gog/epic/xenia/rpcs3/shadps4/steam-official
 - `config_path` (string) – folder containing `achievements.json` and `img/`

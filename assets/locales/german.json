@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "Spielzeit: 0 m",
   "achStatsPlaytimeFmt": "Spielzeit: {value}",
+  "achStatsLastPlayed": "Zuletzt gespielt: N/A",
+  "achStatsLastPlayedFmt": "Zuletzt gespielt: {value}",
   "achStatsProgress": "Fortschritt: {unlocked} / {total}",
   "achStatsText": "Fortschritt: 0 / 0",
   "alert.altAppIdNoImage": "Für den alternativen Namen „AppID“ ist kein Bild verfügbar.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "Beim Laden der Konfiguration ist ein Fehler aufgetreten.",
   "alert.configNotFound": "Konfiguration nicht gefunden!",
   "alert.folderAddFailed": "Hinzufügen des Ordners fehlgeschlagen",
+  "alert.folderNotFound": "Ordner nicht gefunden",
+  "alert.folderBlocked": "Ordner ist blockiert",
+  "alert.folderPathInvalid": "Ungültiger Ordnerpfad",
+  "alert.rescanBusy": "Erneutes Scannen läuft bereits",
   "alert.folderRemoveFailed": "Ordner konnte nicht entfernt werden",
   "alert.folderReplaceAddFailed": "Ersetzen des Ordners fehlgeschlagen (Schritt hinzufügen).",
   "alert.folderReplaceRemoveFailed": "Ersetzen des Ordners fehlgeschlagen (Schritt entfernen).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "Blacklist zurücksetzen",
   "confirm.deleteConfig.message": "Möchten Sie löschen: {name}?",
   "confirm.deleteConfig.deleteExtras": "Möchten Sie auch das Schema, den Cache und die Bilder löschen?",
+  "confirm.deleteConfig.deleteSave": "Möchten Sie die Speicherdaten aus dem Speicherpfad löschen?",
   "confirm.deleteConfig.title": "Konfiguration löschen",
   "confirm.steamApiRemove.message": "Den gespeicherten Steam-API-Schlüssel entfernen?",
   "confirm.steamApiRemove.title": "Steam-API-Schlüssel entfernen",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "Overlay-Interaktionstaste",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "Interaktion umschalten: einmal drücken, um Ziehen/Scrollen zu aktivieren, erneut drücken, um zum Durchklicken zurückzukehren. Erfordert eine Nicht-Modifikatortaste (z. B. \\).",
-  "aria.overlay-interact-shortcut-info": "Interaktion umschalten: einmal drücken, um Ziehen/Scrollen zu aktivieren, erneut drücken, um zum Durchklicken zurückzukehren. Erfordert eine Nicht-Modifikatortaste (z. B. \\)."
+  "aria.overlay-interact-shortcut-info": "Interaktion umschalten: einmal drücken, um Ziehen/Scrollen zu aktivieren, erneut drücken, um zum Durchklicken zurückzukehren. Erfordert eine Nicht-Modifikatortaste (z. B. \\).",
+  "placeholder.achievementsSearchInput": "Erfolge suchen…",
+  "title.achievementsSearchToggle": "Erfolge suchen (Ctrl+F)"
 }
-
-
 

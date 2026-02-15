@@ -57,8 +57,8 @@ const EXOPHASE_LANG_MAP = {
   romanian: "ro",
   russian: "ru",
   spanish: "es",
-  schinese: "zh_CN",
-  tchinese: "zh_TW",
+  schinese: "zh-CN",
+  tchinese: "zh-TW",
   thai: "th",
   turkish: "tr",
   swedish: "se",
@@ -178,7 +178,12 @@ function slugify(input) {
 }
 
 function buildExophaseSlugVariants(input) {
-  const base = String(input || "").trim();
+  const rawBase = String(input || "").trim();
+  const cleaned = rawBase
+    .replace(/\b(trophies?|trophy)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const base = cleaned || rawBase;
   if (!base) return ["game"];
   const normalized = base.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const lower = normalized.toLowerCase();
@@ -509,7 +514,9 @@ async function fetchExophaseAchievementsMultiLang(options = {}) {
     }));
 
     const normalizePair = (a, b) =>
-      `${String(a || "").trim().toLowerCase()}|${String(b || "")
+      `${String(a || "")
+        .trim()
+        .toLowerCase()}|${String(b || "")
         .trim()
         .toLowerCase()}`;
     const englishSignature = baseItems

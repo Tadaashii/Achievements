@@ -426,26 +426,25 @@ function updateSchemaFromTrophy(schemaDir, parsed) {
     fs.writeFileSync(schemaPath, JSON.stringify(entries, null, 2), "utf8");
   }
 
-  schemaLogger.info("rpcs3:schema:updated", {
-    appid: String(parsed?.appid || ""),
-    dir: schemaDir,
-    updated,
-    added,
-    changed,
-    total: entries.length,
-    incoming: incoming.length,
-  });
+  const hasSchemaChanges = updated || added > 0 || changed > 0;
+  if (hasSchemaChanges) {
+    schemaLogger.info("rpcs3:schema:updated", {
+      appid: String(parsed?.appid || ""),
+      dir: schemaDir,
+      updated,
+      added,
+      changed,
+      total: entries.length,
+      incoming: incoming.length,
+    });
+  }
 
   return { updated, added, entries };
 }
 
 async function generateConfigFromTrophyDir(trophyDir, configsDir, options = {}) {
   const appid = path.basename(trophyDir);
-  autoConfigLogger.info("rpcs3:trophy:parse:start", {
-    appid,
-    path: trophyDir,
-  });
-
+  const bootMode = options.bootMode === true;
   let parsed;
   try {
     parsed = parseTrophySetDir(trophyDir);
@@ -465,19 +464,7 @@ async function generateConfigFromTrophyDir(trophyDir, configsDir, options = {}) 
   const schemaRoot = options.schemaRoot || path.join(configsDir, "schema");
   const schemaDir = path.join(schemaRoot, "rpcs3", String(appid));
 
-  autoConfigLogger.info("rpcs3:trophy:parse:success", {
-    appid,
-    title,
-    trophies: trophyCount,
-  });
-
   if (trophyCount === 0) {
-    autoConfigLogger.info("rpcs3:trophy:skip", {
-      appid,
-      title,
-      path: trophyDir,
-      reason: "no-trophies",
-    });
     return { skipped: true, appid, title, reason: "no-trophies" };
   }
 
@@ -518,6 +505,13 @@ async function generateConfigFromTrophyDir(trophyDir, configsDir, options = {}) 
   // Enrich with Exophase (multilang trophies) – keep RPCS3 isolated from other platforms
   if (trophyCount > 0) {
     let skipExo = false;
+    if (bootMode && !schemaChanged) {
+      schemaLogger.info("rpcs3:exophase:skip", {
+        appid: String(appid),
+        reason: "schema-unchanged-boot",
+      });
+      skipExo = true;
+    }
     try {
       if (
         added === 0 &&
@@ -534,10 +528,13 @@ async function generateConfigFromTrophyDir(trophyDir, configsDir, options = {}) 
     // dacă nu am adăugat entry-uri noi și deja avem cel puțin o limbă non-english pe fiecare, sărim
     if (!skipExo && (added > 0 || !hasMultiLang(currentEntries))) {
     const variants = buildExophaseSlugVariants(title || appid);
-    const slugCandidates = [
-      ...variants,
-      ...variants.map((s) => `${s}-ps3`),
-    ];
+    const slugCandidates = Array.from(
+      new Set([
+        ...variants,
+        ...variants.map((s) => `${s}-ps3`),
+        ...variants.map((s) => `${s}-psn`),
+      ]),
+    );
     if (slugCandidates.length) {
       schemaLogger.info("rpcs3:exophase:start", {
         appid: String(appid),
@@ -631,13 +628,6 @@ async function generateConfigFromTrophyDir(trophyDir, configsDir, options = {}) 
     if (hasConfigChanges(existing.data, merged)) {
       fs.writeFileSync(existing.filePath, JSON.stringify(merged, null, 2));
       autoConfigLogger.info("rpcs3:config:updated", {
-        appid,
-        name: merged.name,
-        filePath: existing.filePath,
-        schemaDir,
-      });
-    } else {
-      autoConfigLogger.info("rpcs3:config:unchanged", {
         appid,
         name: merged.name,
         filePath: existing.filePath,

@@ -1,6 +1,8 @@
 {
   "achStatsPlaytime": "Tiempo de reproducción: 0 m",
   "achStatsPlaytimeFmt": "Tiempo de juego: {value}",
+  "achStatsLastPlayed": "Última vez jugado: N/A",
+  "achStatsLastPlayedFmt": "Última vez jugado: {value}",
   "achStatsProgress": "Progreso: {unlocked} / {total}",
   "achStatsText": "Progreso: 0 / 0",
   "alert.altAppIdNoImage": "No hay imagen disponible para el AppID alternativo.",
@@ -14,6 +16,10 @@
   "alert.configLoadFailed": "Algo salió mal al cargar la configuración.",
   "alert.configNotFound": "¡Configuración no encontrada!",
   "alert.folderAddFailed": "No se pudo agregar la carpeta.",
+  "alert.folderNotFound": "No se encontró la carpeta",
+  "alert.folderBlocked": "La carpeta está bloqueada",
+  "alert.folderPathInvalid": "Ruta de la carpeta no válida",
+  "alert.rescanBusy": "El reescaneo ya está en curso",
   "alert.folderRemoveFailed": "No se pudo eliminar la carpeta.",
   "alert.folderReplaceAddFailed": "No se pudo reemplazar la carpeta (agregar paso).",
   "alert.folderReplaceRemoveFailed": "No se pudo reemplazar la carpeta (eliminar paso).",
@@ -55,6 +61,7 @@
   "confirm.blacklistReset.title": "Restablecer lista negra",
   "confirm.deleteConfig.message": "¿Desea eliminar: {name}?",
   "confirm.deleteConfig.deleteExtras": "¿Desea eliminar también el esquema, la caché y las imágenes?",
+  "confirm.deleteConfig.deleteSave": "¿Quieres eliminar los datos de guardado de la ruta de guardado?",
   "confirm.deleteConfig.title": "Eliminar configuración",
   "confirm.steamApiRemove.message": "¿Eliminar la clave API de Steam almacenada?",
   "confirm.steamApiRemove.title": "Eliminar la clave API de Steam",
@@ -430,8 +437,8 @@
   "settings-overlayInteractShortcutTitle": "Tecla de interacción superpuesta",
   "overlay-interact-shortcut-info": "i",
   "title.overlay-interact-shortcut-info": "Alternar interacción: presiona una vez para habilitar arrastrar/desplazar, presiona de nuevo para volver al clic a través. Requiere una tecla no modificadora (p. ej., \\).",
-  "aria.overlay-interact-shortcut-info": "Alternar interacción: presiona una vez para habilitar arrastrar/desplazar, presiona de nuevo para volver al clic a través. Requiere una tecla no modificadora (p. ej., \\)."
+  "aria.overlay-interact-shortcut-info": "Alternar interacción: presiona una vez para habilitar arrastrar/desplazar, presiona de nuevo para volver al clic a través. Requiere una tecla no modificadora (p. ej., \\).",
+  "placeholder.achievementsSearchInput": "Buscar logros…",
+  "title.achievementsSearchToggle": "Buscar logros (Ctrl+F)"
 }
-
-
 

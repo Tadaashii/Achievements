@@ -350,6 +350,9 @@ let selectedPosition = "center-bottom";
 let selectedNotificationScale = 1;
 let bootSeeding = true;
 global.bootDone = false;
+global.bootUiReady = false;
+global.bootOverlayHidden = false;
+let bootOverlayHiddenAt = 0;
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
@@ -1173,29 +1176,10 @@ function registerOverlayShortcut(newShortcut) {
           `Overlay Shortcut Pressed : ${newShortcut}`,
         ),
       );
-        if (overlayWindow && !overlayWindow.isDestroyed()) {
-        if (overlayWindow.isVisible()) {
-          overlayWindow.hide();
-          setOverlayInteractive(false);
-          applyOverlayInteractShortcutRegistration();
-        } else {
-          if (typeof overlayWindow.showInactive === "function") {
-            overlayWindow.showInactive();
-          } else {
-            overlayWindow.show();
-          }
-          applyOverlayInteractShortcutRegistration();
-        }
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        setOverlayPresented(!overlayPresented);
       } else {
         createOverlayWindow(selectedConfig);
-        if (overlayWindow && !overlayWindow.isDestroyed()) {
-          if (typeof overlayWindow.showInactive === "function") {
-            overlayWindow.showInactive();
-          } else {
-            overlayWindow.show();
-          }
-          applyOverlayInteractShortcutRegistration();
-        }
       }
     });
 
@@ -1226,33 +1210,156 @@ function registerOverlayShortcut(newShortcut) {
 function applyOverlayInputMode() {
   if (!overlayWindow || overlayWindow.isDestroyed()) return;
   try {
-    overlayWindow.setIgnoreMouseEvents(!overlayInteractive, { forward: true });
+    if (overlayInteractive) {
+      overlayWindow.setIgnoreMouseEvents(false);
+    } else {
+      overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+    }
   } catch {}
 }
 
 function applyOverlayFocusMode() {
   if (!overlayWindow || overlayWindow.isDestroyed()) return;
   try {
-    if (overlayInteractive) {
-      overlayWindow.setFocusable(true);
-    } else {
-      if (overlayWindow.isFocused()) {
-        overlayWindow.blur();
-      }
+    if (overlayWindow.isFocused()) overlayWindow.blur();
+    overlayWindow.setFocusable(false);
+  } catch {}
+}
+
+function setOverlayPresented(next) {
+  overlayPresented = !!next;
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+
+  if (overlayPresented) {
+    // Always start in click-through mode when presenting.
+    setOverlayInteractive(false);
+
+    // Keep overlay non-focusable even if something outside toggles it.
+    try {
+      overlayWindow.setSkipTaskbar(true);
+    } catch {}
+    try {
       overlayWindow.setFocusable(false);
+    } catch {}
+    try {
+      if (!overlayWindow.isVisible()) {
+        if (typeof overlayWindow.showInactive === "function") {
+          overlayWindow.showInactive();
+        } else {
+          // overlayWindow.show();
+        }
+      }
+    } catch {}
+    try {
+      overlayWindow.webContents.send("overlay:set-visible", { visible: true });
+    } catch {}
+    applyOverlayInteractShortcutRegistration();
+    applyOverlayKeyboardScrollShortcutRegistration();
+    return;
+  }
+
+  // Hide completely + click-through, and unregister shortcuts.
+  setOverlayInteractive(false);
+  clearOverlayInteractShortcut();
+  clearOverlayKeyboardScrollShortcuts();
+  stopOverlayGlobalDrag();
+  try {
+    overlayWindow.webContents.send("overlay:set-visible", { visible: false });
+  } catch {}
+  try {
+    overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+  } catch {}
+}
+
+function clearOverlayKeyboardScrollShortcuts() {
+  if (registeredOverlayScrollPageUpShortcut) {
+    globalShortcut.unregister(registeredOverlayScrollPageUpShortcut);
+    registeredOverlayScrollPageUpShortcut = null;
+  }
+  if (registeredOverlayScrollPageDownShortcut) {
+    globalShortcut.unregister(registeredOverlayScrollPageDownShortcut);
+    registeredOverlayScrollPageDownShortcut = null;
+  }
+}
+
+function applyOverlayKeyboardScrollShortcutRegistration() {
+  if (
+    !overlayWindow ||
+    overlayWindow.isDestroyed() ||
+    !overlayPresented ||
+    !overlayWindow.isVisible()
+  ) {
+    clearOverlayKeyboardScrollShortcuts();
+    return;
+  }
+  try {
+    if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused()) {
+      clearOverlayKeyboardScrollShortcuts();
+      return;
     }
   } catch {}
+
+  const registerIfNeeded = (accelerator, onFire, setter) => {
+    if (setter()) return;
+    try {
+      const ok = globalShortcut.register(accelerator, onFire);
+      if (ok) setter(accelerator);
+    } catch {}
+  };
+
+  registerIfNeeded(
+    "PageUp",
+    () => {
+      if (
+        !overlayWindow ||
+        overlayWindow.isDestroyed() ||
+        !overlayPresented ||
+        !overlayWindow.isVisible()
+      )
+        return;
+      overlayWindow.webContents.send("overlay:scroll-page", {
+        direction: "up",
+      });
+    },
+    (acc) => {
+      if (typeof acc === "string") registeredOverlayScrollPageUpShortcut = acc;
+      return !!registeredOverlayScrollPageUpShortcut;
+    },
+  );
+
+  registerIfNeeded(
+    "PageDown",
+    () => {
+      if (
+        !overlayWindow ||
+        overlayWindow.isDestroyed() ||
+        !overlayPresented ||
+        !overlayWindow.isVisible()
+      )
+        return;
+      overlayWindow.webContents.send("overlay:scroll-page", {
+        direction: "down",
+      });
+    },
+    (acc) => {
+      if (typeof acc === "string")
+        registeredOverlayScrollPageDownShortcut = acc;
+      return !!registeredOverlayScrollPageDownShortcut;
+    },
+  );
 }
 
 function setOverlayInteractive(next) {
   overlayInteractive = !!next;
+  if (!overlayInteractive) stopOverlayGlobalDrag();
   applyOverlayInputMode();
   applyOverlayFocusMode();
+  applyOverlayKeyboardScrollShortcutRegistration();
 }
 
 function toggleOverlayInteractive() {
   if (!overlayWindow || overlayWindow.isDestroyed()) return;
-  if (!overlayWindow.isVisible()) return;
+  if (!overlayPresented || !overlayWindow.isVisible()) return;
   setOverlayInteractive(!overlayInteractive);
 }
 
@@ -1264,7 +1371,12 @@ function clearOverlayInteractShortcut() {
 }
 
 function applyOverlayInteractShortcutRegistration() {
-  if (!overlayWindow || overlayWindow.isDestroyed() || !overlayWindow.isVisible()) {
+  if (
+    !overlayWindow ||
+    overlayWindow.isDestroyed() ||
+    !overlayPresented ||
+    !overlayWindow.isVisible()
+  ) {
     clearOverlayInteractShortcut();
     return;
   }
@@ -1282,7 +1394,10 @@ function normalizeOverlayInteractAccelerator(shortcut) {
   if (!shortcut || typeof shortcut !== "string") return null;
   const trimmed = shortcut.trim();
   if (!trimmed) return null;
-  const parts = trimmed.split("+").map((part) => part.trim()).filter(Boolean);
+  const parts = trimmed
+    .split("+")
+    .map((part) => part.trim())
+    .filter(Boolean);
   const seen = new Set();
   const out = [];
   const pushToken = (token) => {
@@ -1328,17 +1443,49 @@ function registerOverlayInteractShortcut(newShortcut) {
     const accelerator = normalizeOverlayInteractAccelerator(newShortcut);
     if (!accelerator) return;
 
-    const registered = globalShortcut.register(accelerator, () => {
-      toggleOverlayInteractive();
-    });
+    const candidates = (() => {
+      const parts = accelerator
+        .split("+")
+        .map((part) => part.trim())
+        .filter(Boolean);
+      if (!parts.length) return [];
 
-    if (!registered) {
-      notifyError(
-        tUi("main.notify.shortcutSaveRejected", { shortcut: newShortcut }),
-      );
-    } else {
-      registeredOverlayInteractShortcut = accelerator;
+      const out = [];
+      const push = (value) => {
+        if (!value) return;
+        if (!out.includes(value)) out.push(value);
+      };
+      const join = (arr) => arr.join("+");
+
+      push(join(parts));
+      push(join(parts.map((p) => (p === "\\" ? "Backslash" : p))));
+      push(join(parts.map((p) => (/^backslash$/i.test(p) ? "\\" : p))));
+      push(join(parts.map((p) => (p === "\\" ? "Oem5" : p))));
+      push(join(parts.map((p) => (p === "\\" ? "OEM_5" : p))));
+
+      return out;
+    })();
+
+    let lastErr = null;
+    for (const candidate of candidates) {
+      try {
+        const registered = globalShortcut.register(candidate, () => {
+          toggleOverlayInteractive();
+        });
+        if (registered) {
+          registeredOverlayInteractShortcut = candidate;
+          return;
+        }
+      } catch (err) {
+        lastErr = err;
+      }
     }
+
+    if (lastErr) throw lastErr;
+
+    notifyError(
+      tUi("main.notify.shortcutSaveRejected", { shortcut: newShortcut }),
+    );
   } catch (err) {
     notifyError(
       tUi("main.notify.shortcutSaveFailed", {
@@ -1540,10 +1687,9 @@ function applyPreferenceSideEffects(
   }
   if (Object.prototype.hasOwnProperty.call(patch, "showHiddenDescription")) {
     if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.webContents.send(
-        "overlay-preferences-updated",
-        { showHiddenDescription: prefsSnapshot.showHiddenDescription === true },
-      );
+      overlayWindow.webContents.send("overlay-preferences-updated", {
+        showHiddenDescription: prefsSnapshot.showHiddenDescription === true,
+      });
     }
   }
   if (options.removeSteamKey === true) {
@@ -1592,9 +1738,6 @@ function updatePreferences(patch = {}) {
     }
 
     if (changedKeys.length === 0) {
-      prefsLogger.info("preferences:update:no-change", {
-        keys: Object.keys(incoming || {}),
-      });
       return current;
     }
 
@@ -1627,9 +1770,6 @@ function updatePreferences(patch = {}) {
 }
 
 ipcMain.handle("preferences:update", async (_event, newPrefs) => {
-  prefsLogger.info("preferences:update:requested", {
-    keys: newPrefs ? Object.keys(newPrefs) : [],
-  });
   return updatePreferences(newPrefs || {});
 });
 
@@ -1897,7 +2037,6 @@ async function saveFullScreenShot(gameName, achDisplayName) {
 }
 
 ipcMain.handle("load-preferences", () => {
-  prefsLogger.info("load-preferences:requested");
   cachedPreferences = readPrefsSafe();
   if (
     !Object.prototype.hasOwnProperty.call(
@@ -1927,9 +2066,6 @@ ipcMain.handle("load-preferences", () => {
   ) {
     delete cachedPreferences.steamApiKey;
   }
-  prefsLogger.info("load-preferences:loaded", {
-    keys: cachedPreferences ? Object.keys(cachedPreferences) : [],
-  });
   const safePrefs = { ...cachedPreferences };
   if (safePrefs.steamApiKey) {
     safePrefs.steamApiKeyMasked = maskSteamApiKey(safePrefs.steamApiKey);
@@ -2095,6 +2231,9 @@ function requestDashboardRefresh() {
 
 ipcMain.handle("dashboard:set-open", (_e, state) => {
   dashboardOpen = !!state;
+  try {
+    global.dashboardOpen = dashboardOpen;
+  } catch {}
   if (dashboardOpen && pendingDashboardRefresh) {
     requestDashboardRefresh();
   }
@@ -2106,8 +2245,16 @@ ipcMain.handle("dashboard:is-open", () => {
 });
 ipcMain.handle("boot:status", () => ({
   bootDone: global.bootDone === true,
+  uiReady: global.bootUiReady === true,
   bootSeeding,
+  bootManualSeedComplete: global.bootManualSeedComplete === true,
 }));
+ipcMain.on("boot:overlay-hidden", () => {
+  if (global.bootOverlayHidden === true) return;
+  global.bootOverlayHidden = true;
+  bootOverlayHiddenAt = Date.now();
+  appLogger.info("boot:overlay-hidden", { at: bootOverlayHiddenAt });
+});
 
 // List existing configs
 function listConfigs() {
@@ -2130,8 +2277,8 @@ function isRpcs3ConfigName(configName) {
   }
 }
 
-function readCacheSilent(configName) {
-  const cachePath = getCachePath(configName);
+function readCacheSilent(configName, platform = "steam") {
+  const cachePath = getCachePath(configName, platform);
   if (!fs.existsSync(cachePath)) return null;
   try {
     return JSON.parse(fs.readFileSync(cachePath, "utf8"));
@@ -2540,6 +2687,15 @@ ipcMain.handle("loadConfigs", () => {
         meta.appid = String(raw.appid);
         meta.blacklisted = blacklist.has(meta.appid);
       }
+      if (raw?.executable) {
+        meta.executable = raw.executable;
+      }
+      if (raw?.arguments !== undefined) {
+        meta.arguments = raw.arguments;
+      }
+      if (raw?.process_name) {
+        meta.process_name = raw.process_name;
+      }
     } catch (err) {
       ipcLogger.warn("loadConfigs:parse-failed", {
         file: fullPath,
@@ -2652,6 +2808,13 @@ ipcMain.handle("load-saved-achievements", async (_event, configName) => {
       ipcLogger.warn("load-saved-achievements:missing-name", { configName });
       return { achievements: {}, save_path: "", error: "configName required" };
     }
+    const seedWaitTimedOut = await waitForBootManualSeedBeforeLoad(15000);
+    if (seedWaitTimedOut && !bootManualSeedWaitWarned) {
+      bootManualSeedWaitWarned = true;
+      ipcLogger.warn("load-saved-achievements:seed-wait-timeout", {
+        timeoutMs: 15000,
+      });
+    }
     const safeName = sanitizeConfigName(configName);
     const configPath = path.join(configsDir, `${safeName}.json`);
     if (!fs.existsSync(configPath)) {
@@ -2674,8 +2837,8 @@ ipcMain.handle("load-saved-achievements", async (_event, configName) => {
       "gog",
       "epic",
     ]);
-    const getCacheFallback = () =>
-      loadPreviousAchievements(configName, normalizedPlatform) || {};
+    const getCacheFallback = async () =>
+      (await loadPreviousAchievements(configName, normalizedPlatform)) || {};
     const shouldUseCacheFallback = () =>
       cacheFallbackPlatforms.has(normalizedPlatform);
 
@@ -2683,7 +2846,7 @@ ipcMain.handle("load-saved-achievements", async (_event, configName) => {
       const gpdPath = resolveGpdPathForConfig(config);
       if (!gpdPath || !fs.existsSync(gpdPath)) {
         if (shouldUseCacheFallback()) {
-          const cached = getCacheFallback();
+          const cached = await getCacheFallback();
           if (cached && Object.keys(cached).length) {
             return {
               achievements: cached,
@@ -2726,7 +2889,10 @@ ipcMain.handle("load-saved-achievements", async (_event, configName) => {
       try {
         const parsed = parseTrophySetDir(trophyDir);
         const snapshot = buildSnapshotFromTrophy(parsed);
-        const cached = loadPreviousAchievements(configName, normalizedPlatform);
+        const cached = await loadPreviousAchievements(
+          configName,
+          normalizedPlatform,
+        );
         const merged = mergeRpcs3EarnedTime(snapshot, cached);
         return {
           achievements: merged || snapshot || {},
@@ -2757,7 +2923,8 @@ ipcMain.handle("load-saved-achievements", async (_event, configName) => {
         parsed.appid = config.appid || parsed.appid;
         const snapshot = require("./utils/shadps4-trophy").buildSnapshotFromPs4(
           parsed,
-          loadPreviousAchievements(configName, normalizedPlatform) || {},
+          (await loadPreviousAchievements(configName, normalizedPlatform)) ||
+            {},
         );
         return {
           achievements: snapshot || {},
@@ -2792,11 +2959,11 @@ ipcMain.handle("load-saved-achievements", async (_event, configName) => {
         : [];
       const statsDir = config.save_path || "";
       const cached =
-        loadPreviousAchievements(
+        (await loadPreviousAchievements(
           configName,
           normalizedPlatform,
           config.save_path || trophyDir,
-        ) || {};
+        )) || {};
       const userBin =
         statsDir && config.appid
           ? pickLatestUserBin(statsDir, config.appid)
@@ -2885,7 +3052,7 @@ ipcMain.handle("load-saved-achievements", async (_event, configName) => {
     const hasAchievements =
       achievements && Object.keys(achievements).length > 0;
     if (!hasAchievements && !effectiveSavePath && shouldUseCacheFallback()) {
-      const cached = getCacheFallback();
+      const cached = await getCacheFallback();
       if (cached && Object.keys(cached).length) {
         return {
           achievements: cached,
@@ -2913,7 +3080,12 @@ ipcMain.handle("delete-config", async (_event, payload) => {
   const configName =
     typeof payload === "string" ? payload : payload?.configName;
   const deleteExtras = payload?.deleteExtras === true;
-  ipcLogger.info("delete-config:request", { configName, deleteExtras });
+  const deleteSaveFiles = payload?.deleteSaveFiles === true;
+  ipcLogger.info("delete-config:request", {
+    configName,
+    deleteExtras,
+    deleteSaveFiles,
+  });
   if (!configName || typeof configName !== "string") {
     return { success: false, error: "Config name missing." };
   }
@@ -2922,8 +3094,9 @@ ipcMain.handle("delete-config", async (_event, payload) => {
     const configPath = path.join(configsDir, `${safeName}.json`);
     //const configPath = path.join(process.env.APPDATA, 'Achievements', 'configs', `${safe}.json`);
     if (fs.existsSync(configPath)) {
-      if (deleteExtras) {
-        let configData = null;
+      const needsConfigData = deleteExtras || deleteSaveFiles;
+      let configData = null;
+      if (needsConfigData) {
         try {
           configData = JSON.parse(fs.readFileSync(configPath, "utf8"));
         } catch (err) {
@@ -2932,15 +3105,24 @@ ipcMain.handle("delete-config", async (_event, payload) => {
             error: err?.message || String(err),
           });
         }
-        const appid =
-          sanitizeAppId(configData?.appid) ||
+      }
+      const appid = needsConfigData
+        ? sanitizeAppId(configData?.appid) ||
           sanitizeAppId(configData?.appId) ||
           sanitizeAppId(configData?.steamAppId) ||
-          "";
-        const platform =
-          normalizePlatform(configData?.platform) ||
+          ""
+        : "";
+      const platform = needsConfigData
+        ? normalizePlatform(configData?.platform) ||
           getPlatformForAppId(appid) ||
-          "steam";
+          "steam"
+        : "steam";
+      const savePath =
+        needsConfigData && typeof configData?.save_path === "string"
+          ? configData.save_path
+          : "";
+
+      if (deleteExtras) {
         try {
           const cachePath = getCachePath(configName, platform);
           if (fs.existsSync(cachePath)) fs.unlinkSync(cachePath);
@@ -3000,6 +3182,152 @@ ipcMain.handle("delete-config", async (_event, payload) => {
               appid,
               error: err?.message || String(err),
             });
+          }
+        }
+      }
+      if (deleteSaveFiles) {
+        if (platform === "steam-official") {
+          ipcLogger.info("delete-config:save-delete-skip", {
+            configName,
+            platform,
+          });
+        } else {
+          const deleteFile = (p) => {
+            if (!p || typeof p !== "string") return;
+            try {
+              if (fs.existsSync(p) && fs.statSync(p).isFile()) {
+                fs.unlinkSync(p);
+                ipcLogger.info("delete-config:save-delete", {
+                  configName,
+                  path: p,
+                });
+              }
+            } catch (err) {
+              ipcLogger.warn("delete-config:save-delete-failed", {
+                configName,
+                path: p,
+                error: err?.message || String(err),
+              });
+            }
+          };
+          const deleteDir = (dir) => {
+            if (!dir || typeof dir !== "string") return false;
+            try {
+              if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+                try {
+                  fs.rmSync(dir, { recursive: true, force: true });
+                } catch {
+                  fs.rmdirSync(dir, { recursive: true });
+                }
+                ipcLogger.info("delete-config:save-delete-dir", {
+                  configName,
+                  path: dir,
+                });
+                return true;
+              }
+            } catch (err) {
+              ipcLogger.warn("delete-config:save-delete-dir-failed", {
+                configName,
+                path: dir,
+                error: err?.message || String(err),
+              });
+            }
+            return false;
+          };
+          const deleteAllMatching = (dir, matcher) => {
+            if (!dir || typeof dir !== "string") return;
+            try {
+              const entries = fs.readdirSync(dir);
+              for (const name of entries) {
+                if (matcher(name)) {
+                  deleteFile(path.join(dir, name));
+                }
+              }
+            } catch (err) {
+              ipcLogger.warn("delete-config:save-scan-failed", {
+                configName,
+                dir,
+                error: err?.message || String(err),
+              });
+            }
+          };
+
+          const appidStr = String(appid || "").trim();
+          const saveBase = savePath || "";
+          const appidDirs = new Set();
+          const addDir = (dir) => {
+            if (dir && typeof dir === "string") appidDirs.add(dir);
+          };
+
+          if (appidStr && saveBase) {
+            const baseLower = saveBase.toLowerCase();
+            const appLower = appidStr.toLowerCase();
+            addDir(path.join(saveBase, appidStr));
+            if (!baseLower.endsWith(`${path.sep}steam_settings`)) {
+              addDir(path.join(saveBase, "steam_settings", appidStr));
+            }
+            if (!baseLower.endsWith(`${path.sep}remote`)) {
+              addDir(path.join(saveBase, "remote", appidStr));
+            }
+            addDir(path.join(saveBase, normalizePlatform(platform), appidStr));
+            if (path.basename(baseLower) === appLower) addDir(saveBase);
+          }
+
+          if (platform === "rpcs3") {
+            const trophyDir = resolveRpcs3TrophyDirForConfig(configData || {});
+            if (trophyDir) {
+              const base = path.basename(trophyDir).toLowerCase();
+              if (appidStr && base === appidStr.toLowerCase()) {
+                addDir(trophyDir);
+              }
+            }
+          } else if (platform === "shadps4") {
+            const trophyDir =
+              typeof configData?.trophy_path === "string" &&
+              configData.trophy_path
+                ? configData.trophy_path
+                : saveBase;
+            if (trophyDir) {
+              const appDir = path.dirname(path.dirname(trophyDir));
+              const base = path.basename(appDir || "").toLowerCase();
+              if (appidStr && base === appidStr.toLowerCase()) addDir(appDir);
+            }
+          }
+
+          let deletedDir = false;
+          for (const dir of appidDirs) {
+            if (deleteDir(dir)) deletedDir = true;
+          }
+
+          if (!deletedDir) {
+            if (platform === "rpcs3") {
+              const tropusr = resolveTropusrPathForConfig(configData || {});
+              deleteFile(tropusr);
+            } else if (platform === "shadps4") {
+              const trophyDir = saveBase || "";
+              if (trophyDir) {
+                const xmlDir = path.join(trophyDir, "Xml");
+                deleteAllMatching(xmlDir, (n) =>
+                  /^trop(_\d{2})?\.xml$/i.test(n),
+                );
+              }
+            } else if (platform === "xenia") {
+              const gpd = resolveGpdPathForConfig(configData || {});
+              deleteFile(gpd);
+            } else if (saveBase) {
+              const saveJsonPath = resolveSaveFilePath(saveBase, appid);
+              const {
+                tenokeIni: tenokeIniPath,
+                ini: achievementsIniPath,
+                ofx: achievementsIniOnlineFixPath,
+                bin: achievementsBinPath,
+              } = resolveSaveSidecarPaths(saveBase, appid);
+              deleteFile(saveJsonPath);
+              deleteFile(tenokeIniPath);
+              deleteFile(achievementsIniPath);
+              deleteFile(achievementsIniOnlineFixPath);
+              deleteFile(achievementsBinPath);
+            }
           }
         }
       }
@@ -3618,7 +3946,9 @@ function createMainWindow(options = {}) {
       const shouldStartInTray = !!prefs.startInTray;
       const shouldStartMaximized = !!prefs.startMaximized;
       const zoom = Number(prefs.windowZoomFactor) || 1;
-      applyMainWindowZoomFactor(zoom);
+      setTimeout(() => {
+        applyMainWindowZoomFactor(zoom);
+      }, POST_BOOT_ZOOM_DELAY_MS);
       if (forceShowOnLoad || !shouldStartInTray) {
         if (shouldStartMaximized) {
           mainWindow.maximize();
@@ -3626,7 +3956,9 @@ function createMainWindow(options = {}) {
         mainWindow.show();
       }
     } catch (e) {
-      applyMainWindowZoomFactor(1);
+      setTimeout(() => {
+        applyMainWindowZoomFactor(1);
+      }, POST_BOOT_ZOOM_DELAY_MS);
       mainWindow.show();
     }
     windowLogger.info("create-main-window:visible", {
@@ -3667,6 +3999,18 @@ function createMainWindow(options = {}) {
       mainWindow.webContents.send("window-fullscreen-change", false);
     }
   });
+
+  const refreshOverlayKeyboardScrollShortcuts = () => {
+    try {
+      applyOverlayKeyboardScrollShortcutRegistration();
+    } catch {}
+  };
+  mainWindow.on("focus", refreshOverlayKeyboardScrollShortcuts);
+  mainWindow.on("blur", refreshOverlayKeyboardScrollShortcuts);
+  mainWindow.on("minimize", refreshOverlayKeyboardScrollShortcuts);
+  mainWindow.on("restore", refreshOverlayKeyboardScrollShortcuts);
+  mainWindow.on("show", refreshOverlayKeyboardScrollShortcuts);
+  mainWindow.on("hide", refreshOverlayKeyboardScrollShortcuts);
 
   mainWindow.on("move", () => scheduleMainWindowZoomUpdate());
   mainWindow.on("resize", () => scheduleMainWindowZoomUpdate());
@@ -3872,7 +4216,7 @@ function createNotificationWindow(message) {
   return notificationWindow;
 }
 
-ipcMain.on("show-notification", (_event, achievement) => {
+ipcMain.on("show-notification", async (_event, achievement) => {
   const configName =
     achievement?.configName ||
     achievement?.config_name ||
@@ -3885,11 +4229,11 @@ ipcMain.on("show-notification", (_event, achievement) => {
       : null);
   if (configName && achKey) {
     const prev =
-      loadPreviousAchievements(
+      (await loadPreviousAchievements(
         configName,
         normalizePlatform(payload?.platform) || "steam",
         payload?.save_path || "",
-      ) || {};
+      )) || {};
     const prevEntry = prev[achKey];
     const incomingProg = Number(achievement.progress);
     const prevProg = Number(prevEntry?.progress);
@@ -4474,11 +4818,237 @@ function getCachePath(configName, platform = "steam") {
   return path.join(cacheDir, `${key}_achievements_cache.json`);
 }
 
+const achCacheMetaPath = (() => {
+  try {
+    if (app && typeof app.getPath === "function") {
+      const dir = app.getPath("userData");
+      if (dir) return path.join(dir, "ach_cache_meta.json");
+    }
+  } catch {}
+  if (preferencesPath) {
+    try {
+      return path.join(path.dirname(preferencesPath), "ach_cache_meta.json");
+    } catch {}
+  }
+  if (configsDir) {
+    try {
+      return path.join(path.dirname(configsDir), "ach_cache_meta.json");
+    } catch {}
+  }
+  return "";
+})();
+let achCacheMetaLoaded = false;
+const achCacheMeta = new Map();
+
+function normalizeAchCacheMetaPath(inputPath) {
+  if (!inputPath) return "";
+  try {
+    return fs.realpathSync(inputPath);
+  } catch {
+    return path.resolve(String(inputPath));
+  }
+}
+
+function loadAchCacheMetaOnce() {
+  if (achCacheMetaLoaded) return;
+  achCacheMetaLoaded = true;
+  if (!achCacheMetaPath || !fs.existsSync(achCacheMetaPath)) return;
+  try {
+    const raw = fs.readFileSync(achCacheMetaPath, "utf8");
+    const parsed = JSON.parse(raw);
+    const files =
+      parsed && typeof parsed === "object" && parsed.files
+        ? parsed.files
+        : parsed;
+    if (!files || typeof files !== "object") return;
+    for (const [key, entry] of Object.entries(files)) {
+      if (!entry || typeof entry !== "object") continue;
+      const mtimeMs = Number(entry.mtimeMs ?? entry.mtime ?? 0);
+      const size = Number(entry.size ?? 0);
+      if (!Number.isFinite(mtimeMs) || !Number.isFinite(size)) continue;
+      achCacheMeta.set(key, { mtimeMs, size });
+    }
+  } catch {}
+}
+
+function getAchCacheMetaKey(configName, platform, filePath, appid = "") {
+  const normalizedPath = normalizeAchCacheMetaPath(filePath);
+  if (!normalizedPath) return "";
+  const safeName = sanitizeConfigName(configName || "") || String(appid || "");
+  const normalizedPlatform = normalizePlatform(platform) || "steam";
+  if (!safeName) return "";
+  return `${safeName}::${normalizedPlatform}::${normalizedPath}`;
+}
+
+function isAchCacheMetaMatch(configName, platform, filePath, appid = "") {
+  const key = getAchCacheMetaKey(configName, platform, filePath, appid);
+  if (!key) return false;
+  loadAchCacheMetaOnce();
+  const entry = achCacheMeta.get(key);
+  if (!entry || typeof entry !== "object") return false;
+  let stat = null;
+  try {
+    stat = fs.statSync(filePath);
+  } catch {
+    return false;
+  }
+  const expectedMtime = Number(entry.mtimeMs ?? 0);
+  const expectedSize = Number(entry.size ?? 0);
+  if (!Number.isFinite(expectedMtime) || !Number.isFinite(expectedSize)) {
+    return false;
+  }
+  return stat.mtimeMs === expectedMtime && stat.size === expectedSize;
+}
+
+function resolveBootSeedCandidatePath(config) {
+  const savePathRaw = config?.save_path;
+  if (!savePathRaw) return null;
+  let saveRoot = savePathRaw;
+  let candidatePath = null;
+  try {
+    const stat = fs.statSync(savePathRaw);
+    if (stat.isFile()) {
+      candidatePath = savePathRaw;
+      saveRoot = path.dirname(savePathRaw);
+    }
+  } catch {}
+  if (!candidatePath) {
+    if (!fs.existsSync(saveRoot)) return null;
+    const appid = String(config?.appid || "").trim();
+    const saveJsonPath = resolveSaveFilePath(saveRoot, appid);
+    const {
+      tenokeIni: tenokeIniPath,
+      ini: iniPath,
+      ofx: onlineFixIniPath,
+      bin: binPath,
+    } = resolveSaveSidecarPaths(saveRoot, appid);
+    if (fs.existsSync(saveJsonPath)) candidatePath = saveJsonPath;
+    else if (tenokeIniPath) candidatePath = tenokeIniPath;
+    else if (onlineFixIniPath) candidatePath = onlineFixIniPath;
+    else if (iniPath) candidatePath = iniPath;
+    else if (binPath) candidatePath = binPath;
+    else if (appid) {
+      candidatePath = findAchievementFileDeepForAppId(saveRoot, appid, 2);
+    } else {
+      candidatePath = findAchievementFileDeep(saveRoot, 2);
+    }
+  }
+  return candidatePath || null;
+}
+
 const bootSeededCacheKeys = new Set();
 let bootManualSeedScheduled = false;
 let bootManualSeedRunning = false;
-const cacheHitLogTimes = new Map();
-const CACHE_HIT_LOG_WINDOW_MS = 2000;
+let bootManualSeedComplete = false;
+let bootManualSeedWaitWarned = false;
+let bootManualSeedCompletionResolve = null;
+let bootPostSeedLimiterActive = false;
+const BOOT_MANUAL_POST_SEED_DELAY_MS = 1000;
+const BOOT_MANUAL_AFTER_OVERLAY_HIDE_DELAY_MS = 2000;
+const BOOT_MANUAL_OVERLAY_WAIT_MAX_MS = 20000;
+let bootOverlayWaitStartedAt = 0;
+const bootManualSeedCompletion = new Promise((resolve) => {
+  bootManualSeedCompletionResolve = resolve;
+});
+const CACHE_BATCH_LOG_INTERVAL_MS = 1000;
+const cacheBatchWindow = {
+  hits: 0,
+  misses: 0,
+  seeded: 0,
+  errors: 0,
+};
+const cacheBatchTotals = {
+  hits: 0,
+  misses: 0,
+  seeded: 0,
+  errors: 0,
+};
+let cacheBatchTimer = null;
+try {
+  global.bootManualSeedComplete = false;
+} catch {}
+
+function hasCacheBatchPending() {
+  return (
+    cacheBatchWindow.hits > 0 ||
+    cacheBatchWindow.misses > 0 ||
+    cacheBatchWindow.seeded > 0 ||
+    cacheBatchWindow.errors > 0
+  );
+}
+
+function flushCacheBatchWindow(reason = "interval", force = false) {
+  if (cacheBatchTimer) {
+    clearTimeout(cacheBatchTimer);
+    cacheBatchTimer = null;
+  }
+  if (!force && !hasCacheBatchPending()) return;
+  const payload = {
+    reason,
+    ...cacheBatchWindow,
+  };
+  persistenceLogger.info("load-achievement-cache:batch", payload);
+  cacheBatchWindow.hits = 0;
+  cacheBatchWindow.misses = 0;
+  cacheBatchWindow.seeded = 0;
+  cacheBatchWindow.errors = 0;
+}
+
+function scheduleCacheBatchFlush() {
+  if (cacheBatchTimer) return;
+  cacheBatchTimer = setTimeout(() => {
+    flushCacheBatchWindow("interval");
+  }, CACHE_BATCH_LOG_INTERVAL_MS);
+}
+
+function bumpCacheBatchStat(field, amount = 1) {
+  if (!Object.prototype.hasOwnProperty.call(cacheBatchWindow, field)) return;
+  const step = Number(amount) || 0;
+  if (step <= 0) return;
+  cacheBatchWindow[field] += step;
+  cacheBatchTotals[field] += step;
+  scheduleCacheBatchFlush();
+}
+
+function markBootManualSeedComplete() {
+  if (bootManualSeedComplete) return;
+  bootManualSeedComplete = true;
+  try {
+    global.bootManualSeedComplete = true;
+  } catch {}
+  scheduleOverlayDragHookAfterBootComplete();
+  flushCacheBatchWindow("boot-manual-seed-complete");
+  persistenceLogger.info("load-achievement-cache:summary", {
+    phase: "boot-manual-seed-complete",
+    ...cacheBatchTotals,
+  });
+  try {
+    broadcastToAll("boot:manual-seed-complete", { complete: true });
+  } catch {}
+  try {
+    bootManualSeedCompletionResolve?.();
+  } catch {}
+  bootManualSeedCompletionResolve = null;
+}
+
+async function waitForBootManualSeedBeforeLoad(timeoutMs = 15000) {
+  if (bootManualSeedComplete) return false;
+  if (!bootManualSeedScheduled) return false;
+  const ms = Math.max(0, Number(timeoutMs) || 0);
+  let timeout = null;
+  let timedOut = false;
+  await Promise.race([
+    bootManualSeedCompletion,
+    new Promise((resolve) => {
+      timeout = setTimeout(() => {
+        timedOut = true;
+        resolve();
+      }, ms);
+    }),
+  ]);
+  if (timeout) clearTimeout(timeout);
+  return timedOut;
+}
 
 function normalizeCacheSeedPath(input) {
   if (!input) return "";
@@ -4527,29 +5097,77 @@ function markCacheSeedKeyFromName(configName) {
   return fallback;
 }
 
-function loadPreviousAchievements(configName, platform = "steam") {
+const BOOT_CACHE_READ_CONCURRENCY = 10;
+const BOOT_CACHE_READ_SLICE_MS = 100;
+let bootCacheReadLimiter = null;
+
+function isBootCacheReadActive() {
+  return global.bootDone !== true || bootPostSeedLimiterActive;
+}
+
+function createLimiter(limit, sliceMs) {
+  const max = Math.max(1, Number(limit) || 1);
+  const slice = Math.max(0, Number(sliceMs) || 0);
+  let active = 0;
+  const queue = [];
+
+  const pump = () => {
+    while (active < max && queue.length) {
+      const job = queue.shift();
+      active += 1;
+      Promise.resolve()
+        .then(job.fn)
+        .then(job.resolve, job.reject)
+        .finally(() => {
+          active -= 1;
+          if (slice > 0) {
+            setTimeout(pump, slice);
+          } else {
+            setTimeout(pump, 0);
+          }
+        });
+    }
+  };
+
+  return (fn) =>
+    new Promise((resolve, reject) => {
+      queue.push({ fn, resolve, reject });
+      pump();
+    });
+}
+
+function getBootCacheReadLimiter() {
+  if (!bootCacheReadLimiter) {
+    bootCacheReadLimiter = createLimiter(
+      BOOT_CACHE_READ_CONCURRENCY,
+      BOOT_CACHE_READ_SLICE_MS,
+    );
+  }
+  return bootCacheReadLimiter;
+}
+
+async function readCacheJson(pathToRead) {
+  if (!isBootCacheReadActive()) {
+    const raw = fs.readFileSync(pathToRead, "utf8");
+    return JSON.parse(raw);
+  }
+  const limiter = getBootCacheReadLimiter();
+  return limiter(async () => {
+    const raw = await fs.promises.readFile(pathToRead, "utf8");
+    return JSON.parse(raw);
+  });
+}
+
+async function loadPreviousAchievements(configName, platform = "steam") {
   const cachePath = getCachePath(configName, platform);
   if (fs.existsSync(cachePath)) {
     try {
-      const data = JSON.parse(fs.readFileSync(cachePath, "utf8"));
-      const hitKey = `${cachePath}`;
-      const now = Date.now();
-      const lastLogged = cacheHitLogTimes.get(hitKey) || 0;
-      if (now - lastLogged >= CACHE_HIT_LOG_WINDOW_MS) {
-        cacheHitLogTimes.set(hitKey, now);
-        persistenceLogger.info("load-achievement-cache:hit", {
-          config: configName,
-          path: cachePath,
-          count: data ? Object.keys(data).length : 0,
-        });
-      }
+      const data = await readCacheJson(cachePath);
+      bumpCacheBatchStat("hits");
       return data;
     } catch (e) {
       notifyError(tUi("main.notify.cache.readFailed", { error: e.message }));
-      persistenceLogger.error("load-achievement-cache:error", {
-        config: configName,
-        error: e.message,
-      });
+      bumpCacheBatchStat("errors");
     }
   }
   // fallback legacy cache (name-only) for compatibility
@@ -4559,24 +5177,51 @@ function loadPreviousAchievements(configName, platform = "steam") {
   );
   if (fs.existsSync(legacyPath)) {
     try {
-      const data = JSON.parse(fs.readFileSync(legacyPath, "utf8"));
-      persistenceLogger.info("load-achievement-cache:legacy-hit", {
-        config: configName,
-        path: legacyPath,
-        count: data ? Object.keys(data).length : 0,
-      });
+      const data = await readCacheJson(legacyPath);
+      bumpCacheBatchStat("hits");
       return data;
     } catch (e) {
-      persistenceLogger.error("load-achievement-cache:legacy-error", {
-        config: configName,
-        error: e.message,
-      });
+      bumpCacheBatchStat("errors");
     }
   }
-  persistenceLogger.info("load-achievement-cache:miss", {
-    config: configName,
-    path: cachePath,
-  });
+
+  // Alias fallback: some configs (notably steam-official) historically seeded caches under a
+  // different key (e.g. config.displayName/config.name), while the UI uses the config filename.
+  // On a miss, probe aliases from the config JSON and write-through to the canonical path.
+  try {
+    const normalizedPlatform = normalizePlatform(platform) || "steam";
+    const safeName = sanitizeConfigName(configName || "");
+    const configPath = safeName ? path.join(configsDir, `${safeName}.json`) : "";
+    if (configPath && fs.existsSync(configPath)) {
+      const cfg = JSON.parse(fs.readFileSync(configPath, "utf8"));
+      const candidates = [];
+      if (typeof cfg?.name === "string" && cfg.name.trim()) {
+        candidates.push(cfg.name.trim());
+      }
+      if (typeof cfg?.displayName === "string" && cfg.displayName.trim()) {
+        candidates.push(cfg.displayName.trim());
+      }
+      for (const altName of candidates) {
+        const altPath = getCachePath(altName, normalizedPlatform);
+        if (!altPath || altPath === cachePath) continue;
+        if (!fs.existsSync(altPath)) continue;
+        try {
+          const data = await readCacheJson(altPath);
+          bumpCacheBatchStat("hits");
+          try {
+            if (!fs.existsSync(cachePath)) {
+              fs.copyFileSync(altPath, cachePath);
+            }
+          } catch {}
+          return data;
+        } catch {
+          bumpCacheBatchStat("errors");
+        }
+      }
+    }
+  } catch {}
+
+  bumpCacheBatchStat("misses");
   return {};
 }
 
@@ -4585,7 +5230,7 @@ function savePreviousAchievements(configName, data, platform = "steam") {
   try {
     let effectiveData = data;
     if (isRpcs3ConfigName(configName)) {
-      const cached = readCacheSilent(configName);
+      const cached = readCacheSilent(configName, platform);
       if (cached && typeof cached === "object") {
         effectiveData = mergeRpcs3EarnedTime(data, cached);
       }
@@ -4732,7 +5377,7 @@ function findAchievementFileDeepForAppId(saveBase, appid, maxDepth = 2) {
   return null;
 }
 
-function monitorAchievementsFile(filePath) {
+async function monitorAchievementsFile(filePath) {
   if (!filePath) {
     achievementMonitorToken += 1;
     if (achievementMonitorTimer) {
@@ -4835,7 +5480,7 @@ function monitorAchievementsFile(filePath) {
     normalizePlatform(configMeta?.platform) ||
     "steam";
   previousAchievements =
-    loadPreviousAchievements(configName, currentPlatform) || {};
+    (await loadPreviousAchievements(configName, currentPlatform)) || {};
   const isPs4 =
     normalizePlatform(configMeta?.platform) === "shadps4" ||
     String(filePath || "")
@@ -5787,8 +6432,6 @@ ipcMain.handle("renameAndSaveConfig", async (event, oldName, newConfig) => {
 
     const oldConfigPath = path.join(configsDir, `${safeOld}.json`);
     const newConfigPath = path.join(configsDir, `${safeNew}.json`);
-    const oldCachePath = getCachePath(safeOld);
-    const newCachePath = getCachePath(safeNew);
     let prevConfig = null;
     if (fs.existsSync(oldConfigPath)) {
       try {
@@ -5852,6 +6495,8 @@ ipcMain.handle("renameAndSaveConfig", async (event, oldName, newConfig) => {
     }
     nextPlatform = nextPlatform || "steam";
     payload.platform = nextPlatform;
+    const oldCachePath = getCachePath(safeOld, prevPlatform || "steam");
+    const newCachePath = getCachePath(safeNew, nextPlatform);
 
     // missing config_path, generate and set path
     if (
@@ -5944,13 +6589,201 @@ ipcMain.on("close-notification-window", (event) => {
 
 let overlayWindow = null;
 let overlayInteractive = false;
+let overlayPresented = false;
 let registeredOverlayShortcut = null;
 let registeredOverlayInteractShortcut = null;
- 
+let registeredOverlayScrollPageUpShortcut = null;
+let registeredOverlayScrollPageDownShortcut = null;
+let overlayDragRegionHeight = 90;
+let overlayDragActive = false;
+let overlayDragOffset = null;
+let overlayDragHook = null;
+let overlayDragHookStarted = false;
+let overlayDragHookInitAttempted = false;
+let overlayDragHookBootWaitTimer = null;
+const POST_BOOT_UI_INITIAL_DELAY_MS = 350;
+const POST_BOOT_UI_STEP_DELAY_MS = 300;
+const POST_BOOT_ZOOM_DELAY_MS = 200;
+let postBootUiInitScheduled = false;
 
-function createOverlayWindow(selectedConfig) {
+function stopOverlayGlobalDrag() {
+  overlayDragActive = false;
+  overlayDragOffset = null;
+}
+
+function isOverlayDragEligible(point) {
+  if (
+    !overlayWindow ||
+    overlayWindow.isDestroyed() ||
+    !overlayPresented ||
+    !overlayWindow.isVisible() ||
+    !overlayInteractive
+  ) {
+    return false;
+  }
+  if (!point || typeof point.x !== "number" || typeof point.y !== "number") {
+    return false;
+  }
+  let bounds;
+  try {
+    bounds = overlayWindow.getBounds();
+  } catch {
+    return false;
+  }
+  if (!bounds || typeof bounds.x !== "number" || typeof bounds.y !== "number") {
+    return false;
+  }
+  const inX =
+    point.x >= bounds.x && point.x <= bounds.x + Math.max(0, bounds.width);
+  if (!inX) return false;
+  const dragHeight = Math.min(
+    Math.max(0, bounds.height),
+    Math.max(0, Number(overlayDragRegionHeight) || 0),
+  );
+  return point.y >= bounds.y && point.y <= bounds.y + dragHeight;
+}
+
+function initOverlayGlobalDragHook() {
+  if (overlayDragHookStarted || overlayDragHookInitAttempted) return;
+  overlayDragHookInitAttempted = true;
+  try {
+    const { uIOhook } = require("uiohook-napi");
+    overlayDragHook = uIOhook;
+  } catch (err) {
+    windowLogger.warn("overlay:drag-hook:load-failed", {
+      error: err?.message || String(err),
+    });
+    return;
+  }
+
+  overlayDragHook.on("mousedown", (event) => {
+    if (event?.button !== 1) return;
+    const point = { x: Number(event.x), y: Number(event.y) };
+    if (!isOverlayDragEligible(point)) return;
+    let bounds;
+    try {
+      bounds = overlayWindow.getBounds();
+    } catch {
+      return;
+    }
+    overlayDragActive = true;
+    overlayDragOffset = {
+      x: point.x - bounds.x,
+      y: point.y - bounds.y,
+    };
+  });
+
+  overlayDragHook.on("mousemove", (event) => {
+    if (!overlayDragActive || !overlayDragOffset) return;
+    if (
+      !overlayWindow ||
+      overlayWindow.isDestroyed() ||
+      !overlayPresented ||
+      !overlayWindow.isVisible() ||
+      !overlayInteractive
+    ) {
+      stopOverlayGlobalDrag();
+      return;
+    }
+    const point = { x: Number(event.x), y: Number(event.y) };
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
+    const nextX = Math.round(point.x - overlayDragOffset.x);
+    const nextY = Math.round(point.y - overlayDragOffset.y);
+    try {
+      overlayWindow.setPosition(nextX, nextY, false);
+    } catch {}
+  });
+
+  overlayDragHook.on("mouseup", (event) => {
+    if (event?.button !== 1) return;
+    stopOverlayGlobalDrag();
+  });
+
+  try {
+    overlayDragHook.start();
+    overlayDragHookStarted = true;
+    windowLogger.info("overlay:drag-hook:started");
+  } catch (err) {
+    windowLogger.warn("overlay:drag-hook:start-failed", {
+      error: err?.message || String(err),
+    });
+  }
+}
+
+function isOverlayDragHookEligible() {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return false;
+  if (global.bootDone !== true || global.bootUiReady !== true) return false;
+  if (global.bootManualSeedComplete !== true) return false;
+  return true;
+}
+
+function scheduleOverlayDragHookAfterBootComplete() {
+  if (overlayDragHookStarted || overlayDragHookInitAttempted) return;
+  if (overlayDragHookBootWaitTimer) return;
+  const waitAndStart = () => {
+    if (overlayDragHookStarted || overlayDragHookInitAttempted) {
+      overlayDragHookBootWaitTimer = null;
+      return;
+    }
+    if (isOverlayDragHookEligible()) {
+      overlayDragHookBootWaitTimer = null;
+      initOverlayGlobalDragHook();
+      return;
+    }
+    overlayDragHookBootWaitTimer = setTimeout(waitAndStart, 500);
+  };
+  waitAndStart();
+}
+
+function schedulePostBootUiInitialization() {
+  if (postBootUiInitScheduled) return;
+  postBootUiInitScheduled = true;
+
+  const runSteps = () => {
+    const steps = [
+      () => {
+        if (!tray || tray.isDestroyed?.()) {
+          createTray();
+        }
+      },
+      () => {
+        if (!overlayWindow || overlayWindow.isDestroyed()) {
+          createOverlayWindow(selectedConfig || null, false);
+        }
+      },
+    ];
+
+    steps.forEach((step, index) => {
+      const delay =
+        POST_BOOT_UI_INITIAL_DELAY_MS + index * POST_BOOT_UI_STEP_DELAY_MS;
+      setTimeout(step, delay);
+    });
+  };
+
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    runSteps();
+    return;
+  }
+
+  if (mainWindow.webContents.isLoading()) {
+    let started = false;
+    const startOnce = () => {
+      if (started) return;
+      started = true;
+      runSteps();
+    };
+    mainWindow.webContents.once("did-finish-load", startOnce);
+    setTimeout(startOnce, 1500);
+    return;
+  }
+
+  runSteps();
+}
+
+function createOverlayWindow(selectedConfig, initialPresented = true) {
   windowLogger.info("create-overlay:start", {
     selectedConfig: selectedConfig || null,
+    initialPresented: !!initialPresented,
   });
   const { width, height } =
     require("electron").screen.getPrimaryDisplay().workAreaSize;
@@ -5958,6 +6791,8 @@ function createOverlayWindow(selectedConfig) {
   overlayWindow = new BrowserWindow({
     width: 450,
     height: 950,
+    // Create hidden; apply click-through + non-focusable first, then show via `showInactive()`.
+    // Some borderless games minimize if a new top-level window briefly activates.
     show: false,
     x: width - 470,
     y: 20,
@@ -5977,29 +6812,52 @@ function createOverlayWindow(selectedConfig) {
       backgroundThrottling: false,
     },
   });
+  overlayPresented = !!initialPresented;
   windowLogger.info("create-overlay:browserwindow-created", {
     width: 450,
     height: 950,
     position: { x: width - 470, y: 20 },
   });
 
-  overlayWindow.setAlwaysOnTop(true, "screen-saver");
+  overlayWindow.setAlwaysOnTop(true, "floating");
   overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   overlayWindow.setFullScreenable(false);
   overlayWindow.setFocusable(false);
   overlayWindow.setSkipTaskbar(true);
-  setOverlayInteractive(false);
+  //setOverlayInteractive(false);
   const iconUrl = pathToFileURL(ICON_PNG_PATH).toString();
   overlayWindow.loadFile("overlay.html", { query: { icon: iconUrl } });
   windowLogger.info("create-overlay:load-file", { icon: iconUrl });
 
+  // Defensive: re-apply click-through after the window is actually visible (race safety).
   overlayWindow.once("ready-to-show", () => {
     if (!overlayWindow || overlayWindow.isDestroyed()) return;
-    if (typeof overlayWindow.showInactive === "function") {
-      overlayWindow.showInactive();
-    } else {
-      overlayWindow.show();
-    }
+    try {
+      setOverlayInteractive(false);
+    } catch {}
+    try {
+      if (typeof overlayWindow.showInactive === "function") {
+        overlayWindow.showInactive();
+      } else {
+        // overlayWindow.show();
+      }
+    } catch {}
+    try {
+      overlayWindow.blur();
+    } catch {}
+    // Keep the window shown (inactive) and rely on CSS visibility to avoid OS-level hidden state.
+    setTimeout(() => {
+      if (!overlayWindow || overlayWindow.isDestroyed()) return;
+      if (!overlayInteractive) applyOverlayInputMode();
+      applyOverlayFocusMode();
+      if (overlayPresented) {
+        applyOverlayInteractShortcutRegistration();
+        applyOverlayKeyboardScrollShortcutRegistration();
+      } else {
+        clearOverlayInteractShortcut();
+        clearOverlayKeyboardScrollShortcuts();
+      }
+    }, 50);
   });
 
   overlayWindow.webContents.on("did-finish-load", () => {
@@ -6011,33 +6869,49 @@ function createOverlayWindow(selectedConfig) {
       language: selectedLanguage,
       uiLanguage: selectedUiLanguage,
     });
+    try {
+      overlayWindow.webContents.send("overlay:set-visible", {
+        visible: overlayPresented,
+      });
+    } catch {}
   });
 
   overlayWindow.on("closed", () => {
     windowLogger.info("create-overlay:closed");
+    stopOverlayGlobalDrag();
     overlayWindow = null;
     overlayInteractive = false;
+    overlayPresented = false;
     clearOverlayInteractShortcut();
+    clearOverlayKeyboardScrollShortcuts();
   });
 
   overlayWindow.on("show", () => {
-    applyOverlayInputMode();
-    applyOverlayFocusMode();
+    // Always start in click-through mode when the overlay is shown.
+    setOverlayInteractive(false);
     applyOverlayInteractShortcutRegistration();
+    // // Race safety: some environments briefly accept input on show.
+    setTimeout(() => {
+      if (
+        !overlayWindow ||
+        overlayWindow.isDestroyed() ||
+        !overlayWindow.isVisible()
+      )
+        return;
+      if (!overlayInteractive) applyOverlayInputMode();
+      applyOverlayFocusMode();
+      applyOverlayKeyboardScrollShortcutRegistration();
+    }, 50);
   });
 
   overlayWindow.on("hide", () => {
     setOverlayInteractive(false);
     applyOverlayInteractShortcutRegistration();
+    clearOverlayKeyboardScrollShortcuts();
+    stopOverlayGlobalDrag();
   });
 
-  overlayWindow.on("blur", () => {
-    if (!overlayWindow || overlayWindow.isDestroyed()) return;
-    if (!overlayWindow.isVisible()) return;
-    if (overlayInteractive) {
-      setOverlayInteractive(false);
-    }
-  });
+  // Intentionally avoid blur-driven state changes here. The overlay is designed to be non-focusable.
 }
 
 ipcMain.handle("selectExecutable", async () => {
@@ -6124,18 +6998,11 @@ ipcMain.on("toggle-overlay", (_event, selectedConfig) => {
       language: selectedLanguage,
       uiLanguage: selectedUiLanguage,
     });
-    if (!overlayWindow.isVisible()) {
-      setOverlayInteractive(false);
-      if (typeof overlayWindow.showInactive === "function") {
-        overlayWindow.showInactive();
-      } else {
-        overlayWindow.show();
-      }
+    if (!overlayPresented) {
+      setOverlayPresented(true);
     }
   }
 });
-
- 
 
 // Handle request for current config from overlay
 ipcMain.on("request-current-config", (event) => {
@@ -6234,12 +7101,16 @@ ipcMain.on("window:set-position", (event, pos) => {
   } catch {}
 });
 ipcMain.on("overlay:request-focus", () => {
+  return;
+});
+ipcMain.on("overlay:drag-region", (event, payload) => {
   if (!overlayWindow || overlayWindow.isDestroyed()) return;
-  if (!overlayWindow.isVisible()) return;
-  if (!overlayInteractive) return;
-  try {
-    overlayWindow.focus();
-  } catch {}
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) return;
+  if (win.id !== overlayWindow.id) return;
+  const h = Number(payload?.height);
+  if (!Number.isFinite(h) || h <= 0) return;
+  overlayDragRegionHeight = Math.round(h);
 });
 ipcMain.on("tray:action", (_event, action) => {
   const cmd = String(action || "").toLowerCase();
@@ -6312,16 +7183,22 @@ app.whenReady().then(async () => {
   copyFolderOnce(defaultPresetsFolder, userPresetsFolder);
 
   createMainWindow();
-  processPoller.subscribe((list) => {
-    autoSelectRunningGameConfig(list);
-  });
-  createTray();
+  scheduleAutoSelectProcessPollerAfterBoot();
   mainWindow.hide();
+  schedulePostBootUiInitialization();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createMainWindow();
     }
   });
+});
+
+app.on("will-quit", () => {
+  if (overlayDragHook && overlayDragHookStarted) {
+    try {
+      overlayDragHook.stop();
+    } catch {}
+  }
 });
 
 function showProgressNotification(data) {
@@ -6599,7 +7476,7 @@ function createPlaytimeWindow(playData = {}) {
   });
 }
 
-ipcMain.on("queue-achievement-notification", (_event, payload) => {
+ipcMain.on("queue-achievement-notification", async (_event, payload) => {
   try {
     const configName =
       payload?.configName || payload?.config_name || selectedConfig || null;
@@ -6611,7 +7488,7 @@ ipcMain.on("queue-achievement-notification", (_event, payload) => {
         normalizePlatform(payload?.platform) ||
         normalizePlatform(selectedPlatform) ||
         "steam";
-      const prev = loadPreviousAchievements(configName, platform) || {};
+      const prev = (await loadPreviousAchievements(configName, platform)) || {};
       const prevEntry = prev[achKey];
       const incomingProg = Number(payload.progress);
       const prevProg = Number(prevEntry?.progress);
@@ -6636,7 +7513,7 @@ ipcMain.on("queue-achievement-notification", (_event, payload) => {
   }
 });
 
-ipcMain.on("queue-progress-notification", (_event, payload) => {
+ipcMain.on("queue-progress-notification", async (_event, payload) => {
   try {
     const configName =
       payload?.configName || payload?.config_name || selectedConfig || null;
@@ -6648,7 +7525,7 @@ ipcMain.on("queue-progress-notification", (_event, payload) => {
         normalizePlatform(payload?.platform) ||
         normalizePlatform(selectedPlatform) ||
         "steam";
-      const prev = loadPreviousAchievements(configName, platform) || {};
+      const prev = (await loadPreviousAchievements(configName, platform)) || {};
       const prevEntry = prev[achKey];
       const incomingProg = Number(payload.progress);
       const prevProg = Number(prevEntry?.progress);
@@ -6681,6 +7558,65 @@ ipcMain.on("notify-from-child", (_event, message) => {
 
 const { pathToFileURL } = require("url");
 const processPoller = require("./utils/process-poller");
+
+const AUTO_SELECT_AFTER_BOOT_DELAY_MS = 5000;
+const AUTO_SELECT_BOOT_CHECK_INTERVAL_MS = 500;
+let autoSelectProcessPollerStarted = false;
+let autoSelectProcessPollerUnsubscribe = null;
+let autoSelectProcessPollerWaitTimer = null;
+let autoSelectProcessPollerStartTimer = null;
+
+function clearAutoSelectProcessPollerTimers() {
+  if (autoSelectProcessPollerWaitTimer) {
+    clearTimeout(autoSelectProcessPollerWaitTimer);
+    autoSelectProcessPollerWaitTimer = null;
+  }
+  if (autoSelectProcessPollerStartTimer) {
+    clearTimeout(autoSelectProcessPollerStartTimer);
+    autoSelectProcessPollerStartTimer = null;
+  }
+}
+
+function startAutoSelectProcessPoller() {
+  if (autoSelectProcessPollerStarted) return;
+  autoSelectProcessPollerStarted = true;
+  autoSelectProcessPollerUnsubscribe = processPoller.subscribe((list) => {
+    autoSelectRunningGameConfig(list);
+  });
+  appLogger.info("process-poller:auto-select-started", {
+    delayMs: AUTO_SELECT_AFTER_BOOT_DELAY_MS,
+  });
+}
+
+function scheduleAutoSelectProcessPollerAfterBoot() {
+  if (autoSelectProcessPollerStarted) return;
+  if (autoSelectProcessPollerWaitTimer || autoSelectProcessPollerStartTimer)
+    return;
+  const waitForBootReady = () => {
+    const bootDone = global.bootDone === true;
+    const bootUiReady = global.bootUiReady === true;
+    const manualSeedDone = global.bootManualSeedComplete === true;
+    if (!bootDone || !bootUiReady || !manualSeedDone) {
+      autoSelectProcessPollerWaitTimer = setTimeout(
+        waitForBootReady,
+        AUTO_SELECT_BOOT_CHECK_INTERVAL_MS,
+      );
+      return;
+    }
+    autoSelectProcessPollerWaitTimer = null;
+    appLogger.info("process-poller:auto-select-scheduled", {
+      bootDone,
+      uiReady: bootUiReady,
+      manualSeedDone,
+      delayMs: AUTO_SELECT_AFTER_BOOT_DELAY_MS,
+    });
+    autoSelectProcessPollerStartTimer = setTimeout(() => {
+      autoSelectProcessPollerStartTimer = null;
+      startAutoSelectProcessPoller();
+    }, AUTO_SELECT_AFTER_BOOT_DELAY_MS);
+  };
+  waitForBootReady();
+}
 
 let detectedConfigName = null;
 const activePlaytimeConfigs = new Set();
@@ -6718,11 +7654,7 @@ async function autoSelectRunningGameConfig(processes) {
     if (!list.length) return;
     if (process.env.ACH_LOG_PROCESSES === "1") {
       const logPath = path.join(app.getPath("userData"), "process-log.txt");
-      fs.writeFileSync(
-        logPath,
-        list.map((p) => p.name).join("\n"),
-        "utf8",
-      );
+      fs.writeFileSync(logPath, list.map((p) => p.name).join("\n"), "utf8");
     }
 
     if (manualLaunchInProgress) {
@@ -6853,6 +7785,8 @@ async function seedManualConfigsAtBoot() {
   if (bootManualSeedRunning) return;
   bootManualSeedRunning = true;
   let files = [];
+  const BOOT_MANUAL_SEED_CONCURRENCY = 10;
+  const BOOT_MANUAL_SEED_SLICE_MS = 500;
   try {
     if (!fs.existsSync(configsDir)) {
       bootManualSeedRunning = false;
@@ -6867,61 +7801,106 @@ async function seedManualConfigsAtBoot() {
   }
 
   persistenceLogger.info("boot-cache:manual-start", { total: files.length });
-  for (const file of files) {
+  const runWithConcurrency = async (items, limit, worker) => {
+    if (!Array.isArray(items) || items.length === 0) return;
+    const max = Math.max(1, Number(limit) || 1);
+    const sliceMs = Math.max(0, Number(BOOT_MANUAL_SEED_SLICE_MS) || 0);
+    let running = 0;
+    let idx = 0;
+    return new Promise((resolve) => {
+      const next = () => {
+        while (running < max && idx < items.length) {
+          const item = items[idx++];
+          running++;
+          Promise.resolve()
+            .then(() => worker(item))
+            .catch(() => {})
+            .finally(() => {
+              running--;
+              if (running === 0 && idx >= items.length) {
+                resolve();
+                return;
+              }
+              setTimeout(next, sliceMs);
+            });
+        }
+        if (running === 0 && idx >= items.length) resolve();
+      };
+      next();
+    });
+  };
+
+  const processFile = async (file) => {
     const full = path.join(configsDir, file);
     let config;
     try {
       config = JSON.parse(fs.readFileSync(full, "utf8"));
     } catch {
-      continue;
+      bumpCacheBatchStat("errors");
+      return;
     }
-    const configName = config?.name || path.basename(file, ".json");
-    const savePathRaw = config?.save_path;
-    if (!savePathRaw) continue;
+    const configFileName = path.basename(file, ".json");
+    if (!config?.save_path) return;
 
     const seedKey = buildCacheSeedKey(config);
-    if (seedKey && bootSeededCacheKeys.has(seedKey)) continue;
+    if (seedKey && bootSeededCacheKeys.has(seedKey)) return;
+
+    const platform = normalizePlatform(config?.platform) || "steam";
 
     const cachePath = getCachePath(
-      configName,
-      normalizePlatform(config?.platform) || "steam",
+      configFileName,
+      platform,
     );
     if (fs.existsSync(cachePath)) {
       if (seedKey) bootSeededCacheKeys.add(seedKey);
-      continue;
+      return;
     }
 
-    let saveRoot = savePathRaw;
-    let candidatePath = null;
+    // If cache exists under an older alias key, copy it to the canonical key to avoid re-parsing.
     try {
-      const stat = fs.statSync(savePathRaw);
-      if (stat.isFile()) {
-        candidatePath = savePathRaw;
-        saveRoot = path.dirname(savePathRaw);
+      const aliases = [];
+      if (typeof config?.name === "string" && config.name.trim()) {
+        aliases.push(config.name.trim());
+      }
+      if (typeof config?.displayName === "string" && config.displayName.trim()) {
+        aliases.push(config.displayName.trim());
+      }
+      for (const altName of aliases) {
+        const altPath = getCachePath(altName, platform);
+        if (!altPath || altPath === cachePath) continue;
+        if (!fs.existsSync(altPath)) continue;
+        try {
+          fs.copyFileSync(altPath, cachePath);
+          if (seedKey) bootSeededCacheKeys.add(seedKey);
+          return;
+        } catch {}
       }
     } catch {}
-    if (!candidatePath) {
-      if (!fs.existsSync(saveRoot)) continue;
-      const appid = String(config?.appid || "").trim();
-      const saveJsonPath = resolveSaveFilePath(saveRoot, appid);
-      const {
-        tenokeIni: tenokeIniPath,
-        ini: iniPath,
-        ofx: onlineFixIniPath,
-        bin: binPath,
-      } = resolveSaveSidecarPaths(saveRoot, appid);
-      if (fs.existsSync(saveJsonPath)) candidatePath = saveJsonPath;
-      else if (tenokeIniPath) candidatePath = tenokeIniPath;
-      else if (onlineFixIniPath) candidatePath = onlineFixIniPath;
-      else if (iniPath) candidatePath = iniPath;
-      else if (binPath) candidatePath = binPath;
-      else if (appid) {
-        candidatePath = findAchievementFileDeepForAppId(saveRoot, appid, 2);
-      } else {
-        candidatePath = findAchievementFileDeep(saveRoot, 2);
+
+    const candidatePath = resolveBootSeedCandidatePath(config);
+    if (!candidatePath) return;
+
+    if (
+      isAchCacheMetaMatch(
+        configFileName,
+        platform,
+        candidatePath,
+        String(config?.appid || ""),
+      )
+    ) {
+      const cachedSnapshot =
+        (await loadPreviousAchievements(configFileName, platform)) || {};
+      if (Object.keys(cachedSnapshot).length) {
+        seedCacheFromSnapshot(configFileName, cachedSnapshot, platform);
+        if (seedKey) bootSeededCacheKeys.add(seedKey);
+        persistenceLogger.info("boot-cache:manual-meta-skip", {
+          config: configFileName,
+          platform,
+          file: candidatePath,
+        });
+        return;
       }
     }
-    if (!candidatePath) continue;
 
     let schemaPath = null;
     try {
@@ -6938,18 +7917,16 @@ async function seedManualConfigsAtBoot() {
     );
     if (snapshot && Object.keys(snapshot).length) {
       seedCacheFromSnapshot(
-        configName,
+        configFileName,
         snapshot,
-        normalizePlatform(config?.platform) || "steam",
+        platform,
       );
       if (seedKey) bootSeededCacheKeys.add(seedKey);
-      persistenceLogger.info("boot-cache:manual-seeded", {
-        config: configName,
-        entries: Object.keys(snapshot).length,
-      });
+      bumpCacheBatchStat("seeded");
     }
-    await sleep(40);
-  }
+  };
+
+  await runWithConcurrency(files, BOOT_MANUAL_SEED_CONCURRENCY, processFile);
   persistenceLogger.info("boot-cache:manual-complete", { total: files.length });
   bootManualSeedRunning = false;
 }
@@ -6957,9 +7934,53 @@ async function seedManualConfigsAtBoot() {
 function scheduleManualCacheSeedAfterBoot() {
   if (bootManualSeedScheduled) return;
   bootManualSeedScheduled = true;
+  // Keep cache reads throttled until post-boot seed/platinum pass completes.
+  bootPostSeedLimiterActive = true;
   const tick = async () => {
     if (global.bootDone === true) {
-      await seedManualConfigsAtBoot();
+      if (global.bootUiReady !== true) {
+        setTimeout(tick, 500);
+        return;
+      }
+      if (global.bootOverlayHidden !== true) {
+        const now = Date.now();
+        if (!bootOverlayWaitStartedAt) {
+          bootOverlayWaitStartedAt = now;
+        }
+        const waitedMs = now - bootOverlayWaitStartedAt;
+        if (waitedMs < BOOT_MANUAL_OVERLAY_WAIT_MAX_MS) {
+          setTimeout(tick, 500);
+          return;
+        }
+        global.bootOverlayHidden = true;
+        bootOverlayHiddenAt = now;
+        appLogger.warn("boot:overlay-hidden-timeout", {
+          waitedMs,
+          maxMs: BOOT_MANUAL_OVERLAY_WAIT_MAX_MS,
+        });
+      }
+      if (!bootOverlayHiddenAt) {
+        bootOverlayHiddenAt = Date.now();
+      }
+      const elapsedSinceOverlayHidden = Date.now() - bootOverlayHiddenAt;
+      if (elapsedSinceOverlayHidden < BOOT_MANUAL_AFTER_OVERLAY_HIDE_DELAY_MS) {
+        const remainingMs =
+          BOOT_MANUAL_AFTER_OVERLAY_HIDE_DELAY_MS - elapsedSinceOverlayHidden;
+        setTimeout(tick, Math.max(250, Math.min(500, remainingMs)));
+        return;
+      }
+      try {
+        await seedManualConfigsAtBoot();
+        if (BOOT_MANUAL_POST_SEED_DELAY_MS > 0) {
+          await sleep(BOOT_MANUAL_POST_SEED_DELAY_MS);
+        }
+        try {
+          await flagPlatinumFromCacheOnBoot();
+        } catch {}
+      } finally {
+        bootPostSeedLimiterActive = false;
+        markBootManualSeedComplete();
+      }
       return;
     }
     setTimeout(tick, 500);
@@ -7440,21 +8461,26 @@ ipcMain.handle("uplay:steam-appid", async (_evt, appid) => {
 
 const {
   accumulatePlaytime,
-  getPlaytimeTotal,
+  getPlaytimeInfo,
 } = require("./utils/playtime-store");
 
 ipcMain.on("playtime:session-ended", (_event, payload = {}) => {
-  const totalMs = typeof payload.totalMs === "number" ? payload.totalMs : 0;
+  const safeKey = sanitizeConfigName(payload.configName || "");
+  const info = getPlaytimeInfo(safeKey);
+  const totalMs =
+    typeof payload.totalMs === "number" ? payload.totalMs : info.totalMs;
+  const updatedAt = Number(info.updatedAt) || (totalMs > 0 ? Date.now() : 0);
 
   broadcastToAll("playtime:update", {
     configName: payload.configName || "",
     totalMs,
+    updatedAt,
   });
 });
 
 ipcMain.handle("playtime:get-total", async (_event, configName) => {
   const safe = sanitizeConfigName(configName);
-  return { totalMs: getPlaytimeTotal(safe) };
+  return getPlaytimeInfo(safe);
 });
 
 ipcMain.handle("covers:ui-log", async (_event, payload = {}) => {
@@ -7531,12 +8557,16 @@ watchedFoldersApi = makeWatchedFolders({
       );
     }
   },
-  getCachedSnapshot: (configName) => {
+  getCachedSnapshot: (configName, platform = "steam") => {
     try {
-      const cachePath = getCachePath(configName);
+      const cachePath = getCachePath(
+        configName,
+        normalizePlatform(platform) || "steam",
+      );
       if (fs.existsSync(cachePath)) {
         const raw = fs.readFileSync(cachePath, "utf8");
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        return parsed;
       }
     } catch (err) {
       console.warn(
@@ -7616,36 +8646,79 @@ ipcMain.handle("platinum:manual", async (_event, payload = {}) => {
 // Flag already-complete configs at boot to avoid retroactive platinum popups
 async function flagPlatinumFromCacheOnBoot() {
   try {
-    const files = fs
-      .readdirSync(configsDir)
-      .filter((f) => f.toLowerCase().endsWith(".json"));
-    for (const file of files) {
+    if (!configsDir || !fs.existsSync(configsDir)) return;
+    const entries = await fs.promises.readdir(configsDir);
+    const files = entries.filter((f) => f.toLowerCase().endsWith(".json"));
+    if (!files.length) return;
+
+    const BATCH_SIZE = 20;
+    const CONCURRENCY = 4;
+    const runWithConcurrency = async (items, limit, worker) => {
+      if (!Array.isArray(items) || items.length === 0) return;
+      const max = Math.max(1, Number(limit) || 1);
+      let running = 0;
+      let idx = 0;
+      return new Promise((resolve) => {
+        const next = () => {
+          while (running < max && idx < items.length) {
+            const item = items[idx++];
+            running++;
+            Promise.resolve()
+              .then(() => worker(item))
+              .catch(() => {})
+              .finally(() => {
+                running--;
+                if (running === 0 && idx >= items.length) {
+                  resolve();
+                  return;
+                }
+                setTimeout(next, 0);
+              });
+          }
+          if (running === 0 && idx >= items.length) resolve();
+        };
+        next();
+      });
+    };
+
+    const processFile = async (file) => {
       const name = path.basename(file, ".json");
       const configPath = path.join(configsDir, file);
       let config = null;
       try {
-        const raw = fs.readFileSync(configPath, "utf8");
+        const raw = await fs.promises.readFile(configPath, "utf8");
         config = JSON.parse(raw);
       } catch {
-        continue;
+        return;
       }
+      const platform = normalizePlatform(config?.platform) || "steam";
+      const seedCandidatePath = resolveBootSeedCandidatePath(config);
+      const unchangedByMeta = seedCandidatePath
+        ? isAchCacheMetaMatch(
+            name,
+            platform,
+            seedCandidatePath,
+            String(config?.appid || ""),
+          )
+        : false;
+      if (unchangedByMeta && config?.platinum === true) return;
       const schemaPath = resolveConfigSchemaPath(config);
-      if (!schemaPath || !fs.existsSync(schemaPath)) continue;
+      if (!schemaPath) return;
       let schema = null;
       try {
-        schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+        const rawSchema = await fs.promises.readFile(schemaPath, "utf8");
+        schema = JSON.parse(rawSchema);
       } catch {
-        continue;
+        return;
       }
       const schemaNames = Array.isArray(schema)
         ? schema
             .map((a) => (a && a.name ? String(a.name) : null))
             .filter(Boolean)
         : [];
-      if (!schemaNames.length) continue;
+      if (!schemaNames.length) return;
 
-      const platform = normalizePlatform(config?.platform);
-      const snapshot = loadPreviousAchievements(name, platform) || {};
+      const snapshot = (await loadPreviousAchievements(name, platform)) || {};
       const isEarnedByName = (achName) => {
         const main = snapshot?.[achName];
         if (main?.earned) return true;
@@ -7662,11 +8735,29 @@ async function flagPlatinumFromCacheOnBoot() {
       if (total > 0 && earned === total) {
         markConfigPlatinumFlag(name);
       }
+    };
+
+    for (let i = 0; i < files.length; i += BATCH_SIZE) {
+      const batch = files.slice(i, i + BATCH_SIZE);
+      await runWithConcurrency(batch, CONCURRENCY, processFile);
+      await sleep(0);
     }
   } catch {}
 }
 
 app.on("before-quit", () => {
+  clearAutoSelectProcessPollerTimers();
+  if (overlayDragHookBootWaitTimer) {
+    clearTimeout(overlayDragHookBootWaitTimer);
+    overlayDragHookBootWaitTimer = null;
+  }
+  if (typeof autoSelectProcessPollerUnsubscribe === "function") {
+    try {
+      autoSelectProcessPollerUnsubscribe();
+    } catch {}
+    autoSelectProcessPollerUnsubscribe = null;
+  }
+  flushCacheBatchWindow("before-quit", true);
   appLogger.info("app:before-quit", {
     isQuitting,
     hasMainWindow: !!mainWindow && !mainWindow.isDestroyed(),
@@ -7681,7 +8772,6 @@ app.on("before-quit", () => {
   }
 });
 
-flagPlatinumFromCacheOnBoot();
 app.on("window-all-closed", () => {
   appLogger.info("app:window-all-closed");
   if (process.platform !== "darwin") {
