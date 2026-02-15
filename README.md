@@ -11,6 +11,12 @@ A desktop application built with Electron that monitors running games and displa
 
 **Platform:** Windows (uses Task Scheduler + Windows paths).
 
+## ☕ Support
+
+If you’d like to support the project further, you can buy me a coffee on Ko-fi:
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/V7V81U42NF)
+
 ## ✨ Features
 
 - **Achievement Tracking**
@@ -144,10 +150,6 @@ Creates a standalone `.exe` installer in the `dist/` folder.
 - `ps-list` (via `utils/pslist-wrapper.mjs`) provides process snapshots for auto-selection and playtime tracking
 - Interval timers (~2s) keep dashboard cards and playtime state up to date
 
-## ☕ Support
-
-If you’d like to support the project further, you can buy me a coffee on Ko-fi:
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/V7V81U42NF)
 
 ## 🎮 Setup & Configuration
 
