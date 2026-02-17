@@ -257,7 +257,12 @@ async function generateConfigFromPs4Dir(trophyDir, configsDir, options = {}) {
   const schemaDir = path.join(schemaRoot, "shadps4", String(baseAppId));
 
   if (trophyCount === 0) {
-    return { skipped: true, appid, title, reason: "no-trophies" };
+    return {
+      skipped: true,
+      appid: String(baseAppId),
+      title,
+      reason: "no-trophies",
+    };
   }
 
   const existing = findExistingPs4Config(configsDir, baseAppId);

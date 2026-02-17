@@ -195,13 +195,20 @@ function resolveXeniaImageId(parsedGpd, achKey) {
   return hit ? hit.imageId : null;
 }
 
-async function waitForXeniaAchievementIcon(meta, achKey, imageId, parsedGpd) {
+async function waitForXeniaAchievementIcon(
+  meta,
+  achKey,
+  imageId,
+  parsedGpd,
+  resolveGpdPath,
+) {
   if (!meta?.config_path) return false;
   if (imageId === undefined || imageId === null) return false;
   const iconPath = path.join(meta.config_path, "img", `${imageId}.png`);
   if (fs.existsSync(iconPath)) return true;
 
-  const gpdPath = resolveGpdPathForMeta(meta);
+  const gpdPath =
+    typeof resolveGpdPath === "function" ? resolveGpdPath(meta) : "";
   if (!gpdPath || !fs.existsSync(gpdPath)) return false;
 
   watcherLogger.info("xenia:notify:wait-icon", {
@@ -2434,6 +2441,7 @@ module.exports = function makeWatchedFolders({
             achKey,
             imageId,
             parsedGpd,
+            resolveGpdPathForMeta,
           );
           if (!ready) continue;
         }

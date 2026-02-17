@@ -2962,7 +2962,7 @@ ipcMain.handle("load-saved-achievements", async (_event, configName) => {
         (await loadPreviousAchievements(
           configName,
           normalizedPlatform,
-          config.save_path || trophyDir,
+          statsDir,
         )) || {};
       const userBin =
         statsDir && config.appid
@@ -4216,6 +4216,9 @@ function createNotificationWindow(message) {
   return notificationWindow;
 }
 
+// Legacy direct-notification channel.
+// Current app flows (runtime watcher + test button) use queue-* notifications,
+// so this path is not hit in normal usage in the current version.
 ipcMain.on("show-notification", async (_event, achievement) => {
   const configName =
     achievement?.configName ||
@@ -5514,6 +5517,7 @@ async function monitorAchievementsFile(filePath) {
   }
   const processSnapshot = (isRetry = false) => {
     let currentAchievements = null;
+    let touchedInLoop = false;
     try {
       if (isXenia) {
         const parsed = parseGpdFile(filePath);
@@ -5709,8 +5713,6 @@ async function monitorAchievementsFile(filePath) {
         previousAchievements = { ...currentAchievements };
       }
     }
-
-    touchedInLoop = false;
 
     Object.keys(currentAchievements).forEach((key) => {
       const current = currentAchievements[key];
@@ -7207,11 +7209,42 @@ function showProgressNotification(data) {
     config: data?.config_path || null,
   });
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  const progressHtmlPath = path.join(__dirname, "progress.html");
+  let progressWidth = 350;
+  let progressHeight = 150;
+  let progressDurationMs = 5000;
+  try {
+    const htmlContent = fs.readFileSync(progressHtmlPath, "utf-8");
+    const sizeMatch = htmlContent.match(
+      /<meta\s+width\s*=\s*"(\d+)"\s+height\s*=\s*"(\d+)"\s*\/?>/i,
+    );
+    if (sizeMatch) {
+      const parsedWidth = Number.parseInt(sizeMatch[1], 10);
+      const parsedHeight = Number.parseInt(sizeMatch[2], 10);
+      if (Number.isFinite(parsedWidth) && parsedWidth > 0) {
+        progressWidth = parsedWidth;
+      }
+      if (Number.isFinite(parsedHeight) && parsedHeight > 0) {
+        progressHeight = parsedHeight;
+      }
+    }
+    const durationMatch = htmlContent.match(
+      /<meta\s+name\s*=\s*"duration"\s+content\s*=\s*"(\d+)"\s*\/?>/i,
+    );
+    if (durationMatch) {
+      const parsedDuration = Number.parseInt(durationMatch[1], 10);
+      if (Number.isFinite(parsedDuration) && parsedDuration > 0) {
+        progressDurationMs = parsedDuration;
+      }
+    }
+  } catch {}
+  const x = 20;
+  const y = Math.max(0, height - progressHeight + 10);
   const progressWindow = new BrowserWindow({
-    width: 350,
-    height: 150,
-    x: 20,
-    y: height - 140,
+    width: progressWidth,
+    height: progressHeight,
+    x,
+    y,
     transparent: true,
     frame: false,
     alwaysOnTop: true,
@@ -7235,8 +7268,9 @@ function showProgressNotification(data) {
   progressWindow.setFocusable(false);
   progressWindow.loadFile("progress.html");
   windowLogger.info("create-progress-window:browserwindow-created", {
-    size: { width: 350, height: 150 },
-    position: { x: 20, y: height - 140 },
+    size: { width: progressWidth, height: progressHeight },
+    position: { x, y },
+    durationMs: progressDurationMs,
   });
 
   progressWindow.once("ready-to-show", () => {
@@ -7253,7 +7287,7 @@ function showProgressNotification(data) {
 
   setTimeout(() => {
     if (!progressWindow.isDestroyed()) progressWindow.close();
-  }, 5000);
+  }, progressDurationMs);
   return progressWindow;
 }
 ipcMain.on("disable-progress-check", (event) => {

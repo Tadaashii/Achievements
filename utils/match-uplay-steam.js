@@ -29,7 +29,6 @@ const DEFAULT_STEAM_DB_RUNTIME = (() => {
 const STEAM_DB_PATH = path.resolve(
   process.env.STEAM_DB_PATH || DEFAULT_STEAM_DB_RUNTIME
 );
-_MS = 15000;
 const MIN_TOKEN_SCORE = 0.72;
 
 const DEFAULT_OUTPUT = path.join(__dirname, "..", "assets", "uplay-steam.json");

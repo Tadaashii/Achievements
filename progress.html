@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="stylesheet" href="style.css" />
-    <meta width="350" height="120" />
+    <meta name="duration" content="5000" />
+    <meta width="350" height="150" />
     <title>Progress Notification</title>
     <style>
       :root {
@@ -98,6 +99,13 @@
     <script src="utils/i18n-ui.js"></script>
     <script>
       (async function () {
+        const metaDur = document.querySelector('meta[name="duration"]');
+        const totalDurationMs = Math.max(0, Number(metaDur?.content || 5000));
+        document.documentElement.style.setProperty(
+          "--displaytime",
+          `${totalDurationMs}ms`,
+        );
+
         const tUi = (key, fallback) =>
           window.i18nUi && typeof window.i18nUi.getString === "function"
             ? window.i18nUi.getString(key, fallback)
@@ -146,7 +154,7 @@
 
         setTimeout(() => {
           window.api?.closeNotificationWindow?.();
-        }, 5000);
+        }, totalDurationMs);
       })();
     </script>
   </body>

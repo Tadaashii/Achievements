@@ -455,6 +455,7 @@ async function getGameNameFromGogDb(appid) {
 
 // Epic name resolution helpers
 let epicProductMap = null;
+const epicEgdataTitleCache = new Map();
 async function loadEpicProductMap() {
   if (epicProductMap) return epicProductMap;
   try {
@@ -555,6 +556,98 @@ async function getEpicTitle(appid) {
   return null;
 }
 
+function cleanEpicPageTitle(rawTitle) {
+  return decodeHtml(String(rawTitle || ""))
+    .replace(/\s*-\s*Achievements\s*\|\s*Sandbox\s*$/i, "")
+    .replace(/\s*\|\s*EGDATA(?:\.APP)?\s*$/i, "")
+    .replace(/\s*-\s*EGDATA(?:\.APP)?\s*$/i, "")
+    .trim();
+}
+
+function extractMetaContentByKey(html, key) {
+  const tags = String(html || "").match(/<meta\b[^>]*>/gi) || [];
+  const wanted = String(key || "")
+    .trim()
+    .toLowerCase();
+  for (const tag of tags) {
+    const attrs = {};
+    const re = /([:@\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
+    let m;
+    while ((m = re.exec(tag))) {
+      const attrKey = String(m[1] || "").toLowerCase();
+      attrs[attrKey] = m[2] ?? m[3] ?? m[4] ?? "";
+    }
+    const lookup = String(attrs.name || attrs.property || "")
+      .trim()
+      .toLowerCase();
+    if (lookup === wanted && attrs.content) {
+      return cleanEpicPageTitle(attrs.content);
+    }
+  }
+  return null;
+}
+
+function extractEpicTitleFromHtml(html) {
+  const source = String(html || "");
+  const headMatch = source.match(/<head[\s\S]*?<title[^>]*>([\s\S]*?)<\/title>/i);
+  if (headMatch && headMatch[1]) {
+    const headTitle = cleanEpicPageTitle(
+      String(headMatch[1]).replace(/<[^>]*>/g, "")
+    );
+    if (headTitle) return headTitle;
+  }
+  const ogTitle = extractMetaContentByKey(source, "og:title");
+  if (ogTitle) return ogTitle;
+  const twitterTitle = extractMetaContentByKey(source, "twitter:title");
+  if (twitterTitle) return twitterTitle;
+  return null;
+}
+
+async function getEpicTitleFromEgdata(appid) {
+  const id = String(appid || "").trim();
+  if (!id) return null;
+  if (epicEgdataTitleCache.has(id)) {
+    return epicEgdataTitleCache.get(id);
+  }
+  const pageUrl = `https://egdata.app/sandboxes/${id}/achievements`;
+  try {
+    const res = await axios.get(pageUrl, {
+      headers: {
+        "User-Agent": UA,
+        Accept: "text/html,application/xhtml+xml,*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+      timeout: 15000,
+      validateStatus: (s) => s >= 200 && s < 500,
+    });
+    if (res.status >= 400 || typeof res.data !== "string") {
+      autoConfigLogger.warn("epic:name-egdata-http-failed", {
+        appid: id,
+        status: res.status,
+      });
+      epicEgdataTitleCache.set(id, null);
+      return null;
+    }
+    const title = extractEpicTitleFromHtml(res.data);
+    if (title) {
+      autoConfigLogger.info("epic:name-resolved-egdata", {
+        appid: id,
+        title,
+      });
+      epicEgdataTitleCache.set(id, title);
+      return title;
+    }
+    autoConfigLogger.warn("epic:name-egdata-missing", { appid: id });
+  } catch (err) {
+    autoConfigLogger.warn("epic:name-egdata-fetch-failed", {
+      appid: id,
+      error: err?.message || String(err),
+    });
+  }
+  epicEgdataTitleCache.set(id, null);
+  return null;
+}
+
 async function getGameName(appid, opts = {}, retries = 2) {
   const platformHint = normalizePlatform(opts?.platform);
   const preferredName = (opts?.preferredName || "").trim();
@@ -565,6 +658,8 @@ async function getGameName(appid, opts = {}, retries = 2) {
   if (hasHex) {
     const epicName = await getEpicTitle(appid);
     if (epicName) return epicName;
+    const egdataTitle = await getEpicTitleFromEgdata(appid);
+    if (egdataTitle) return egdataTitle;
     // For Epic IDs, do not fall back to Steam/GOG
     return null;
   }

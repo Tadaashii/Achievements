@@ -2247,7 +2247,6 @@
           "./assets/achievements-logo.png",
           window.location.href,
         ).toString();
-        const downloadIdCache = new Map();
         const steamGridUrlCache = new Map();
         function buildSteamGridSearchTerm(input) {
           return String(input || "")
@@ -2329,21 +2328,6 @@
           }
           steamGridUrlCache.set(cacheKey, null);
           return false;
-        }
-        async function resolveRemoteAppId(appid) {
-          const key = String(appid || "");
-          if (!/^\d+$/.test(key)) return key;
-          if (downloadIdCache.has(key)) return downloadIdCache.get(key);
-          try {
-            const mapped = await window.api.getSteamLookupAppId(key);
-            const effective =
-              mapped && /^\d+$/.test(String(mapped)) ? String(mapped) : key;
-            downloadIdCache.set(key, effective);
-            return effective;
-          } catch {
-            downloadIdCache.set(key, key);
-            return key;
-          }
         }
         if (!embedRoot || !imgWrap || !imgEl) return;
 
@@ -3624,7 +3608,7 @@
           button.innerHTML = `${tUi(
             "ui.config.editing",
             "Editing...",
-          )} <span class="arrow-icon" class="rotate-up"></span>`;
+          )} <span class="arrow-icon rotate-up">▼</span>`;
           document.getElementById("configFormTitle").textContent = tUi(
             "ui.config.formEditTitle",
             "Edit Config",
@@ -8121,6 +8105,119 @@
           }
         }
 
+        const normalizeDashboardImagePlatform = (value) =>
+          String(value || "")
+            .trim()
+            .toLowerCase();
+
+        const makeDashboardImageCacheKey = (appid, platform) => {
+          const id = String(appid || "").trim();
+          if (!id) return "";
+          return `${id}::${normalizeDashboardImagePlatform(platform)}`;
+        };
+
+        const clearDashboardImageCacheByAppId = (appid) => {
+          const id = String(appid || "").trim();
+          if (!id) return;
+          const prefix = `${id}::`;
+          for (const key of Array.from(dashboardImageCache.keys())) {
+            if (key === id || key.startsWith(prefix)) {
+              dashboardImageCache.delete(key);
+            }
+          }
+        };
+
+        const applyDashboardCardImage = (img, src) => {
+          if (!img || !src) return;
+          img.dataset.src = src;
+          ensureLazyObserver().observe(img);
+          if (!isDashboardBooting()) {
+            img.src = src;
+          }
+        };
+
+        async function refreshDashboardImageByAppId(appid, platformHint = null) {
+          const id = String(appid || "").trim();
+          if (!id || !gridEl) return;
+
+          const cards = Array.from(gridEl.querySelectorAll(".dash-card")).filter(
+            (card) => String(card?.dataset?.appid || "").trim() === id,
+          );
+          if (!cards.length) return;
+
+          const cardsByPlatform = new Map();
+          for (const card of cards) {
+            const platform = normalizeDashboardImagePlatform(
+              card?.dataset?.platform,
+            );
+            if (!cardsByPlatform.has(platform)) {
+              cardsByPlatform.set(platform, []);
+            }
+            cardsByPlatform.get(platform).push(card);
+          }
+          const hintedPlatform = normalizeDashboardImagePlatform(platformHint);
+          const targetPlatforms =
+            hintedPlatform && cardsByPlatform.has(hintedPlatform)
+              ? [hintedPlatform]
+              : Array.from(cardsByPlatform.keys());
+
+          for (const platform of targetPlatforms) {
+            const platformCards = cardsByPlatform.get(platform) || [];
+            if (!platformCards.length) continue;
+
+            let imgSrc = null;
+            try {
+              const localPath = await window.api.checkLocalGameImage(
+                id,
+                platform || null,
+              );
+              if (localPath) imgSrc = fileUrl(localPath);
+            } catch {
+              imgSrc = null;
+            }
+
+            const cacheKey = makeDashboardImageCacheKey(id, platform);
+            if (imgSrc) {
+              dashboardImageCache.set(cacheKey, imgSrc);
+              for (const card of platformCards) {
+                const name = String(card?.dataset?.name || "").trim();
+                if (name) localStorage.setItem(IMG_CACHE_PREFIX + name, imgSrc);
+              }
+            } else {
+              dashboardImageCache.delete(cacheKey);
+              for (const card of platformCards) {
+                const name = String(card?.dataset?.name || "").trim();
+                if (name) localStorage.removeItem(IMG_CACHE_PREFIX + name);
+              }
+              imgSrc = fallbackIcon;
+            }
+
+            for (const card of platformCards) {
+              const img = card.querySelector(".dash-thumb");
+              if (!img) continue;
+              applyDashboardCardImage(img, imgSrc);
+            }
+          }
+        }
+
+        if (!window.__dashboardImageListenerAttached) {
+          window.api.onImageUpdate(async (payload) => {
+            const appid =
+              typeof payload === "object" && payload?.appid
+                ? String(payload.appid)
+                : /^\d+$/.test(String(payload))
+                  ? String(payload)
+                  : null;
+            if (!appid) return;
+            const platformHint =
+              typeof payload === "object" && payload?.platform
+                ? String(payload.platform)
+                : null;
+            await refreshDashboardImageByAppId(appid, platformHint);
+          });
+          window.__dashboardImageListenerAttached = true;
+        }
+
         async function handleDashboardBlacklistAction(
           configName,
           appid,
@@ -8200,7 +8297,7 @@
 
           localStorage.removeItem(`${DASH_PROGRESS_PREFIX}${configName}`);
           localStorage.removeItem(`${IMG_CACHE_PREFIX}${configName}`);
-          dashboardImageCache?.delete?.(appid);
+          clearDashboardImageCacheByAppId(appid);
           if (Array.isArray(response.blacklist)) {
             blacklistState.appids = new Set(response.blacklist);
           } else {
@@ -9054,6 +9151,8 @@
                     meta.data.appid = appid;
                   }
                   const platform = cfg?.platform || null;
+                  const normalizedPlatform =
+                    normalizeDashboardImagePlatform(platform);
                   const cardBlacklisted = appid && isAppIdInBlacklist(appid);
                   meta.element.dataset.blacklisted = cardBlacklisted
                     ? "1"
@@ -9073,29 +9172,33 @@
                   };
                   let imgSrc = null;
                   if (appid) {
+                    const dashboardCacheKey = makeDashboardImageCacheKey(
+                      appid,
+                      normalizedPlatform,
+                    );
                     if (meta.data?.hasCachedImg && meta.data?.img) {
                       imgSrc = meta.data.img;
-                      dashboardImageCache.set(appid, imgSrc);
-                    } else if (dashboardImageCache.has(appid)) {
-                      imgSrc = dashboardImageCache.get(appid);
+                      dashboardImageCache.set(dashboardCacheKey, imgSrc);
+                    } else if (dashboardImageCache.has(dashboardCacheKey)) {
+                      imgSrc = dashboardImageCache.get(dashboardCacheKey);
                     } else {
                       try {
                         const p = await window.api.checkLocalGameImage(
                           appid,
-                          platform || null,
+                          normalizedPlatform || null,
                         );
                         imgSrc = p ? fileUrl(p) : null;
                       } catch {
                         imgSrc = null;
                       }
                       if (imgSrc) {
-                        dashboardImageCache.set(appid, imgSrc);
+                        dashboardImageCache.set(dashboardCacheKey, imgSrc);
                         localStorage.setItem(
                           IMG_CACHE_PREFIX + it.name,
                           imgSrc,
                         );
                       } else {
-                        dashboardImageCache.delete(appid);
+                        dashboardImageCache.delete(dashboardCacheKey);
                         localStorage.removeItem(IMG_CACHE_PREFIX + it.name);
                       }
                     }
@@ -9113,58 +9216,6 @@
                         localStorage.removeItem(IMG_CACHE_PREFIX + it.name);
                       });
                     }
-                  }
-
-                  async function refreshDashboardImage(appid) {
-                    const cards = Array.from(
-                      gridEl.querySelectorAll(
-                        `.dash-card[data-appid="${appid}"]`,
-                      ),
-                    );
-                    if (!cards.length) return;
-
-                    let imgSrc = null;
-                    try {
-                      const localPath = await window.api.checkLocalGameImage(
-                        appid,
-                        platform || null,
-                      );
-                      if (localPath) imgSrc = fileUrl(localPath);
-                    } catch {
-                      /* ignore */
-                    }
-
-                    if (imgSrc) {
-                      dashboardImageCache.set(appid, imgSrc);
-                      localStorage.setItem(IMG_CACHE_PREFIX + it.name, imgSrc);
-                    } else {
-                      dashboardImageCache.delete(appid);
-                      cards.forEach((card) => {
-                        localStorage.removeItem(
-                          IMG_CACHE_PREFIX + card.dataset.name,
-                        );
-                      });
-                      imgSrc = fallbackIcon;
-                    }
-                    for (const card of cards) {
-                      const img = card.querySelector(".dash-thumb");
-                      if (!img) continue;
-                      applyDashboardImg(img, imgSrc);
-                    }
-                  }
-
-                  if (!window.__dashboardImageListenerAttached) {
-                    window.api.onImageUpdate(async (payload) => {
-                      const appid =
-                        typeof payload === "object" && payload?.appid
-                          ? String(payload.appid)
-                          : /^\d+$/.test(String(payload))
-                            ? String(payload)
-                            : null;
-                      if (!appid) return;
-                      await refreshDashboardImage(appid);
-                    });
-                    window.__dashboardImageListenerAttached = true;
                   }
 
                   const progress = await computeCardProgress(it.name);
