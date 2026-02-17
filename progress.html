@@ -4,39 +4,88 @@
     <meta charset="UTF-8" />
     <link rel="stylesheet" href="style.css" />
     <meta name="duration" content="5000" />
-    <meta width="350" height="150" />
+    <meta width="350" height="100" />
     <title>Progress Notification</title>
     <style>
       :root {
-        --transition: 0.3s;
-        --displaytime: 5s;
+        --transition-in: 280ms;
+        --transition-out: 240ms;
+        --displaytime: 5000ms;
         --scale: 0.95;
         --roundness: 8px;
+        --slide-in: 30px;
+        --slide-out: -26px;
+        --progress-max-width: 350px;
+        --progress-min-width: 220px;
+        --progress-bar-color: lime;
       }
 
       body {
         margin: 0;
         padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
         background: transparent;
         font-family: Arial, sans-serif;
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
       }
 
       .progress-notification {
-        display: flex;
+        display: inline-flex;
         align-items: center;
         gap: 15px;
+        width: fit-content;
+        min-width: var(--progress-min-width);
+        max-width: min(var(--progress-max-width), calc(100vw - 8px));
+        box-sizing: border-box;
         background: rgba(0, 0, 0, 0.75);
         border-radius: var(--roundness);
         padding: 10px 20px;
         color: white;
-        transform: scale(0) translateY(30px);
+        transform: scale(0) translateY(var(--slide-in));
         opacity: 0;
+      }
+
+      .progress-notification.is-active {
         animation:
-          ach-in var(--transition) ease-out forwards,
-          ach-hold calc(var(--displaytime) - var(--transition) * 2) ease
-            forwards var(--transition),
-          ach-out var(--transition) ease-in forwards
-            calc(var(--displaytime) - var(--transition));
+          ach-in var(--transition-in) ease-out forwards,
+          ach-hold
+            calc(var(--displaytime) - var(--transition-in) - var(--transition-out))
+            ease forwards var(--transition-in),
+          ach-out var(--transition-out) ease-in forwards
+            calc(var(--displaytime) - var(--transition-out));
+      }
+
+      .progress-notification.is-short {
+        --transition-in: 220ms;
+        --transition-out: 200ms;
+        --scale: 0.97;
+        --slide-in: 20px;
+        --slide-out: -16px;
+      }
+
+      .progress-notification.is-medium {
+        --transition-in: 280ms;
+        --transition-out: 240ms;
+        --scale: 0.95;
+        --slide-in: 28px;
+        --slide-out: -24px;
+      }
+
+      .progress-notification.is-long {
+        --transition-in: 340ms;
+        --transition-out: 280ms;
+        --scale: 0.93;
+        --slide-in: 36px;
+        --slide-out: -30px;
+      }
+
+      .progress-notification.is-complete {
+        --progress-bar-color: #ffd54f;
+        box-shadow: 0 0 12px rgba(255, 213, 79, 0.35);
       }
 
       @keyframes ach-in {
@@ -55,9 +104,13 @@
 
       @keyframes ach-out {
         to {
-          transform: scale(0.85) translateY(-30px);
+          transform: scale(calc(var(--scale) * 0.9)) translateY(var(--slide-out));
           opacity: 0;
         }
+      }
+
+      .progress-icon {
+        flex: 0 0 auto;
       }
 
       .progress-icon img {
@@ -66,10 +119,32 @@
       }
 
       .progress-text {
-        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .title {
+        margin: 0;
+        font-size: 16px;
+        line-height: 1.25;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        overflow: hidden;
+      }
+
+      .bar-container {
+        width: 100%;
       }
 
       .progress-bar {
+        width: 100%;
         height: 8px;
         border-radius: 4px;
         background: #444;
@@ -79,7 +154,7 @@
 
       .progress-fill {
         height: 100%;
-        background-color: lime;
+        background-color: var(--progress-bar-color);
         transition: width 0.5s ease;
       }
     </style>
@@ -99,12 +174,48 @@
     <script src="utils/i18n-ui.js"></script>
     <script>
       (async function () {
+        const docEl = document.documentElement;
+        const container = document.querySelector(".progress-notification");
+        const titleEl = document.querySelector(".title");
+        const imgEl = document.querySelector(".progress-icon img");
+        const fill = document.querySelector(".progress-fill");
         const metaDur = document.querySelector('meta[name="duration"]');
+        const sizeMeta = document.querySelector("meta[width][height]");
         const totalDurationMs = Math.max(0, Number(metaDur?.content || 5000));
-        document.documentElement.style.setProperty(
-          "--displaytime",
-          `${totalDurationMs}ms`,
+        const parsedMaxWidth = Number(sizeMeta?.getAttribute("width") || 350);
+        const maxWidth =
+          Number.isFinite(parsedMaxWidth) && parsedMaxWidth > 0
+            ? parsedMaxWidth
+            : 350;
+        const minWidth = Math.min(
+          maxWidth,
+          Math.max(220, Math.round(maxWidth * 0.55)),
         );
+        docEl.style.setProperty("--displaytime", `${totalDurationMs}ms`);
+        docEl.style.setProperty("--progress-max-width", `${maxWidth}px`);
+        docEl.style.setProperty("--progress-min-width", `${minWidth}px`);
+
+        const PROFILE_CLASSES = ["is-short", "is-medium", "is-long", "is-complete"];
+        let closeTimer = null;
+
+        const scheduleClose = (delayMs) => {
+          if (closeTimer) clearTimeout(closeTimer);
+          closeTimer = setTimeout(() => {
+            container?.classList.remove("is-active");
+            window.api?.closeNotificationWindow?.();
+          }, delayMs);
+        };
+
+        const applyProgressProfile = (text, pct) => {
+          if (!container) return;
+          const len = String(text || "").trim().length;
+          const toneClass = len > 74 ? "is-long" : len > 40 ? "is-medium" : "is-short";
+          container.classList.remove(...PROFILE_CLASSES, "is-active");
+          container.classList.add(toneClass);
+          if (pct >= 100) container.classList.add("is-complete");
+          void container.offsetWidth;
+          container.classList.add("is-active");
+        };
 
         const tUi = (key, fallback) =>
           window.i18nUi && typeof window.i18nUi.getString === "function"
@@ -123,11 +234,7 @@
 
         window.api.onProgressUpdate(async (data) => {
           try {
-            if (!data) return;
-
-            const titleEl = document.querySelector(".title");
-            const imgEl = document.querySelector(".progress-icon img");
-            const fill = document.querySelector(".progress-fill");
+            if (!data || !container || !titleEl || !imgEl || !fill) return;
 
             const name =
               typeof data.displayName === "object"
@@ -144,17 +251,18 @@
             const pct =
               max > 0 ? Math.min(100, Math.round((cur / max) * 100)) : 0;
 
-            titleEl.textContent = `${name}: ${cur}/${max}`;
+            const title = `${name}: ${cur}/${max}`;
+            titleEl.textContent = title;
+            applyProgressProfile(title, pct);
             await resolveAchievementIcon(imgEl, data.config_path, data.icon);
             fill.style.width = `${pct}%`;
+            scheduleClose(totalDurationMs);
           } catch (e) {
             console.error("[progress.html] render error:", e);
           }
         });
 
-        setTimeout(() => {
-          window.api?.closeNotificationWindow?.();
-        }, totalDurationMs);
+        scheduleClose(totalDurationMs);
       })();
     </script>
   </body>

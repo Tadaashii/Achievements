@@ -186,6 +186,97 @@ function migrateDefaultPresetsIfNeeded() {
   }
 }
 
+function copyProgressTemplateToUserPresetsOnce() {
+  const targetPath = getUserProgressTemplatePath();
+  const targetDir = path.dirname(targetPath);
+  const bundledSourcePath = path.join(__dirname, "progress.html");
+  const legacyPresetPath = path.join(
+    userPresetsFolder,
+    "Non-scalable",
+    "Progress",
+    "progress.html",
+  );
+  const sourcePath = fs.existsSync(legacyPresetPath)
+    ? legacyPresetPath
+    : bundledSourcePath;
+
+  try {
+    if (!fs.existsSync(sourcePath)) {
+      appLogger.warn("progress-template:source-missing", { sourcePath });
+      return;
+    }
+    if (fs.existsSync(targetPath)) return;
+
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.copyFileSync(sourcePath, targetPath);
+    appLogger.info("progress-template:copied", {
+      source: sourcePath,
+      target: targetPath,
+    });
+  } catch (err) {
+    appLogger.warn("progress-template:copy-failed", {
+      error: err?.message || String(err),
+      source: sourcePath,
+      target: targetPath,
+    });
+  }
+}
+
+function getUserProgressTemplatePath() {
+  return path.join(path.dirname(userPresetsFolder), "progress.html");
+}
+
+function resolveProgressTemplatePath() {
+  const userPath = getUserProgressTemplatePath();
+  if (fs.existsSync(userPath)) return userPath;
+  return path.join(__dirname, "progress.html");
+}
+
+function resolveNotificationPresetFolder(presetName) {
+  const requested = String(presetName || "default");
+  const scalableFolder = path.join(userPresetsFolder, "Scalable", requested);
+  const nonScalableFolder = path.join(
+    userPresetsFolder,
+    "Non-scalable",
+    requested,
+  );
+  const oldStyleFolder = path.join(userPresetsFolder, requested);
+
+  const candidates = [scalableFolder, nonScalableFolder, oldStyleFolder];
+  const firstWithIndex = candidates.find((folder) =>
+    fs.existsSync(path.join(folder, "index.html")),
+  );
+  if (firstWithIndex) {
+    return { presetFolder: firstWithIndex, requestedPreset: requested };
+  }
+
+  const fallbackCandidates = [
+    path.join(userPresetsFolder, "Scalable", "Default"),
+    path.join(userPresetsFolder, "Non-scalable", "Default"),
+    path.join(userPresetsFolder, "Default"),
+    path.join(userPresetsFolder, "Scalable", "default"),
+    path.join(userPresetsFolder, "Non-scalable", "default"),
+    path.join(userPresetsFolder, "default"),
+  ];
+  const fallbackFolder = fallbackCandidates.find((folder) =>
+    fs.existsSync(path.join(folder, "index.html")),
+  );
+
+  if (fallbackFolder) {
+    appLogger.warn("preset:index-missing-fallback", {
+      preset: requested,
+      candidates,
+      fallbackFolder,
+    });
+    return { presetFolder: fallbackFolder, requestedPreset: requested };
+  }
+
+  return {
+    presetFolder: candidates.find((folder) => fs.existsSync(folder)) || oldStyleFolder,
+    requestedPreset: requested,
+  };
+}
+
 function deepEqual(a, b) {
   if (a === b) return true;
   if (typeof a !== typeof b) return false;
@@ -4067,24 +4158,7 @@ function normalizeNotificationScale(rawScale) {
 
 function createNotificationWindow(message) {
   const preset = message.preset || "default";
-  // Check in both scalable and non-scalable folders
-  const scalableFolder = path.join(userPresetsFolder, "Scalable", preset);
-  const nonScalableFolder = path.join(
-    userPresetsFolder,
-    "Non-scalable",
-    preset,
-  );
-  const oldStyleFolder = path.join(userPresetsFolder, preset);
-
-  // Determine which folder contains the preset
-  let presetFolder;
-  if (fs.existsSync(scalableFolder)) {
-    presetFolder = scalableFolder;
-  } else if (fs.existsSync(nonScalableFolder)) {
-    presetFolder = nonScalableFolder;
-  } else {
-    presetFolder = oldStyleFolder; // Fallback to the old structure
-  }
+  const { presetFolder } = resolveNotificationPresetFolder(preset);
 
   const presetHtml = path.join(presetFolder, "index.html");
   const position = message.position || "center-bottom";
@@ -4489,6 +4563,7 @@ ipcMain.handle("load-presets", async () => {
             .readdirSync(nonScalableFolder, { withFileTypes: true })
             .filter((dirent) => dirent.isDirectory())
             .map((dirent) => dirent.name)
+            .filter((name) => String(name || "").toLowerCase() !== "progress")
         : [];
 
       return {
@@ -4622,24 +4697,7 @@ function processNextNotification() {
   });
 
   const preset = achievement.preset || "default";
-  // Check in both scalable and non-scalable folders
-  const scalableFolder = path.join(userPresetsFolder, "Scalable", preset);
-  const nonScalableFolder = path.join(
-    userPresetsFolder,
-    "Non-scalable",
-    preset,
-  );
-  const oldStyleFolder = path.join(userPresetsFolder, preset);
-
-  // Determine which folder contains the preset
-  let presetFolder;
-  if (fs.existsSync(scalableFolder)) {
-    presetFolder = scalableFolder;
-  } else if (fs.existsSync(nonScalableFolder)) {
-    presetFolder = nonScalableFolder;
-  } else {
-    presetFolder = oldStyleFolder; // Fallback to the old structure
-  }
+  const { presetFolder } = resolveNotificationPresetFolder(preset);
 
   const overrideDurationSec = Number(cachedPreferences?.notificationDuration);
   const overrideDurationMs =
@@ -7183,6 +7241,7 @@ app.whenReady().then(async () => {
   copyFolderOnce(defaultSoundsFolder, userSoundsFolder);
   migrateDefaultPresetsIfNeeded();
   copyFolderOnce(defaultPresetsFolder, userPresetsFolder);
+  copyProgressTemplateToUserPresetsOnce();
 
   createMainWindow();
   scheduleAutoSelectProcessPollerAfterBoot();
@@ -7209,7 +7268,7 @@ function showProgressNotification(data) {
     config: data?.config_path || null,
   });
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-  const progressHtmlPath = path.join(__dirname, "progress.html");
+  const progressHtmlPath = resolveProgressTemplatePath();
   let progressWidth = 350;
   let progressHeight = 150;
   let progressDurationMs = 5000;
@@ -7266,11 +7325,12 @@ function showProgressNotification(data) {
   progressWindow.setVisibleOnAllWorkspaces(true);
   progressWindow.setFullScreenable(false);
   progressWindow.setFocusable(false);
-  progressWindow.loadFile("progress.html");
+  progressWindow.loadFile(progressHtmlPath);
   windowLogger.info("create-progress-window:browserwindow-created", {
     size: { width: progressWidth, height: progressHeight },
     position: { x, y },
     durationMs: progressDurationMs,
+    progressHtmlPath,
   });
 
   progressWindow.once("ready-to-show", () => {

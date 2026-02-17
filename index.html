@@ -2330,6 +2330,33 @@
           return false;
         }
         if (!embedRoot || !imgWrap || !imgEl) return;
+        const isPlatinumFlagEnabled = (value) => {
+          if (value === true || value === 1) return true;
+          const normalized = String(value || "")
+            .trim()
+            .toLowerCase();
+          return normalized === "true" || normalized === "1";
+        };
+        const perfectBadge = document.createElement("img");
+        perfectBadge.src = new URL(
+          "./assets/trophy-icon.png",
+          window.location.href,
+        ).toString();
+        perfectBadge.alt = "Perfect Game";
+        perfectBadge.style.position = "absolute";
+        perfectBadge.style.left = "10px";
+        perfectBadge.style.bottom = "10px";
+        perfectBadge.style.width = "30%";
+        perfectBadge.style.height = "25%";
+        perfectBadge.style.display = "none";
+        perfectBadge.style.pointerEvents = "none";
+        perfectBadge.style.zIndex = "5";
+        imgWrap.style.position = "relative";
+        imgWrap.appendChild(perfectBadge);
+        window.__setEmbeddedPlatinumBadgeByConfig = (configMeta) => {
+          const shouldShow = isPlatinumFlagEnabled(configMeta?.platinum);
+          perfectBadge.style.display = shouldShow ? "block" : "none";
+        };
 
         // --- fallback logo ---
         function showFallbackLogo() {
@@ -4720,6 +4747,7 @@
               window.api.toggleOverlay(null);
               window.api.onLoadOverlayData(null);
               window.__showFallbackLogo?.();
+              window.__setEmbeddedPlatinumBadgeByConfig?.(null);
             }
 
             if (typeof buildDashboard === "function") {
@@ -4833,9 +4861,11 @@
             if (playBtn) playBtn.style.display = "none";
             setAchievementsHeaderVisible(false);
             window.__showFallbackLogo?.();
+            window.__setEmbeddedPlatinumBadgeByConfig?.(null);
             updateMuteProgressUI().catch(() => {});
             return;
           }
+          window.__setEmbeddedPlatinumBadgeByConfig?.(null);
           const cachedMeta = configMetaIndex.get(selectedConfig) || null;
           const blocked =
             !!cachedMeta?.appid &&
@@ -4862,6 +4892,7 @@
             savedAchievementsObj,
           );
           lastSelectedConfigMeta = currentConfig || null;
+          window.__setEmbeddedPlatinumBadgeByConfig?.(currentConfig || null);
           updateBlacklistButtonState(currentConfig?.appid || null);
           if (currentConfig?.appid) {
             const resolvedName =
