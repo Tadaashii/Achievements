@@ -569,6 +569,15 @@
                   <button id="foldersAddBtn" type="button">Add Folder…</button>
                   <button id="foldersRescanBtn" type="button">Rescan</button>
                 </div>
+                <div class="checkbox-control" style="margin-top: -25px">
+                  <input
+                    type="checkbox"
+                    id="settings-enableLumaPlayWatcherCheckbox"
+                  />
+                  <label for="settings-enableLumaPlayWatcherCheckbox">
+                    Enable LumaPlay Watcher
+                  </label>
+                </div>
                 <div id="foldersList" style="margin-top: 2px"></div>
               </div>
             </div>
@@ -3331,6 +3340,14 @@
         /Achievements missing/i,
       ];
 
+      const TECHNICAL_WARN_PATTERNS = [
+        /\bDeprecationWarning\b/i,
+        /\[DEP\d{4}\]/i,
+        /--trace-deprecation/i,
+        /node:internal\/process\/warning/i,
+        /fs\.rmdir\(path,\s*\{\s*recursive:\s*true\s*\}\)/i,
+      ];
+
       const _shownWarns = new Set();
       function shouldShowOnce(msg) {
         const key = msg.replace(/\s+/g, " ").trim();
@@ -3340,7 +3357,14 @@
         return true;
       }
 
+      function isTechnicalWarn(msg) {
+        const text = String(msg || "");
+        return TECHNICAL_WARN_PATTERNS.some((rx) => rx.test(text));
+      }
+
       window.api.onNotify(({ message, color }) => {
+        if (isTechnicalWarn(message)) return;
+
         const isConfigPathWarn = SUPPRESS_MSG_PATTERNS.some((rx) =>
           rx.test(message),
         );
@@ -3372,17 +3396,23 @@
 
         console.log = (...args) => {
           originalLog(...args);
-          showNotification(toMsg(args), "#4CAF50");
+          const msg = toMsg(args);
+          if (isTechnicalWarn(msg)) return;
+          showNotification(msg, "#4CAF50");
         };
 
         console.warn = (...args) => {
           originalWarn(...args);
-          showNotification(toMsg(args), "#ff9800");
+          const msg = toMsg(args);
+          if (isTechnicalWarn(msg)) return;
+          showNotification(msg, "#ff9800");
         };
 
         console.error = (...args) => {
           originalError(...args);
-          showNotification(toMsg(args), "#f44336");
+          const msg = toMsg(args);
+          if (isTechnicalWarn(msg)) return;
+          showNotification(msg, "#f44336");
         };
 
         window.alert = (message) => {
@@ -5571,10 +5601,18 @@
       if (window.api?.on) {
         window.api.on("blacklist:updated", async (_evt, payload) => {
           try {
-            await syncBlacklistList();
-            renderBlacklistList();
-            if (payload?.appids) {
+            if (Array.isArray(payload?.appids)) {
               blacklistState.appids = new Set(payload.appids);
+            } else {
+              await syncBlacklistList();
+            }
+            renderBlacklistList();
+            window.__dashboardNeedsRebuild = true;
+            if (
+              window.__dashboardOpen &&
+              typeof buildDashboard === "function"
+            ) {
+              await buildDashboard();
             }
           } catch (err) {
             console.warn(
@@ -5783,6 +5821,12 @@
             "settings-disablePlaytimeCheckbox",
           );
           if (cb) cb.checked = prefs.disablePlaytime;
+        }
+        {
+          const cb = document.getElementById(
+            "settings-enableLumaPlayWatcherCheckbox",
+          );
+          if (cb) cb.checked = prefs?.lumaPlayWatcherEnabled === true;
         }
         {
           const hwCb = document.getElementById(
@@ -6149,6 +6193,20 @@
                 ? tUi("log.appCloseToTray", "App will close to tray")
                 : tUi("log.appCloseFully", "App will close fully"),
             );
+          });
+        }
+        const enableLumaPlayWatcherEl = document.getElementById(
+          "settings-enableLumaPlayWatcherCheckbox",
+        );
+        if (enableLumaPlayWatcherEl) {
+          enableLumaPlayWatcherEl.checked =
+            prefs?.lumaPlayWatcherEnabled === true;
+          enableLumaPlayWatcherEl.addEventListener("change", async (e) => {
+            await window.api.savePreferences({
+              lumaPlayWatcherEnabled: e.target.checked,
+            });
+            await loadPreferencesCached().catch(() => {});
+            await window.refreshFoldersList?.();
           });
         }
 
@@ -7329,6 +7387,9 @@
           disableProgress: checkbox("settings-disableProgressCheckbox"),
           disablePlaytime: checkbox("settings-disablePlaytimeCheckbox"),
           disablePlatinum: checkbox("settings-disablePlatinumCheckbox"),
+          lumaPlayWatcherEnabled: checkbox(
+            "settings-enableLumaPlayWatcherCheckbox",
+          ),
           startMaximized: checkbox("settings-startMaximizedCheckbox"),
           startInTray: checkbox("settings-startInTrayCheckbox"),
           closeToTray: checkbox("settings-closeToTrayCheckbox"),
@@ -7937,6 +7998,9 @@
         let dashboardMenuIndex = 0;
         window.__dashboardContextMenuOpen = false;
         window.__dashboardContextMenuIgnoreClick = false;
+        if (window.__dashboardNeedsRebuild !== true) {
+          window.__dashboardNeedsRebuild = false;
+        }
 
         const fileUrl = (p) =>
           p ? `file:///${String(p).replace(/\\/g, "/")}` : "";
@@ -8167,13 +8231,16 @@
           }
         };
 
-        async function refreshDashboardImageByAppId(appid, platformHint = null) {
+        async function refreshDashboardImageByAppId(
+          appid,
+          platformHint = null,
+        ) {
           const id = String(appid || "").trim();
           if (!id || !gridEl) return;
 
-          const cards = Array.from(gridEl.querySelectorAll(".dash-card")).filter(
-            (card) => String(card?.dataset?.appid || "").trim() === id,
-          );
+          const cards = Array.from(
+            gridEl.querySelectorAll(".dash-card"),
+          ).filter((card) => String(card?.dataset?.appid || "").trim() === id);
           if (!cards.length) return;
 
           const cardsByPlatform = new Map();
@@ -8447,7 +8514,9 @@
           } catch {}
           setBackgroundInert(true);
           const needsBuild =
-            window.__dashboardReady !== true || !gridEl?.children?.length;
+            window.__dashboardNeedsRebuild === true ||
+            window.__dashboardReady !== true ||
+            !gridEl?.children?.length;
           if (needsBuild) {
             await buildDashboard();
           }
@@ -9015,6 +9084,7 @@
               __dashboardBuildRequested = false;
               await buildDashboardOnce();
             }
+            window.__dashboardNeedsRebuild = false;
           })().finally(() => {
             __dashboardBuildPromise = null;
           });
@@ -9847,11 +9917,32 @@
         function applyDashboardSortAndFilter() {
           const grid = document.getElementById("dashboardGrid");
           if (!grid) return;
+          const dashboardBody = document.getElementById("dashboardBody");
+          const isCardVisibleInViewport = (card) => {
+            if (!card) return false;
+            if (
+              card.offsetParent === null ||
+              getComputedStyle(card).display === "none"
+            ) {
+              return false;
+            }
+            if (!dashboardBody) return true;
+            const bodyRect = dashboardBody.getBoundingClientRect();
+            const rect = card.getBoundingClientRect();
+            return (
+              rect.bottom > bodyRect.top + 1 && rect.top < bodyRect.bottom - 1
+            );
+          };
 
           const st = getMultiSortState();
           const focusedEl = grid.querySelector(".dash-card:focus");
           const activeEl = grid.querySelector(".dash-card.active");
-          const keepName = (focusedEl || activeEl)?.dataset?.name || null;
+          const keepEl = isCardVisibleInViewport(focusedEl)
+            ? focusedEl
+            : isCardVisibleInViewport(activeEl)
+              ? activeEl
+              : null;
+          const keepName = keepEl?.dataset?.name || null;
           const cardStates = Array.from(
             grid.querySelectorAll(".dash-card"),
           ).map((card) => ({
@@ -9911,21 +10002,31 @@
           });
           grid.appendChild(frag);
 
-          const newlyFocused = window.focusFirstVisibleDashCard?.();
-          if (!newlyFocused && keepName) {
+          let restoredFocus = false;
+          if (keepName) {
             const keepCard = grid.querySelector(
               `.dash-card[data-name="${CSS.escape(keepName)}"]`,
             );
             if (keepCard) {
-              setActiveCard(keepName);
-              keepCard.focus({ preventScroll: true });
-              try {
-                __dashNav.index = Math.max(
-                  0,
-                  getDashCards(false).indexOf(keepCard),
-                );
-              } catch {}
+              const keepVisible = isCardVisibleInViewport(keepCard);
+              if (keepVisible) {
+                setActiveCard(keepName);
+                if (document.activeElement !== keepCard) {
+                  keepCard.focus({ preventScroll: true });
+                }
+                try {
+                  __dashNav.index = Math.max(
+                    0,
+                    getDashCards(false).indexOf(keepCard),
+                  );
+                } catch {}
+                restoredFocus = true;
+              }
             }
+          }
+
+          if (!restoredFocus) {
+            window.focusFirstVisibleDashCard?.();
           }
         }
 
@@ -10296,6 +10397,8 @@
               await reloadConfigsDropdown(true);
             if (window.__dashboardOpen) {
               await buildDashboard();
+            } else {
+              window.__dashboardNeedsRebuild = true;
             }
           } catch (e) {
             console.warn(

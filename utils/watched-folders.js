@@ -32,6 +32,11 @@ const {
 } = require("./steam-appcache");
 const { parsePs4TrophySetDir } = require("./shadps4-trophy");
 const { sanitizeConfigName } = require("./playtime-store");
+const {
+  readLumaPlayAchievementsSnapshot,
+  scanLumaPlayRegistryEntries,
+  startLumaPlayRegistryEventWatcher,
+} = require("./lumaplay-registry");
 
 const watcherLogger = createLogger("watcher");
 function isAppIdName(name) {
@@ -172,6 +177,10 @@ function coercePath(input) {
   } catch {
     return "";
   }
+}
+
+function isNonEmptyString(value) {
+  return typeof value === "string" && value.trim().length > 0;
 }
 
 function waitForFileExists(fp, tries = 50, delay = 60) {
@@ -766,8 +775,15 @@ module.exports = function makeWatchedFolders({
   const BOOT_SCAN_AFTER_OVERLAY_HIDE_DELAY_MS = 500;
   const BOOT_SCAN_OVERLAY_WAIT_POLL_MS = 200;
   const BOOT_SCAN_OVERLAY_WAIT_MAX_MS = 15000;
+  const LUMAPLAY_EVENT_WATCH_RESTART_MS = Math.max(
+    500,
+    Number(process.env.LUMAPLAY_EVENT_WATCH_RESTART_MS) || 1500,
+  );
   let bootMode = true;
   let bootCompleteEmitted = false;
+  let lumaPlayDiscoveryRunning = false;
+  let lumaPlayDiscoveryPending = false;
+  let lumaPlayDiscoveryWatcher = null;
 
   function isPlainObject(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -1004,6 +1020,15 @@ module.exports = function makeWatchedFolders({
         : {};
     } catch {
       return {};
+    }
+  }
+  const LUMAPLAY_WATCHER_PREF_KEY = "lumaPlayWatcherEnabled";
+  function isLumaPlayWatcherEnabled() {
+    try {
+      const prefs = readPrefsSafe();
+      return prefs?.[LUMAPLAY_WATCHER_PREF_KEY] === true;
+    } catch {
+      return false;
     }
   }
   function collectWatchedFolderEntries() {
@@ -1249,6 +1274,12 @@ module.exports = function makeWatchedFolders({
     return trimmed.replace(new RegExp(`${sepPattern}$`), "");
   };
 
+  function normalizeEmuValue(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase();
+  }
+
   function isXeniaMeta(meta) {
     return normalizePlatform(meta?.platform) === "xenia";
   }
@@ -1262,6 +1293,13 @@ module.exports = function makeWatchedFolders({
 
   function isPs4Meta(meta) {
     return normalizePlatform(meta?.platform) === "shadps4";
+  }
+
+  function isLumaPlayMeta(meta) {
+    return (
+      normalizePlatform(meta?.platform) === "uplay" &&
+      normalizeEmuValue(meta?.emu) === "lumaplay"
+    );
   }
 
   function parseSteamOfficialBinInfo(filePath) {
@@ -1757,8 +1795,15 @@ module.exports = function makeWatchedFolders({
         name: path.basename(fileName, ".json"),
         appid,
         platform,
+        emu: normalizeEmuValue(data?.emu),
         save_path: data?.save_path || null,
         config_path: data?.config_path || null,
+        lumaplay_user:
+          typeof data?.lumaplay_user === "string"
+            ? data.lumaplay_user
+            : typeof data?.lumaplayUser === "string"
+              ? data.lumaplayUser
+              : "",
         normalizedSavePath,
         platinum: data?.platinum === true,
         __tenoke: data?.emu === "tenoke" || false,
@@ -1949,6 +1994,7 @@ module.exports = function makeWatchedFolders({
 
   function getSaveWatchTargets(meta) {
     const out = new Set();
+    if (isLumaPlayMeta(meta)) return [];
     if (!meta?.save_path) return [];
 
     if (isXeniaMeta(meta)) {
@@ -2045,13 +2091,16 @@ module.exports = function makeWatchedFolders({
       forceEmptyPrev = false,
       isAddEvent = false,
     } = opts || {};
-    if (!filePath) return;
-    const base = path.basename(filePath).toLowerCase();
+    const isLumaPlay = isLumaPlayMeta(meta);
+    if (!filePath && !isLumaPlay) return;
+    const base = isLumaPlay ? "" : path.basename(filePath).toLowerCase();
     const isXenia = isXeniaMeta(meta);
     const isRpcs3 = isRpcs3Meta(meta);
     const isPs4 = isPs4Meta(meta);
     const isSteamOfficial = isSteamOfficialMeta(meta);
-    if (isXenia) {
+    if (isLumaPlay) {
+      // Registry-backed source; no file suffix checks.
+    } else if (isXenia) {
       if (!base.endsWith(".gpd")) return;
     } else if (isRpcs3) {
       if (base !== "tropusr.dat") return;
@@ -2074,9 +2123,12 @@ module.exports = function makeWatchedFolders({
     }
 
     const now = Date.now();
-    const last = fileHitCooldown.get(filePath) || 0;
+    const hitKey = isLumaPlay
+      ? `lumaplay:${String(appid || "")}:${String(meta?.name || "")}`
+      : filePath;
+    const last = fileHitCooldown.get(hitKey) || 0;
     if (now - last < 200) return;
-    fileHitCooldown.set(filePath, now);
+    fileHitCooldown.set(hitKey, now);
 
     const key = String(appid);
     clearTimeout(evalDebounce.get(key));
@@ -2089,9 +2141,9 @@ module.exports = function makeWatchedFolders({
     await waitForFileExists(cfgPath);
 
     const snapKey = makeSnapshotKey(meta, appid);
-    const metaKey = getCacheMetaKey(meta, appid, filePath);
+    const metaKey = isLumaPlay ? "" : getCacheMetaKey(meta, appid, filePath);
     let fileStat = null;
-    if (bootMode && !forceEmptyPrev) {
+    if (!isLumaPlay && bootMode && !forceEmptyPrev) {
       loadCacheMetaOnce();
       const cachedMeta = metaKey ? cacheMeta.get(metaKey) : null;
       if (cachedMeta && typeof cachedMeta === "object") {
@@ -2137,8 +2189,34 @@ module.exports = function makeWatchedFolders({
     let parsedGpd = null;
     let parsedTrophy = null;
     let parsedSteam = null;
-    const fileBase = path.basename(filePath || "").toLowerCase();
-    if (isXenia) {
+    if (isLumaPlay) {
+      const parsed = readLumaPlayAchievementsSnapshot({
+        appid: String(meta?.appid || appid || ""),
+        configPath: meta?.config_path || "",
+        preferredUser: meta?.lumaplay_user || "",
+        previousSnapshot: prev,
+      });
+      if (parsed?.found) {
+        cur = parsed?.snapshot || {};
+        if (parsed.user && parsed.user !== meta?.lumaplay_user) {
+          meta.lumaplay_user = parsed.user;
+          try {
+            const cfgPath = path.join(configsDir, `${meta.name}.json`);
+            if (cfgPath && fs.existsSync(cfgPath)) {
+              const raw = fs.readFileSync(cfgPath, "utf8");
+              const data = JSON.parse(raw);
+              if (data.lumaplay_user !== parsed.user) {
+                data.lumaplay_user = parsed.user;
+                fs.writeFileSync(cfgPath, JSON.stringify(data, null, 2));
+              }
+            }
+          } catch {}
+        }
+      } else {
+        parseOk = false;
+        cur = { ...prev };
+      }
+    } else if (isXenia) {
       try {
         parsedGpd = parseGpdFile(filePath);
         parsedGpd.appid = String(meta?.appid || appid || "");
@@ -2407,7 +2485,7 @@ module.exports = function makeWatchedFolders({
         });
       }
       if (!becameEarned && !progressChanged) continue;
-      if (becameEarned && isRpcs3) {
+      if (becameEarned && (isRpcs3 || isLumaPlay)) {
         if (!nowVal.earned_time) nowVal.earned_time = Date.now();
       }
       if (!initial && isActiveConfig && !forceEmptyPrev && !prevWasEmpty)
@@ -2501,6 +2579,133 @@ module.exports = function makeWatchedFolders({
       } catch {}
     }
     return touched;
+  }
+
+  function getActiveLumaPlayWatcherEntries() {
+    const entries = [];
+    for (const bucket of appidSaveWatchers.values()) {
+      if (!(bucket instanceof Map)) continue;
+      for (const watcher of bucket.values()) {
+        if (!watcher?.isLumaPlayEventWatcher) continue;
+        if (watcher.closed) continue;
+        if (!watcher.meta || !watcher.appid) continue;
+        entries.push(watcher);
+      }
+    }
+    return entries;
+  }
+
+  async function evaluateLumaPlayWatcherEntry(
+    entry,
+    { initial = false, retry = false } = {},
+  ) {
+    if (!entry || entry.closed) return;
+    if (entry.running) {
+      entry.pending = true;
+      return;
+    }
+    entry.running = true;
+    try {
+      const result = await evaluateFile(entry.appid, entry.meta, "", {
+        initial,
+        retry,
+        forceEmptyPrev: false,
+        isAddEvent: false,
+      });
+      if (result === "__retry__") {
+        if (!entry.retryTimer && !entry.closed) {
+          entry.retryTimer = setTimeout(() => {
+            entry.retryTimer = null;
+            evaluateLumaPlayWatcherEntry(entry, {
+              initial,
+              retry: true,
+            }).catch(() => {});
+          }, 250);
+        }
+        return;
+      }
+      if (result) {
+        try {
+          broadcastAll("refresh-achievements-table");
+          broadcastAll("achievements:file-updated", {
+            appid: String(entry.appid),
+            configName: entry.meta?.name || null,
+          });
+        } catch {}
+        if (
+          !bootMode &&
+          !justUnblocked.has(String(entry.appid)) &&
+          !suppressAutoSelect.has(String(entry.appid))
+        ) {
+          setTimeout(() => enqueueAutoSelect(entry.meta), 0);
+        }
+      } else if (initial) {
+        try {
+          broadcastAll("refresh-achievements-table");
+        } catch {}
+      }
+    } catch {} finally {
+      entry.running = false;
+      if (entry.pending && !entry.closed) {
+        entry.pending = false;
+        setTimeout(() => {
+          evaluateLumaPlayWatcherEntry(entry).catch(() => {});
+        }, 0);
+      }
+    }
+  }
+
+  async function runLumaPlayDiscoveryTick(options = {}) {
+    if (process.platform !== "win32") return;
+    if (!isLumaPlayWatcherEnabled()) {
+      lumaPlayDiscoveryPending = false;
+      stopLumaPlayDiscoveryPolling();
+      return;
+    }
+    if (bootMode || rescanInProgress.value) {
+      lumaPlayDiscoveryPending = true;
+      return;
+    }
+    if (lumaPlayDiscoveryRunning) {
+      lumaPlayDiscoveryPending = true;
+      return;
+    }
+    lumaPlayDiscoveryRunning = true;
+    try {
+      do {
+        lumaPlayDiscoveryPending = false;
+        await scanLumaPlayRegistryOnce({
+          suppressInitialNotify: true,
+          autoRebuild: options.autoRebuild !== false,
+        });
+        const entries = getActiveLumaPlayWatcherEntries();
+        for (const entry of entries) {
+          await evaluateLumaPlayWatcherEntry(entry, {
+            initial: false,
+            retry: false,
+          });
+        }
+      } while (
+        lumaPlayDiscoveryPending &&
+        !bootMode &&
+        !rescanInProgress.value
+      );
+    } catch (err) {
+      watcherLogger.warn("lumaplay:realtime-event-failed", {
+        error: err?.message || String(err),
+      });
+    } finally {
+      lumaPlayDiscoveryRunning = false;
+      if (
+        lumaPlayDiscoveryPending &&
+        !bootMode &&
+        !rescanInProgress.value
+      ) {
+        setTimeout(() => {
+          runLumaPlayDiscoveryTick(options).catch(() => {});
+        }, 0);
+      }
+    }
   }
 
   function runInitialSeedForMeta(id, meta, candidates, options = {}) {
@@ -2738,10 +2943,45 @@ module.exports = function makeWatchedFolders({
   function attachWatcherForMeta(meta, options = {}) {
     const suppressInitialNotify = options.suppressInitialNotify === true;
     const deferInitialSeed = options.deferInitialSeed === true;
-    if (!meta?.save_path) return;
+    const isLumaPlay = isLumaPlayMeta(meta);
+    if (!meta?.save_path && !isLumaPlay) return;
     const appid = String(meta.appid);
     const bucket = ensureWatcherBucket(appid);
     if (bucket.has(meta.name)) return;
+
+    if (isLumaPlay) {
+      if (!isLumaPlayWatcherEnabled()) return;
+      const entry = {
+        appid: String(appid),
+        meta,
+        closed: false,
+        running: false,
+        pending: false,
+        retryTimer: null,
+        isLumaPlayEventWatcher: true,
+        close: async () => {
+          entry.closed = true;
+          if (entry.retryTimer) {
+            clearTimeout(entry.retryTimer);
+            entry.retryTimer = null;
+          }
+        },
+      };
+      bucket.set(meta.name, entry);
+      const shouldSuppressInitialSeed =
+        suppressInitialNotify || bootMode || deferInitialSeed;
+      evaluateLumaPlayWatcherEntry(entry, {
+        initial: shouldSuppressInitialSeed,
+        retry: false,
+      }).catch(() => {});
+      watcherLogger.info("watch-lumaplay", {
+        appid,
+        config: meta?.name || null,
+        mode: "event",
+      });
+      startLumaPlayDiscoveryPolling();
+      return;
+    }
 
     if (isSteamOfficialMeta(meta)) {
       const statsDir = meta.save_path || "";
@@ -3279,6 +3519,12 @@ module.exports = function makeWatchedFolders({
       const id = String(appid);
       if (blacklist.has(id)) continue;
       for (const meta of metas || []) {
+        if (isLumaPlayMeta(meta)) {
+          if (!isLumaPlayWatcherEnabled()) continue;
+          if (!allowed.has(id)) allowed.set(id, new Set());
+          allowed.get(id).add(meta.name);
+          continue;
+        }
         const savePath = meta?.save_path ? normalize(meta.save_path) : null;
         if (!savePath) continue;
         const inside = roots.some((root) => {
@@ -3358,6 +3604,11 @@ module.exports = function makeWatchedFolders({
           }
         }
       }
+    }
+    if (getActiveLumaPlayWatcherEntries().length > 0) {
+      startLumaPlayDiscoveryPolling();
+    } else {
+      stopLumaPlayDiscoveryPolling();
     }
   }
 
@@ -3690,6 +3941,9 @@ module.exports = function makeWatchedFolders({
         if (opts.__emu) {
           genOptions.emu = opts.__emu;
         }
+        if (opts.__lumaplayUser) {
+          genOptions.lumaplayUser = opts.__lumaplayUser;
+        }
         const result = await generateConfigForAppId(
           appid,
           configsDir,
@@ -3701,7 +3955,7 @@ module.exports = function makeWatchedFolders({
           recordExistingSavePath(appid, normalizedSavePath);
         }
         // Ensure emu flag persisted when requested
-        if (opts.__emu) {
+        if (opts.__emu || opts.__lumaplayUser || opts.__lumaplayKeyPath) {
           try {
             const cfgFile =
               (result && result.filePath) ||
@@ -3716,11 +3970,25 @@ module.exports = function makeWatchedFolders({
               cfgFile && fs.existsSync(cfgFile) ? cfgFile : fallback;
             if (target && fs.existsSync(target)) {
               const data = JSON.parse(fs.readFileSync(target, "utf8"));
-              if (data.emu !== opts.__emu) {
+              if (opts.__emu && data.emu !== opts.__emu) {
                 data.emu = opts.__emu;
-                fs.writeFileSync(target, JSON.stringify(data, null, 2));
               }
-              tenokeIds.add(String(appid));
+              if (
+                opts.__lumaplayUser &&
+                data.lumaplay_user !== opts.__lumaplayUser
+              ) {
+                data.lumaplay_user = opts.__lumaplayUser;
+              }
+              if (
+                opts.__lumaplayKeyPath &&
+                data.lumaplay_key_path !== opts.__lumaplayKeyPath
+              ) {
+                data.lumaplay_key_path = opts.__lumaplayKeyPath;
+              }
+              fs.writeFileSync(target, JSON.stringify(data, null, 2));
+              if (opts.__emu === "tenoke") {
+                tenokeIds.add(String(appid));
+              }
             }
           } catch {}
         }
@@ -3738,21 +4006,200 @@ module.exports = function makeWatchedFolders({
       if (normalizedSavePath) {
         clearPendingSavePath(appid, normalizedSavePath);
       }
-      if (opts.__emu) {
+      if (opts.__emu || opts.__lumaplayUser || opts.__lumaplayKeyPath) {
         try {
           const metas = getConfigMetas(appid);
           for (const meta of metas || []) {
             const cfgFile = path.join(configsDir, `${meta.name}.json`);
             if (!fs.existsSync(cfgFile)) continue;
             const data = JSON.parse(fs.readFileSync(cfgFile, "utf8"));
-            if (data.emu !== opts.__emu) {
+            let changed = false;
+            if (opts.__emu && data.emu !== opts.__emu) {
               data.emu = opts.__emu;
+              changed = true;
+            }
+            if (
+              opts.__lumaplayUser &&
+              data.lumaplay_user !== opts.__lumaplayUser
+            ) {
+              data.lumaplay_user = opts.__lumaplayUser;
+              changed = true;
+            }
+            if (
+              opts.__lumaplayKeyPath &&
+              data.lumaplay_key_path !== opts.__lumaplayKeyPath
+            ) {
+              data.lumaplay_key_path = opts.__lumaplayKeyPath;
+              changed = true;
+            }
+            if (changed) {
               fs.writeFileSync(cfgFile, JSON.stringify(data, null, 2));
             }
           }
         } catch {}
       }
     }
+  }
+
+  async function scanLumaPlayRegistryOnce(options = {}) {
+    if (process.platform !== "win32") {
+      return { scanned: 0, created: 0, updated: 0 };
+    }
+    if (!isLumaPlayWatcherEnabled()) {
+      return { scanned: 0, created: 0, updated: 0 };
+    }
+    const suppressInitialNotify = options.suppressInitialNotify === true;
+    const autoRebuild = options.autoRebuild !== false;
+    let discovered = [];
+    try {
+      discovered = scanLumaPlayRegistryEntries();
+    } catch (err) {
+      watcherLogger.warn("lumaplay:scan-failed", {
+        error: err?.message || String(err),
+      });
+      return { scanned: 0, created: 0, updated: 0 };
+    }
+    if (!Array.isArray(discovered) || discovered.length === 0) {
+      return { scanned: 0, created: 0, updated: 0 };
+    }
+
+    const blacklist = getBlacklistedAppIdsSet();
+    const createdIds = new Set();
+    const updatedIds = new Set();
+
+    const markConfigAsLumaPlay = (meta, user, keyPath) => {
+      if (!meta?.name) return false;
+      const cfgPath = path.join(configsDir, `${meta.name}.json`);
+      if (!fs.existsSync(cfgPath)) return false;
+      try {
+        const data = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+        let changed = false;
+        if (normalizeEmuValue(data?.emu) !== "lumaplay") {
+          data.emu = "lumaplay";
+          changed = true;
+        }
+        if (user && data.lumaplay_user !== user) {
+          data.lumaplay_user = user;
+          changed = true;
+        }
+        if (keyPath && data.lumaplay_key_path !== keyPath) {
+          data.lumaplay_key_path = keyPath;
+          changed = true;
+        }
+        if (!changed) return false;
+        fs.writeFileSync(cfgPath, JSON.stringify(data, null, 2));
+        meta.emu = "lumaplay";
+        meta.lumaplay_user = user || data.lumaplay_user || "";
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    for (const row of discovered) {
+      const appid = String(row?.appid || "").trim();
+      const user = String(row?.user || "").trim();
+      const keyPath = String(row?.keyPath || "").trim();
+      if (!appid || !/^[0-9a-fA-F]+$/.test(appid)) continue;
+      if (blacklist.has(appid)) continue;
+
+      knownAppIds.add(appid);
+      const metas = getConfigMetas(appid);
+      const hasLumaPlay = metas.some((meta) => isLumaPlayMeta(meta));
+      if (hasLumaPlay) {
+        for (const meta of metas) {
+          if (!isLumaPlayMeta(meta)) continue;
+          if (markConfigAsLumaPlay(meta, user, keyPath)) {
+            updatedIds.add(appid);
+          }
+        }
+        continue;
+      }
+
+      const created = await generateOneAppId(appid, null, {
+        forcePlatform: "uplay",
+        __emu: "lumaplay",
+        __lumaplayUser: user,
+        __lumaplayKeyPath: keyPath,
+      });
+      if (created) {
+        createdIds.add(appid);
+        continue;
+      }
+
+      const candidate = metas.find(
+        (meta) => normalizePlatform(meta?.platform) === "uplay",
+      );
+      if (candidate) {
+        const hasUsableSavePath =
+          isNonEmptyString(candidate?.save_path) &&
+          fs.existsSync(candidate.save_path);
+        if (!hasUsableSavePath && markConfigAsLumaPlay(candidate, user, keyPath)) {
+          updatedIds.add(appid);
+        }
+      }
+    }
+
+    if (createdIds.size || updatedIds.size) {
+      await indexExistingConfigsSync();
+      if (autoRebuild) {
+        await rebuildSaveWatchers({ suppressInitialNotify });
+      }
+      broadcastAll("configs:changed");
+      broadcastAll("refresh-achievements-table");
+      emitDashboardRefresh();
+    }
+
+    const created = createdIds.size;
+    const updated = updatedIds.size;
+    if (created || updated) {
+      watcherLogger.info("lumaplay:scan-applied", {
+        scanned: discovered.length,
+        created,
+        updated,
+      });
+    }
+    return {
+      scanned: discovered.length,
+      created,
+      updated,
+    };
+  }
+
+  function startLumaPlayDiscoveryPolling() {
+    if (process.platform !== "win32") return;
+    if (!isLumaPlayWatcherEnabled()) {
+      stopLumaPlayDiscoveryPolling();
+      return;
+    }
+    if (lumaPlayDiscoveryWatcher) return;
+    lumaPlayDiscoveryWatcher = startLumaPlayRegistryEventWatcher({
+      restartDelayMs: LUMAPLAY_EVENT_WATCH_RESTART_MS,
+      onReady: () => {
+        watcherLogger.info("lumaplay:realtime-event-start", {
+          mode: "registry-event",
+          restartDelayMs: LUMAPLAY_EVENT_WATCH_RESTART_MS,
+        });
+      },
+      onChange: () => {
+        runLumaPlayDiscoveryTick({ autoRebuild: true }).catch(() => {});
+      },
+      onWarn: (error) => {
+        watcherLogger.warn("lumaplay:realtime-event-warning", {
+          error: String(error || ""),
+        });
+      },
+    });
+  }
+
+  function stopLumaPlayDiscoveryPolling() {
+    if (lumaPlayDiscoveryWatcher) {
+      lumaPlayDiscoveryWatcher.stop();
+      lumaPlayDiscoveryWatcher = null;
+    }
+    lumaPlayDiscoveryRunning = false;
+    lumaPlayDiscoveryPending = false;
+    watcherLogger.info("lumaplay:realtime-event-stop");
   }
 
   function seedInitialSnapshot(
@@ -5287,6 +5734,16 @@ module.exports = function makeWatchedFolders({
         notifyWarn(`Rescan failed for "${f}": ${e.message}`);
       }
     }
+    try {
+      await scanLumaPlayRegistryOnce({
+        suppressInitialNotify: true,
+        autoRebuild: false,
+      });
+    } catch (e) {
+      watcherLogger.warn("lumaplay:rescan-failed", {
+        error: e?.message || String(e),
+      });
+    }
     const generatedSomething = existingConfigIds.size > before;
 
     // rebuild watchers
@@ -5294,6 +5751,9 @@ module.exports = function makeWatchedFolders({
     broadcastAll("refresh-achievements-table");
 
     rescanInProgress.value = false;
+    if (lumaPlayDiscoveryPending) {
+      runLumaPlayDiscoveryTick({ autoRebuild: true }).catch(() => {});
+    }
     return {
       ok: true,
       restarted: folders.length,
@@ -5531,6 +5991,16 @@ module.exports = function makeWatchedFolders({
           } catch {}
         });
       } catch {}
+      try {
+        await scanLumaPlayRegistryOnce({
+          suppressInitialNotify: true,
+          autoRebuild: false,
+        });
+      } catch (err) {
+        watcherLogger.warn("lumaplay:boot-scan-failed", {
+          error: err?.message || String(err),
+        });
+      }
 
       try {
         await rebuildSaveWatchers();
@@ -5539,6 +6009,8 @@ module.exports = function makeWatchedFolders({
         emitDashboardRefresh();
       } catch {}
       bootMode = false;
+      startLumaPlayDiscoveryPolling();
+      runLumaPlayDiscoveryTick({ autoRebuild: true }).catch(() => {});
       scheduleDeferredSeedPumpAfterOverlayGate();
     })().catch(() => {});
   });
@@ -5632,6 +6104,7 @@ module.exports = function makeWatchedFolders({
 
   if (app && typeof app.on === "function") {
     app.on("before-quit", async () => {
+      stopLumaPlayDiscoveryPolling();
       for (const entry of folderWatchers.values()) {
         try {
           await entry.watcher.close();

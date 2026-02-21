@@ -150,7 +150,6 @@ Creates a standalone `.exe` installer in the `dist/` folder.
 - `ps-list` (via `utils/pslist-wrapper.mjs`) provides process snapshots for auto-selection and playtime tracking
 - Interval timers (~2s) keep dashboard cards and playtime state up to date
 
-
 ## 🎮 Setup & Configuration
 
 ### Quick Start (Tutorial)
@@ -330,7 +329,9 @@ Sources used when available: Steam Web API, SteamDB, SteamHunters, Exophase, GOG
 ### Game Compatibility
 
 - Works best with games in Borderless window mode
+  [Note: Games using DirectX 9/10/11 require Borderless/Borderless Windowed mode to be enabled via in-game display settings in order for notifications to show above the game window]
 - Limited support for Fullscreen mode
+  [Note: If a game supports and runs using DirectX 12, notifications will usually show above the game window when Fullscreen is enabled]
 - Automatically detects and imports existing achievements
 - Supports multiple achievement languages if available in Config
 

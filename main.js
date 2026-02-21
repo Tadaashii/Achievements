@@ -58,6 +58,10 @@ const {
   buildSnapshotFromAppcache,
   pickLatestUserBin,
 } = require("./utils/steam-appcache");
+const {
+  readLumaPlayAchievementsSnapshot,
+  startLumaPlayRegistryEventWatcher,
+} = require("./utils/lumaplay-registry");
 const getConfigInflight = new Map();
 const { createLogger } = require("./utils/logger");
 
@@ -333,6 +337,7 @@ const DEFAULT_PREFERENCES = {
   blockedWatchedFolders: [],
   blacklistedAppIds: [],
   watchedFolders: [],
+  lumaPlayWatcherEnabled: false,
   steamApiKey: "",
 };
 
@@ -1167,6 +1172,25 @@ function isNonEmptyString(s) {
   return typeof s === "string" && s.trim().length > 0;
 }
 
+function normalizeEmuValue(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+}
+
+function isLumaPlayConfig(config) {
+  return (
+    normalizePlatform(config?.platform) === "uplay" &&
+    normalizeEmuValue(config?.emu) === "lumaplay"
+  );
+}
+
+function isLumaPlayWatcherEnabled(prefs = null) {
+  const source =
+    prefs && typeof prefs === "object" ? prefs : readPrefsSafe?.() || {};
+  return source?.lumaPlayWatcherEnabled === true;
+}
+
 //Achievements Image
 function resolveIconAbsolutePath(configPath, rel) {
   try {
@@ -1594,12 +1618,28 @@ const originalConsole = {
   error: console.error,
 };
 
+const UI_CONSOLE_SUPPRESS_PATTERNS = [
+  /\bDeprecationWarning\b/i,
+  /\[DEP\d{4}\]/i,
+  /--trace-deprecation/i,
+  /node:internal\/process\/warning/i,
+  /fs\.rmdir\(path,\s*\{\s*recursive:\s*true\s*\}\)/i,
+];
+
+function shouldSuppressConsoleMessageInUI(msg) {
+  if (!msg) return true;
+  if (
+    msg.startsWith("steam-achievements:request") ||
+    msg.startsWith("steam-achievements:success")
+  ) {
+    return true;
+  }
+  return UI_CONSOLE_SUPPRESS_PATTERNS.some((rx) => rx.test(msg));
+}
+
 function sendConsoleMessageToUI(message, color) {
   const msg = String(message || "").trim();
-  const suppress =
-    msg.startsWith("steam-achievements:request") ||
-    msg.startsWith("steam-achievements:success");
-  if (suppress) return;
+  if (shouldSuppressConsoleMessageInUI(msg)) return;
   if (!mainWindow || mainWindow.isDestroyed()) return;
   const wc = mainWindow.webContents;
   if (!wc || wc.isDestroyed?.() || wc.isCrashed?.()) return;
@@ -1781,6 +1821,43 @@ function applyPreferenceSideEffects(
       overlayWindow.webContents.send("overlay-preferences-updated", {
         showHiddenDescription: prefsSnapshot.showHiddenDescription === true,
       });
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "lumaPlayWatcherEnabled")) {
+    try {
+      watchedFoldersApi?.refreshConfigState?.();
+    } catch (err) {
+      ipcLogger.error("lumaplay:refresh-config-state-failed", {
+        error: err?.message || String(err),
+      });
+    }
+    let selectedLumaAppId = "";
+    let selectedIsLumaPlay = false;
+    try {
+      const safeConfig = sanitizeConfigName(selectedConfig || "");
+      const cfgPath = safeConfig ? path.join(configsDir, `${safeConfig}.json`) : "";
+      if (cfgPath && fs.existsSync(cfgPath)) {
+        const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+        selectedIsLumaPlay = isLumaPlayConfig(cfg);
+        selectedLumaAppId = String(cfg?.appid || "");
+      }
+    } catch {}
+    const enabled = isLumaPlayWatcherEnabled(prefsSnapshot);
+    if (!enabled) {
+      try {
+        stopActiveLumaPlayRegistryWatcher();
+      } catch {}
+      if (selectedIsLumaPlay) {
+        try {
+          monitorAchievementsFile(null);
+        } catch {}
+        achievementsFilePath = null;
+      }
+    } else {
+      if (selectedIsLumaPlay) {
+        achievementsFilePath = `lumaplay:${selectedLumaAppId || "unknown"}`;
+        monitorAchievementsFile(achievementsFilePath);
+      }
     }
   }
   if (options.removeSteamKey === true) {
@@ -2368,6 +2445,19 @@ function isRpcs3ConfigName(configName) {
   }
 }
 
+function isLumaPlayConfigName(configName) {
+  const safeName = sanitizeConfigName(configName);
+  if (!safeName) return false;
+  const cfgPath = path.join(configsDir, `${safeName}.json`);
+  if (!fs.existsSync(cfgPath)) return false;
+  try {
+    const data = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+    return isLumaPlayConfig(data);
+  } catch {
+    return false;
+  }
+}
+
 function readCacheSilent(configName, platform = "steam") {
   const cachePath = getCachePath(configName, platform);
   if (!fs.existsSync(cachePath)) return null;
@@ -2379,6 +2469,10 @@ function readCacheSilent(configName, platform = "steam") {
 }
 
 function mergeRpcs3EarnedTime(snapshot, cached) {
+  return mergeEarnedTimeFromCached(snapshot, cached);
+}
+
+function mergeEarnedTimeFromCached(snapshot, cached) {
   if (!snapshot || typeof snapshot !== "object") return snapshot || {};
   if (!cached || typeof cached !== "object") return snapshot;
   let changed = false;
@@ -3030,6 +3124,47 @@ ipcMain.handle("load-saved-achievements", async (_event, configName) => {
       }
     }
 
+    if (isLumaPlayConfig(config)) {
+      const cached =
+        (await loadPreviousAchievements(configName, normalizedPlatform)) || {};
+      if (!isLumaPlayWatcherEnabled()) {
+        return {
+          achievements: cached || {},
+          save_path: config.save_path || "",
+        };
+      }
+      try {
+        const parsed = readLumaPlayAchievementsSnapshot({
+          appid: String(config?.appid || ""),
+          configPath: config?.config_path || "",
+          preferredUser:
+            config?.lumaplay_user || config?.lumaplayUser || "",
+          previousSnapshot: cached,
+        });
+        if (parsed?.user && parsed.user !== config?.lumaplay_user) {
+          config.lumaplay_user = parsed.user;
+          try {
+            fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+          } catch {}
+        }
+        const snapshot =
+          parsed?.snapshot && Object.keys(parsed.snapshot).length
+            ? parsed.snapshot
+            : cached;
+        const merged = mergeEarnedTimeFromCached(snapshot, cached);
+        return {
+          achievements: merged || snapshot || {},
+          save_path: config.save_path || "",
+        };
+      } catch (error) {
+        return {
+          achievements: cached || {},
+          save_path: config.save_path || "",
+          error: error?.message || "lumaplay read failed",
+        };
+      }
+    }
+
     if (normalizedPlatform === "steam-official") {
       const schemaPath = resolveConfigSchemaPath(config);
       const schemaArr =
@@ -3237,11 +3372,7 @@ ipcMain.handle("delete-config", async (_event, payload) => {
               String(appid),
             );
             if (fs.existsSync(imagesDir)) {
-              try {
-                fs.rmSync(imagesDir, { recursive: true, force: true });
-              } catch {
-                fs.rmdirSync(imagesDir, { recursive: true });
-              }
+              fs.rmSync(imagesDir, { recursive: true, force: true });
             }
           } catch (err) {
             ipcLogger.warn("delete-config:images-delete-failed", {
@@ -3261,11 +3392,7 @@ ipcMain.handle("delete-config", async (_event, payload) => {
           try {
             const schemaDir = resolveSchemaDirForPlatform(appid, platform);
             if (fs.existsSync(schemaDir)) {
-              try {
-                fs.rmSync(schemaDir, { recursive: true, force: true });
-              } catch {
-                fs.rmdirSync(schemaDir, { recursive: true });
-              }
+              fs.rmSync(schemaDir, { recursive: true, force: true });
             }
           } catch (err) {
             ipcLogger.warn("delete-config:schema-delete-failed", {
@@ -3305,11 +3432,7 @@ ipcMain.handle("delete-config", async (_event, payload) => {
             if (!dir || typeof dir !== "string") return false;
             try {
               if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
-                try {
-                  fs.rmSync(dir, { recursive: true, force: true });
-                } catch {
-                  fs.rmdirSync(dir, { recursive: true });
-                }
+                fs.rmSync(dir, { recursive: true, force: true });
                 ipcLogger.info("delete-config:save-delete-dir", {
                   configName,
                   path: dir,
@@ -4863,6 +4986,15 @@ let achievementsWatcher = null;
 let extraAchievementFiles = new Set();
 let achievementMonitorToken = 0;
 let achievementMonitorTimer = null;
+let activeLumaPlayRegistryWatcher = null;
+
+function stopActiveLumaPlayRegistryWatcher() {
+  if (!activeLumaPlayRegistryWatcher) return;
+  try {
+    activeLumaPlayRegistryWatcher.stop();
+  } catch {}
+  activeLumaPlayRegistryWatcher = null;
+}
 
 if (!fs.existsSync(cacheDir)) {
   fs.mkdirSync(cacheDir, { recursive: true });
@@ -5290,10 +5422,10 @@ function savePreviousAchievements(configName, data, platform = "steam") {
   const cachePath = getCachePath(configName, platform);
   try {
     let effectiveData = data;
-    if (isRpcs3ConfigName(configName)) {
+    if (isRpcs3ConfigName(configName) || isLumaPlayConfigName(configName)) {
       const cached = readCacheSilent(configName, platform);
       if (cached && typeof cached === "object") {
-        effectiveData = mergeRpcs3EarnedTime(data, cached);
+        effectiveData = mergeEarnedTimeFromCached(data, cached);
       }
     }
     const ordered = {};
@@ -5441,6 +5573,7 @@ function findAchievementFileDeepForAppId(saveBase, appid, maxDepth = 2) {
 async function monitorAchievementsFile(filePath) {
   if (!filePath) {
     achievementMonitorToken += 1;
+    stopActiveLumaPlayRegistryWatcher();
     if (achievementMonitorTimer) {
       clearTimeout(achievementMonitorTimer);
       achievementMonitorTimer = null;
@@ -5472,6 +5605,7 @@ async function monitorAchievementsFile(filePath) {
   }
 
   achievementMonitorToken += 1;
+  stopActiveLumaPlayRegistryWatcher();
   if (achievementMonitorTimer) {
     clearTimeout(achievementMonitorTimer);
     achievementMonitorTimer = null;
@@ -5552,6 +5686,8 @@ async function monitorAchievementsFile(filePath) {
     String(filePath || "")
       .toLowerCase()
       .startsWith("usergamestats_");
+  const isLumaPlay =
+    isLumaPlayConfig(configMeta) && isLumaPlayWatcherEnabled();
   try {
     if (
       fullAchievementsConfigPath &&
@@ -5576,6 +5712,7 @@ async function monitorAchievementsFile(filePath) {
   const processSnapshot = (isRetry = false) => {
     let currentAchievements = null;
     let touchedInLoop = false;
+    let lumaPlayReadFailed = false;
     try {
       if (isXenia) {
         const parsed = parseGpdFile(filePath);
@@ -5632,6 +5769,33 @@ async function monitorAchievementsFile(filePath) {
             parsed,
             previousAchievements,
           );
+      } else if (isLumaPlay) {
+        const parsed = readLumaPlayAchievementsSnapshot({
+          appid: String(configMeta?.appid || ""),
+          configPath: configMeta?.config_path || selectedConfigPath || "",
+          preferredUser:
+            configMeta?.lumaplay_user || configMeta?.lumaplayUser || "",
+          previousSnapshot: previousAchievements,
+        });
+        if (parsed?.user && parsed.user !== configMeta?.lumaplay_user) {
+          configMeta.lumaplay_user = parsed.user;
+          try {
+            if (configFile && fs.existsSync(configFile)) {
+              const raw = fs.readFileSync(configFile, "utf8");
+              const cfg = JSON.parse(raw);
+              if (cfg.lumaplay_user !== parsed.user) {
+                cfg.lumaplay_user = parsed.user;
+                fs.writeFileSync(configFile, JSON.stringify(cfg, null, 2));
+              }
+            }
+          } catch {}
+        }
+        if (parsed?.found === false) {
+          lumaPlayReadFailed = true;
+          currentAchievements = { ...previousAchievements };
+        } else {
+          currentAchievements = parsed?.snapshot || {};
+        }
       } else {
         currentAchievements = loadAchievementsFromSaveFile(
           path.dirname(filePath),
@@ -5778,7 +5942,7 @@ async function monitorAchievementsFile(filePath) {
       const lang = selectedLanguage || "english";
       const newlyEarned =
         Boolean(current.earned) && (!previous || !Boolean(previous.earned));
-      if (newlyEarned && isRpcs3 && !current.earned_time) {
+      if (newlyEarned && (isRpcs3 || isLumaPlay) && !current.earned_time) {
         current.earned_time = Date.now();
       }
 
@@ -5891,23 +6055,85 @@ async function monitorAchievementsFile(filePath) {
     const appid = String(configMeta?.appid || currentAppId || "");
     currentAppId = appid || null;
     previousAchievements = currentAchievements;
-    savePreviousAchievements(configName, previousAchievements, currentPlatform);
+    if (!(isLumaPlay && lumaPlayReadFailed)) {
+      savePreviousAchievements(
+        configName,
+        previousAchievements,
+        currentPlatform,
+      );
+    }
     isFirstLoad = false;
   };
   achievementsWatcher = () => processSnapshot(false);
+  const refreshAchievementsUi = () => {
+    mainWindow.webContents.send("refresh-achievements-table");
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+      overlayWindow.webContents.send("set-language", {
+        language: selectedLanguage,
+        uiLanguage: selectedUiLanguage,
+      });
+    }
+  };
+
+  if (isLumaPlay) {
+    const activeConfigName = selectedConfig || null;
+    const activeAppId = String(configMeta?.appid || "");
+    const restartDelayMs = Math.max(
+      500,
+      Number(process.env.LUMAPLAY_EVENT_WATCH_RESTART_MS) || 1500,
+    );
+    let running = false;
+    let pending = false;
+
+    const runSnapshotFromEvent = () => {
+      if (monitorToken !== achievementMonitorToken) return;
+      if (running) {
+        pending = true;
+        return;
+      }
+      running = true;
+      try {
+        do {
+          pending = false;
+          processSnapshot(false);
+          refreshAchievementsUi();
+        } while (pending && monitorToken === achievementMonitorToken);
+      } finally {
+        running = false;
+      }
+    };
+
+    activeLumaPlayRegistryWatcher = startLumaPlayRegistryEventWatcher({
+      restartDelayMs,
+      onReady: () => {
+        appLogger.info("active-lumaplay:event-start", {
+          config: activeConfigName,
+          appid: activeAppId || null,
+          restartDelayMs,
+        });
+      },
+      onWarn: (error) => {
+        appLogger.warn("active-lumaplay:event-warning", {
+          config: activeConfigName,
+          appid: activeAppId || null,
+          error: String(error || ""),
+        });
+      },
+      onChange: () => {
+        runSnapshotFromEvent();
+      },
+    });
+
+    runSnapshotFromEvent();
+    return;
+  }
+
   const checkFileLoop = () => {
     if (monitorToken !== achievementMonitorToken) return;
     if (fs.existsSync(filePath)) {
       processSnapshot(false);
-
-      mainWindow.webContents.send("refresh-achievements-table");
-      if (overlayWindow && !overlayWindow.isDestroyed()) {
-        overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-        overlayWindow.webContents.send("set-language", {
-          language: selectedLanguage,
-          uiLanguage: selectedUiLanguage,
-        });
-      }
+      refreshAchievementsUi();
 
       try {
         fs.unwatchFile(filePath);
@@ -5979,6 +6205,11 @@ ipcMain.on(
     const safeName = configName ? sanitizeConfigName(configName) : null;
 
     if (!safeName) {
+      stopActiveLumaPlayRegistryWatcher();
+      if (achievementMonitorTimer) {
+        clearTimeout(achievementMonitorTimer);
+        achievementMonitorTimer = null;
+      }
       if (achievementsWatcher && achievementsFilePath) {
         fs.unwatchFile(achievementsFilePath, achievementsWatcher);
         achievementsWatcher = null;
@@ -6034,6 +6265,36 @@ ipcMain.on(
       : null;
 
     const normalizedPlatform = normalizePlatform(config.platform);
+    if (isLumaPlayConfig(config)) {
+      const appid = String(config.appid || "");
+      currentAppId = appid || null;
+      if (!isLumaPlayWatcherEnabled()) {
+        stopActiveLumaPlayRegistryWatcher();
+        achievementsFilePath = null;
+        monitorAchievementsFile(null);
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+          overlayWindow.webContents.send("set-language", {
+            language: selectedLanguage,
+            uiLanguage: selectedUiLanguage,
+          });
+        }
+        return;
+      }
+      achievementsFilePath = `lumaplay:${appid || "unknown"}`;
+      if (isNonEmptyString(configName)) {
+        pendingMissingAchievementFiles.delete(configName);
+      }
+      monitorAchievementsFile(achievementsFilePath);
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+        overlayWindow.webContents.send("set-language", {
+          language: selectedLanguage,
+          uiLanguage: selectedUiLanguage,
+        });
+      }
+      return;
+    }
     if (normalizedPlatform === "xenia") {
       const appid = String(config.appid || "");
       currentAppId = appid || null;
@@ -8416,7 +8677,7 @@ function migrateImagesToPlatformStorage() {
         }
       }
       try {
-        fs.rmdirSync(srcDir);
+        fs.rmSync(srcDir, { recursive: true, force: true });
       } catch {}
     } catch (err) {
       ipcLogger?.warn?.("images:migrate-dir-failed", {
@@ -8840,6 +9101,7 @@ async function flagPlatinumFromCacheOnBoot() {
 }
 
 app.on("before-quit", () => {
+  stopActiveLumaPlayRegistryWatcher();
   clearAutoSelectProcessPollerTimers();
   if (overlayDragHookBootWaitTimer) {
     clearTimeout(overlayDragHookBootWaitTimer);

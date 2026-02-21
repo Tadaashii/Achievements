@@ -16,7 +16,6 @@
         --slide-in: 30px;
         --slide-out: -26px;
         --progress-max-width: 350px;
-        --progress-min-width: 220px;
         --progress-bar-color: lime;
       }
 
@@ -38,7 +37,6 @@
         align-items: center;
         gap: 15px;
         width: fit-content;
-        min-width: var(--progress-min-width);
         max-width: min(var(--progress-max-width), calc(100vw - 8px));
         box-sizing: border-box;
         background: rgba(0, 0, 0, 0.75);
@@ -187,13 +185,8 @@
           Number.isFinite(parsedMaxWidth) && parsedMaxWidth > 0
             ? parsedMaxWidth
             : 350;
-        const minWidth = Math.min(
-          maxWidth,
-          Math.max(220, Math.round(maxWidth * 0.55)),
-        );
         docEl.style.setProperty("--displaytime", `${totalDurationMs}ms`);
         docEl.style.setProperty("--progress-max-width", `${maxWidth}px`);
-        docEl.style.setProperty("--progress-min-width", `${minWidth}px`);
 
         const PROFILE_CLASSES = ["is-short", "is-medium", "is-long", "is-complete"];
         let closeTimer = null;
