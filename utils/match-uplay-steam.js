@@ -11,7 +11,8 @@ const HTTP_TIMEOUT_MS = 15000;
 
 const UPLAY_URL =
   "https://raw.githubusercontent.com/Haoose/UPLAY_GAME_ID/master/README.md";
-const STEAM_URL = "https://api.steampowered.com/ISteamApps/GetAppList/v2/";
+const STEAM_URL =
+  "https://raw.githubusercontent.com/jsnli/steamappidlist/refs/heads/master/data/games_appid.json";
 const DEFAULT_STEAM_DB_ASSET = path.join(
   __dirname,
   "..",
@@ -130,7 +131,7 @@ function loadLocalSteamDb() {
 function persistSteamDb(apps) {
   try {
     fs.mkdirSync(path.dirname(STEAM_DB_PATH), { recursive: true });
-    fs.writeFileSync(STEAM_DB_PATH, JSON.stringify(apps, null, 2), "utf8");
+    fs.writeFileSync(STEAM_DB_PATH, JSON.stringify(apps), "utf8");
     console.log(
       `💾 updated Steam DB: ${apps.length} entries -> ${STEAM_DB_PATH}`
     );
@@ -504,17 +505,17 @@ async function fetchSteamList() {
   try {
     const raw = await httpGet(STEAM_URL);
     const json = JSON.parse(raw);
-    const apps = json?.applist?.apps || [];
+    const apps = Array.isArray(json) ? json : json?.applist?.apps || [];
     if (apps.length) {
       remote = apps.filter(
         (app) => Number.isInteger(app.appid) && app.name?.trim()
       );
     } else {
-      throw new Error("Steam GetAppList returned no entries.");
+      throw new Error("Steam app list source returned no entries.");
     }
   } catch (err) {
     console.warn(
-      "⚠️ Steam GetAppList failed, using local steamdb.json:",
+      "⚠️ Steam app list fetch failed, using local steamdb.json:",
       err.message
     );
   }

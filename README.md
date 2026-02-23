@@ -85,7 +85,7 @@ If you’d like to support the project further, you can buy me a coffee on Ko-fi
 | `utils/rpcs3-*`                         | RPCS3 parsing + schema generation                    |
 | `utils/shadps4-*`                       | PS4 trophy parsing + schema generation               |
 | `utils/paths.js`, etc.                  | Other utility modules                                |
-| `presets/`                              | Scalable and non-scalable notification themes        |
+| `presets/`                              | `Default Presets` and `Users Presets` themes         |
 | `sounds/`                               | Notification sound assets                            |
 | `style.css`                             | Global styling for all UI components                 |
 | `assets/locales/`                       | UI translations                                      |

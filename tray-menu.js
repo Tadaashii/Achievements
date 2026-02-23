@@ -4,6 +4,30 @@
       window.api.trayAction(action);
     }
   };
+  const resumeStartupBtn = document.getElementById("trayMenuResumeStartup");
+
+  const setResumeStartupVisible = (visible) => {
+    if (!resumeStartupBtn) return;
+    resumeStartupBtn.classList.toggle("hidden", !visible);
+    resumeStartupBtn.disabled = !visible;
+  };
+
+  const refreshResumeStartupState = async () => {
+    if (!resumeStartupBtn) return;
+    if (!window.api || typeof window.api.getBootStatus !== "function") {
+      setResumeStartupVisible(false);
+      return;
+    }
+    try {
+      const status = await window.api.getBootStatus();
+      const pending =
+        status?.bootOnboardingGateOpen === false ||
+        status?.bootOnboardingRequired === true;
+      setResumeStartupVisible(pending);
+    } catch {
+      setResumeStartupVisible(false);
+    }
+  };
 
   // Setup button click actions
   document.querySelectorAll("[data-action]").forEach((button) => {
@@ -27,4 +51,12 @@
       }
     });
   }
+
+  refreshResumeStartupState().catch(() => {});
+  const refreshTimer = setInterval(() => {
+    refreshResumeStartupState().catch(() => {});
+  }, 3000);
+  window.addEventListener("beforeunload", () => {
+    clearInterval(refreshTimer);
+  });
 })();

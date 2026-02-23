@@ -33,7 +33,7 @@
       "overlay.html",
       "progress.html",
       "playtime.html",
-      "playtime-log-watcher.js",
+      "utils/playtime-log-watcher.js",
       "style.css",
       "tray-menu.html",
       "tray-menu.js",

@@ -149,6 +149,8 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.send("window:set-position", { x, y }),
   setOverlayDragRegionHeight: (height) =>
     ipcRenderer.send("overlay:drag-region", { height }),
+  overlayVisibleAck: (payload) =>
+    ipcRenderer.send("overlay:visible-ack", payload),
   requestOverlayFocus: () => ipcRenderer.send("overlay:request-focus"),
   // language
   refreshUILanguage: (language) =>
@@ -162,6 +164,12 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("auto-select-config", (_e, name) => handler(name)),
   getBootStatus: () => ipcRenderer.invoke("boot:status"),
   bootOverlayHidden: () => ipcRenderer.send("boot:overlay-hidden"),
+  getBootOnboardingState: () => ipcRenderer.invoke("boot:onboarding:get-state"),
+  discoverBootOnboardingFolders: () =>
+    ipcRenderer.invoke("boot:onboarding:discover-folders"),
+  applyBootOnboardingSelection: (selectedPaths = []) =>
+    ipcRenderer.invoke("boot:onboarding:apply-selection", { selectedPaths }),
+  skipBootOnboarding: () => ipcRenderer.invoke("boot:onboarding:skip-all"),
   getSteamDbCover: (appid) => ipcRenderer.invoke("covers:steamdb", appid),
   getSteamGridDbCover: (payload) =>
     ipcRenderer.invoke("covers:steamgriddb", payload),
@@ -267,6 +275,10 @@ contextBridge.exposeInMainWorld("electron", {
         "dashboard:set-open",
         "dashboard:is-open",
         "dashboard:poll-pause",
+        "boot:onboarding:get-state",
+        "boot:onboarding:discover-folders",
+        "boot:onboarding:apply-selection",
+        "boot:onboarding:skip-all",
       ];
       if (!valid.includes(channel))
         throw new Error(`Blocked invoke on channel: ${channel}`);

@@ -779,11 +779,39 @@ module.exports = function makeWatchedFolders({
     500,
     Number(process.env.LUMAPLAY_EVENT_WATCH_RESTART_MS) || 1500,
   );
+  const AUTOCONFIG_ONBOARDING_VERSION = 1;
+  const AUTOCONFIG_ONBOARDING_COMPLETED_PREF_KEY =
+    "autoConfigOnboardingCompleted";
+  const AUTOCONFIG_ONBOARDING_VERSION_PREF_KEY =
+    "autoConfigOnboardingVersion";
+  const AUTOCONFIG_ONBOARDING_COMPLETED_AT_PREF_KEY =
+    "autoConfigOnboardingCompletedAt";
+  const AUTOCONFIG_ONBOARDING_DISCOVERY_MAX_DEPTH = 5;
+  const AUTOCONFIG_ONBOARDING_DISCOVERY_MAX_DIRS = 500;
+  const AUTOCONFIG_ONBOARDING_DISCOVERY_CACHE_MS = 15000;
+  const AUTOCONFIG_ONBOARDING_ATTENTION_INTERVAL_MS = Math.max(
+    5000,
+    Number(process.env.AUTOCONFIG_ONBOARDING_ATTENTION_INTERVAL_MS) || 20000,
+  );
   let bootMode = true;
   let bootCompleteEmitted = false;
   let lumaPlayDiscoveryRunning = false;
   let lumaPlayDiscoveryPending = false;
   let lumaPlayDiscoveryWatcher = null;
+  let bootOnboardingRequired = false;
+  let bootOnboardingGateOpen = true;
+  let bootOnboardingGatePromise = Promise.resolve();
+  let bootOnboardingGateResolve = null;
+  let bootOnboardingStartedAt = 0;
+  let bootOnboardingDecisionAt = 0;
+  let bootOnboardingShowSent = false;
+  let bootOnboardingAttentionTimer = null;
+  let bootOnboardingDiscoveryCache = {
+    at: 0,
+    candidates: [],
+  };
+  let bootOnboardingDirtyRoots = new Set();
+  let bootOnboardingDirtyRescanRunning = false;
 
   function isPlainObject(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -1031,6 +1059,488 @@ module.exports = function makeWatchedFolders({
       return false;
     }
   }
+
+  function persistPreferencesPatch(patch = {}) {
+    try {
+      if (persistPreferences) {
+        const next = persistPreferences(patch || {});
+        return next && typeof next === "object" ? next : readPrefsSafe();
+      }
+      const current = readPrefsSafe();
+      const merged = { ...current, ...(patch || {}) };
+      fs.writeFileSync(preferencesPath, JSON.stringify(merged, null, 2));
+      return merged;
+    } catch {
+      return readPrefsSafe();
+    }
+  }
+
+  function readAutoConfigOnboardingState(sourcePrefs = null) {
+    const prefs = sourcePrefs && typeof sourcePrefs === "object"
+      ? sourcePrefs
+      : readPrefsSafe();
+    const completed =
+      prefs?.[AUTOCONFIG_ONBOARDING_COMPLETED_PREF_KEY] === true;
+    const storedVersion = Number(
+      prefs?.[AUTOCONFIG_ONBOARDING_VERSION_PREF_KEY] || 0,
+    );
+    const required = !completed || storedVersion !== AUTOCONFIG_ONBOARDING_VERSION;
+    return {
+      required,
+      completed,
+      version: storedVersion,
+      targetVersion: AUTOCONFIG_ONBOARDING_VERSION,
+      completedAt:
+        Number(prefs?.[AUTOCONFIG_ONBOARDING_COMPLETED_AT_PREF_KEY] || 0) || 0,
+    };
+  }
+
+  function saveAutoConfigOnboardingCompletion() {
+    const now = Date.now();
+    const next = persistPreferencesPatch({
+      [AUTOCONFIG_ONBOARDING_COMPLETED_PREF_KEY]: true,
+      [AUTOCONFIG_ONBOARDING_VERSION_PREF_KEY]: AUTOCONFIG_ONBOARDING_VERSION,
+      [AUTOCONFIG_ONBOARDING_COMPLETED_AT_PREF_KEY]: now,
+    });
+    bootOnboardingDecisionAt = now;
+    return readAutoConfigOnboardingState(next);
+  }
+
+  function emitBootOnboardingError(stage, error, extra = {}) {
+    const message =
+      (error && (error.message || String(error))) ||
+      "boot onboarding error";
+    watcherLogger.warn("boot:onboarding:error", {
+      stage,
+      message,
+      ...extra,
+    });
+    try {
+      broadcastAll("boot:onboarding:error", {
+        stage: String(stage || "unknown"),
+        message,
+        ...extra,
+      });
+    } catch {}
+  }
+
+  function emitBootOnboardingAttention(extra = {}) {
+    if (bootOnboardingGateOpen) return;
+    const waitedMs =
+      bootOnboardingStartedAt > 0
+        ? Math.max(0, Date.now() - bootOnboardingStartedAt)
+        : 0;
+    watcherLogger.info("boot:onboarding:attention", {
+      waitedMs,
+      ...extra,
+    });
+    try {
+      broadcastAll("boot:onboarding:attention", {
+        waitedMs,
+        startedAt: bootOnboardingStartedAt || 0,
+        ...extra,
+      });
+    } catch {}
+  }
+
+  function stopBootOnboardingAttentionLoop() {
+    if (!bootOnboardingAttentionTimer) return;
+    clearInterval(bootOnboardingAttentionTimer);
+    bootOnboardingAttentionTimer = null;
+  }
+
+  function startBootOnboardingAttentionLoop() {
+    if (bootOnboardingAttentionTimer) return;
+    emitBootOnboardingAttention({ immediate: true });
+    bootOnboardingAttentionTimer = setInterval(() => {
+      if (bootOnboardingGateOpen) {
+        stopBootOnboardingAttentionLoop();
+        return;
+      }
+      emitBootOnboardingAttention({ reminder: true });
+    }, AUTOCONFIG_ONBOARDING_ATTENTION_INTERVAL_MS);
+  }
+
+  function markBootOnboardingDirtyRoot(rootPath, source = "unknown") {
+    if (!rootPath || bootOnboardingGateOpen) return;
+    let normalized = "";
+    try {
+      normalized = normalizeRoot(rootPath);
+    } catch {
+      normalized = "";
+    }
+    if (!normalized) return;
+    const before = bootOnboardingDirtyRoots.size;
+    bootOnboardingDirtyRoots.add(normalized);
+    if (bootOnboardingDirtyRoots.size !== before) {
+      watcherLogger.info("boot:onboarding:dirty-root", {
+        root: normalized,
+        source,
+      });
+    }
+  }
+
+  async function flushBootOnboardingDirtyRoots(options = {}) {
+    if (!bootOnboardingGateOpen) {
+      return {
+        ok: false,
+        blocked: true,
+        pending: bootOnboardingDirtyRoots.size,
+      };
+    }
+    if (bootOnboardingDirtyRescanRunning) {
+      return {
+        ok: true,
+        running: true,
+        pending: bootOnboardingDirtyRoots.size,
+      };
+    }
+    const roots = Array.from(bootOnboardingDirtyRoots).filter(Boolean);
+    if (!roots.length) {
+      return { ok: true, scannedRoots: 0 };
+    }
+    bootOnboardingDirtyRoots = new Set();
+    bootOnboardingDirtyRescanRunning = true;
+    const reason = String(options?.reason || "gate-open");
+    let scannedRoots = 0;
+    watcherLogger.info("boot:onboarding:dirty-rescan-start", {
+      roots: roots.length,
+      reason,
+    });
+    try {
+      for (const root of roots) {
+        if (!root) continue;
+        try {
+          if (!fs.existsSync(root)) continue;
+        } catch {
+          continue;
+        }
+        try {
+          await scanRootOnce(root, { suppressInitialNotify: true });
+          scannedRoots += 1;
+        } catch (err) {
+          watcherLogger.warn("boot:onboarding:dirty-root-scan-failed", {
+            root,
+            error: err?.message || String(err),
+          });
+        }
+      }
+      try {
+        await rebuildSaveWatchers({ suppressInitialNotify: true });
+      } catch {}
+      try {
+        emitDashboardRefresh();
+      } catch {}
+      watcherLogger.info("boot:onboarding:dirty-rescan-complete", {
+        roots: roots.length,
+        scannedRoots,
+        reason,
+      });
+      return {
+        ok: true,
+        scannedRoots,
+      };
+    } finally {
+      bootOnboardingDirtyRescanRunning = false;
+      if (bootOnboardingDirtyRoots.size && bootOnboardingGateOpen) {
+        setTimeout(() => {
+          flushBootOnboardingDirtyRoots({ reason: "post-rescan-drain" }).catch(
+            () => {},
+          );
+        }, 0);
+      }
+    }
+  }
+
+  function normalizeOnboardingCandidateRoots(discovered = []) {
+    return new Set(
+      (Array.isArray(discovered) ? discovered : [])
+        .map((entry) => normalizePrefPath(entry?.path))
+        .filter(Boolean),
+    );
+  }
+
+  function normalizeOnboardingSelection(selectedPaths = [], candidateRoots) {
+    const candidates = candidateRoots instanceof Set ? candidateRoots : new Set();
+    return new Set(
+      (Array.isArray(selectedPaths) ? selectedPaths : [])
+        .map((entry) => normalizePrefPath(entry))
+        .filter((entry) => candidates.has(entry)),
+    );
+  }
+
+  async function applyBootOnboardingDecision(options = {}) {
+    const {
+      discovered = [],
+      selectedPaths = [],
+      reason = "apply-selection",
+    } = options || {};
+    const candidateRoots = normalizeOnboardingCandidateRoots(discovered);
+    const selectedSet = normalizeOnboardingSelection(selectedPaths, candidateRoots);
+    const blocked = getBlockedFoldersSet();
+    for (const root of candidateRoots) {
+      if (selectedSet.has(root)) blocked.delete(root);
+      else blocked.add(root);
+    }
+    saveBlockedFolders([...blocked]);
+    const watcherState = await syncFolderWatchersWithCurrentPrefs();
+    const savedState = saveAutoConfigOnboardingCompletion();
+    bootOnboardingRequired = false;
+    openBootOnboardingGate({ reason });
+    const response = {
+      ok: true,
+      selectedCount: selectedSet.size,
+      mutedCount: Math.max(0, candidateRoots.size - selectedSet.size),
+      restartedWatchers: watcherState.running,
+      required: savedState.required,
+      completed: savedState.completed,
+      reason,
+    };
+    try {
+      broadcastAll("boot:onboarding:done", response);
+    } catch {}
+    return response;
+  }
+
+  function closeBootOnboardingGate() {
+    if (!bootOnboardingGateOpen) return;
+    bootOnboardingGateOpen = false;
+    bootOnboardingStartedAt = Date.now();
+    bootOnboardingDirtyRoots = new Set();
+    bootOnboardingGatePromise = new Promise((resolve) => {
+      bootOnboardingGateResolve = resolve;
+    });
+    try {
+      global.bootOnboardingGateOpen = false;
+      global.bootOnboardingRequired = true;
+      global.bootOnboardingStartedAt = bootOnboardingStartedAt;
+      global.bootOnboardingDecisionAt = 0;
+    } catch {}
+    startBootOnboardingAttentionLoop();
+  }
+
+  function openBootOnboardingGate(meta = {}) {
+    stopBootOnboardingAttentionLoop();
+    if (!bootOnboardingGateOpen) {
+      bootOnboardingGateOpen = true;
+      bootOnboardingDecisionAt = Date.now();
+      const resolver = bootOnboardingGateResolve;
+      bootOnboardingGateResolve = null;
+      if (typeof resolver === "function") {
+        try {
+          resolver();
+        } catch {}
+      }
+      bootOnboardingGatePromise = Promise.resolve();
+      watcherLogger.info("boot:onboarding:gate-open", {
+        decisionMs:
+          bootOnboardingStartedAt > 0
+            ? Math.max(0, bootOnboardingDecisionAt - bootOnboardingStartedAt)
+            : 0,
+        reason: meta?.reason || "completed",
+      });
+    }
+    flushBootOnboardingDirtyRoots({
+      reason: meta?.reason || "gate-open",
+    }).catch(() => {});
+    try {
+      global.bootOnboardingGateOpen = true;
+      global.bootOnboardingRequired = false;
+      global.bootOnboardingDecisionAt = bootOnboardingDecisionAt || Date.now();
+    } catch {}
+  }
+
+  async function waitForBootOnboardingGateOpen() {
+    if (bootOnboardingGateOpen) return;
+    watcherLogger.info("boot:onboarding:gate-wait", {
+      startedAt: bootOnboardingStartedAt || Date.now(),
+    });
+    try {
+      await bootOnboardingGatePromise;
+    } catch {}
+  }
+
+  function isBootOnboardingPending() {
+    return bootOnboardingGateOpen === false;
+  }
+
+  async function forceBootOnboardingSkipAll(reason = "manual-skip-all") {
+    if (!isBootOnboardingPending()) {
+      return {
+        ok: true,
+        alreadyOpen: true,
+        required: bootOnboardingRequired,
+        completed: bootOnboardingRequired !== true,
+        reason: "already-open",
+      };
+    }
+    try {
+      const discovered = await discoverOnboardingFolders({ force: true });
+      return await applyBootOnboardingDecision({
+        discovered,
+        selectedPaths: [],
+        reason: String(reason || "manual-skip-all"),
+      });
+    } catch (err) {
+      emitBootOnboardingError("force-skip-all", err, {
+        recoverable: true,
+        reason: String(reason || "manual-skip-all"),
+      });
+      return {
+        ok: false,
+        mutedCount: 0,
+        restartedWatchers: folderWatchers.size,
+        reason: String(reason || "manual-skip-all"),
+        error: err?.message || String(err),
+      };
+    }
+  }
+
+  const ONBOARDING_SIGNAL_RULES = [
+    { id: "achievements-json", weight: 8 },
+    { id: "achievements-ini", weight: 6 },
+    { id: "stats-bin", weight: 6 },
+    { id: "user-stats-ini", weight: 6 },
+    { id: "xenia-gpd", weight: 5 },
+    { id: "rpcs3-trophy", weight: 5 },
+    { id: "ps4-trophy", weight: 5 },
+    { id: "steam-official-bin", weight: 7 },
+    { id: "tenoke-ini", weight: 4 },
+    { id: "gog-info", weight: 4 },
+  ];
+  const ONBOARDING_SIGNAL_WEIGHT_MAP = new Map(
+    ONBOARDING_SIGNAL_RULES.map((rule) => [rule.id, rule.weight]),
+  );
+
+  function getOnboardingSignalIds(fileName) {
+    const base = String(fileName || "").toLowerCase();
+    const out = [];
+    if (base === "achievements.json") out.push("achievements-json");
+    if (base === "achievements.ini") out.push("achievements-ini");
+    if (base === "stats.bin") out.push("stats-bin");
+    if (base === "user_stats.ini") out.push("user-stats-ini");
+    if (base.endsWith(".gpd")) out.push("xenia-gpd");
+    if (base === "tropusr.dat" || base === "tropconf.sfm") {
+      out.push("rpcs3-trophy");
+    }
+    if (base === "trop.xml") out.push("ps4-trophy");
+    if (/^usergamestatsschema_\d+\.bin$/i.test(base)) {
+      out.push("steam-official-bin");
+    }
+    if (base === "tenoke.ini") out.push("tenoke-ini");
+    if (base.endsWith(".info")) out.push("gog-info");
+    return out;
+  }
+
+  function shouldSkipOnboardingScanDir(name) {
+    const value = String(name || "").toLowerCase();
+    if (!value) return true;
+    if (value === "." || value === "..") return true;
+    if (value === "$recycle.bin") return true;
+    if (value === "system volume information") return true;
+    if (value === "windows") return true;
+    if (value === "program files" || value === "program files (x86)")
+      return true;
+    return false;
+  }
+
+  function buildOnboardingCandidate(entry, signalsMap) {
+    const sortedSignals = Array.from(signalsMap.entries())
+      .sort((a, b) => {
+        const aw = ONBOARDING_SIGNAL_WEIGHT_MAP.get(a[0]) || 0;
+        const bw = ONBOARDING_SIGNAL_WEIGHT_MAP.get(b[0]) || 0;
+        if (bw !== aw) return bw - aw;
+        if (b[1] !== a[1]) return b[1] - a[1];
+        return a[0].localeCompare(b[0]);
+      })
+      .map(([id]) => id);
+    const score = sortedSignals.reduce(
+      (sum, id) => sum + (ONBOARDING_SIGNAL_WEIGHT_MAP.get(id) || 0),
+      0,
+    );
+    return {
+      path: entry.path,
+      exists: entry.exists !== false,
+      source: entry.isDefault ? "default" : "user",
+      blocked: entry.blocked === true,
+      signals: sortedSignals,
+      score,
+      recommended: score >= 6,
+    };
+  }
+
+  async function scanFolderSignalsForOnboarding(rootPath) {
+    const seenSignals = new Map();
+    const queue = [{ dir: rootPath, depth: 0 }];
+    let scannedDirs = 0;
+    while (queue.length) {
+      const current = queue.shift();
+      if (!current?.dir) continue;
+      scannedDirs += 1;
+      if (scannedDirs > AUTOCONFIG_ONBOARDING_DISCOVERY_MAX_DIRS) break;
+      let entries = [];
+      try {
+        entries = await fsp.readdir(current.dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const ent of entries) {
+        if (!ent) continue;
+        if (ent.isFile()) {
+          const ids = getOnboardingSignalIds(ent.name);
+          if (ids.length) {
+            for (const id of ids) {
+              seenSignals.set(id, (seenSignals.get(id) || 0) + 1);
+            }
+            if (seenSignals.size >= 3 && current.depth <= 2) {
+              continue;
+            }
+          }
+          continue;
+        }
+        if (!ent.isDirectory()) continue;
+        if (current.depth >= AUTOCONFIG_ONBOARDING_DISCOVERY_MAX_DEPTH) continue;
+        if (shouldSkipOnboardingScanDir(ent.name)) continue;
+        queue.push({
+          dir: path.join(current.dir, ent.name),
+          depth: current.depth + 1,
+        });
+      }
+    }
+    return seenSignals;
+  }
+
+  async function discoverOnboardingFolders(options = {}) {
+    const force = options.force === true;
+    const now = Date.now();
+    if (
+      !force &&
+      bootOnboardingDiscoveryCache.at > 0 &&
+      now - bootOnboardingDiscoveryCache.at <
+        AUTOCONFIG_ONBOARDING_DISCOVERY_CACHE_MS
+    ) {
+      return bootOnboardingDiscoveryCache.candidates;
+    }
+    const entries = collectWatchedFolderEntries().filter(
+      (entry) => entry?.path && entry.exists !== false,
+    );
+    const candidates = [];
+    for (const entry of entries) {
+      const signals = await scanFolderSignalsForOnboarding(entry.path);
+      if (signals.size === 0) continue;
+      candidates.push(buildOnboardingCandidate(entry, signals));
+    }
+    candidates.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return String(a.path || "").localeCompare(String(b.path || ""));
+    });
+    bootOnboardingDiscoveryCache = {
+      at: Date.now(),
+      candidates,
+    };
+    return candidates;
+  }
+
   function collectWatchedFolderEntries() {
     const prefs = readPrefsSafe();
     const userFolders = Array.isArray(prefs.watchedFolders)
@@ -5149,6 +5659,10 @@ module.exports = function makeWatchedFolders({
     const schedule = () => {
       clearTimeout(state.debounce);
       state.debounce = setTimeout(async () => {
+        if (!bootOnboardingGateOpen) {
+          markBootOnboardingDirtyRoot(root, "debounced-scan");
+          return;
+        }
         if (activeRoots.has(root)) return;
         activeRoots.add(root);
         try {
@@ -5183,6 +5697,10 @@ module.exports = function makeWatchedFolders({
 
       .on("add", async (filePath) => {
         if (rescanInProgress.value) return;
+        if (!bootOnboardingGateOpen) {
+          markBootOnboardingDirtyRoot(root, "watch:add");
+          return;
+        }
         const steamInfo = parseSteamOfficialBinInfo(filePath);
         const isSteamSchemaBin = !!steamInfo && steamInfo.kind === "schema";
         const isSteamUserBin = !!steamInfo && steamInfo.kind === "user";
@@ -5387,6 +5905,10 @@ module.exports = function makeWatchedFolders({
 
       .on("change", async (filePath) => {
         if (rescanInProgress.value) return;
+        if (!bootOnboardingGateOpen) {
+          markBootOnboardingDirtyRoot(root, "watch:change");
+          return;
+        }
         const steamInfo = parseSteamOfficialBinInfo(filePath);
         const isSteamSchemaBin = !!steamInfo && steamInfo.kind === "schema";
         const isSteamUserBin = !!steamInfo && steamInfo.kind === "user";
@@ -5595,6 +6117,10 @@ module.exports = function makeWatchedFolders({
 
       .on("addDir", async (dir) => {
         if (rescanInProgress.value) return;
+        if (!bootOnboardingGateOpen) {
+          markBootOnboardingDirtyRoot(root, "watch:addDir");
+          return;
+        }
 
         const base = path.basename(dir);
         if (strictRootProfile) {
@@ -5666,6 +6192,10 @@ module.exports = function makeWatchedFolders({
         schedule(); // fallback
       })
       .on("unlinkDir", () => {
+        if (!bootOnboardingGateOpen) {
+          markBootOnboardingDirtyRoot(root, "watch:unlinkDir");
+          return;
+        }
         if (!rescanInProgress.value) schedule();
       })
       .on("error", (err) => {
@@ -5687,12 +6217,111 @@ module.exports = function makeWatchedFolders({
     folderWatchers.delete(root);
   }
 
+  async function syncFolderWatchersWithCurrentPrefs() {
+    const allowedRoots = new Set(getWatchedFolders().map(normalizeRoot));
+    const toStop = [];
+    for (const watchedRoot of folderWatchers.keys()) {
+      const normalized = normalizeRoot(watchedRoot);
+      if (!allowedRoots.has(normalized)) {
+        toStop.push(watchedRoot);
+      }
+    }
+    for (const root of toStop) {
+      stopFolderWatcher(root);
+    }
+    await startFolderWatchersBatched(Array.from(allowedRoots), {
+      initialScan: false,
+      batchDelayMs: 0,
+    });
+    return {
+      running: folderWatchers.size,
+      allowed: allowedRoots.size,
+      stopped: toStop.length,
+    };
+  }
+
   // ——— IPC ———
   ipcMain.handle("folders:list", async () => {
     return {
       ok: true,
       folders: getWatchedFolders({ includeMeta: true }),
     };
+  });
+
+  ipcMain.handle("boot:onboarding:get-state", async () => {
+    const state = readAutoConfigOnboardingState();
+    return {
+      required: state.required,
+      completed: state.completed,
+      version: state.version,
+      targetVersion: state.targetVersion,
+      gateOpen: bootOnboardingGateOpen,
+      startedAt: bootOnboardingStartedAt || 0,
+      decisionAt: bootOnboardingDecisionAt || 0,
+      completedAt: state.completedAt || 0,
+    };
+  });
+
+  ipcMain.handle("boot:onboarding:discover-folders", async () => {
+    const started = Date.now();
+    try {
+      const candidates = await discoverOnboardingFolders({ force: true });
+      return {
+        ok: true,
+        candidates,
+        scanMs: Date.now() - started,
+      };
+    } catch (err) {
+      emitBootOnboardingError("discover", err, { recoverable: true });
+      return {
+        ok: false,
+        candidates: [],
+        scanMs: Date.now() - started,
+        error: err?.message || String(err),
+      };
+    }
+  });
+
+  ipcMain.handle("boot:onboarding:apply-selection", async (_e, payload = {}) => {
+    try {
+      const discovered = await discoverOnboardingFolders({ force: true });
+      const selectedRaw = Array.isArray(payload?.selectedPaths)
+        ? payload.selectedPaths
+        : [];
+      return await applyBootOnboardingDecision({
+        discovered,
+        selectedPaths: selectedRaw,
+        reason: "apply-selection",
+      });
+    } catch (err) {
+      emitBootOnboardingError("apply-selection", err, { recoverable: true });
+      return {
+        ok: false,
+        selectedCount: 0,
+        mutedCount: 0,
+        restartedWatchers: folderWatchers.size,
+        error: err?.message || String(err),
+      };
+    }
+  });
+
+  ipcMain.handle("boot:onboarding:skip-all", async () => {
+    try {
+      const discovered = await discoverOnboardingFolders({ force: true });
+      return await applyBootOnboardingDecision({
+        discovered,
+        selectedPaths: [],
+        reason: "skip-all",
+      });
+    } catch (err) {
+      emitBootOnboardingError("skip-all", err, { recoverable: true });
+      return {
+        ok: false,
+        mutedCount: 0,
+        restartedWatchers: folderWatchers.size,
+        error: err?.message || String(err),
+      };
+    }
   });
 
   async function restartWatchersAndRescan() {
@@ -5892,6 +6521,14 @@ module.exports = function makeWatchedFolders({
   // rescan
   ipcMain.handle("folders:rescan", async () => {
     try {
+      if (!bootOnboardingGateOpen) {
+        return {
+          ok: false,
+          errorCode: "onboardingPending",
+          error: "Boot onboarding is still in progress.",
+          folders: getWatchedFolders({ includeMeta: true }),
+        };
+      }
       if (rescanInProgress.value)
         return { ok: false, errorCode: "rescanBusy", busy: true };
       const result = await restartWatchersAndRescan();
@@ -5934,15 +6571,32 @@ module.exports = function makeWatchedFolders({
 
   // ——— boot ———
   app.whenReady().then(async () => {
+    const onboardingState = readAutoConfigOnboardingState();
+    bootOnboardingRequired = onboardingState.required;
+    if (bootOnboardingRequired) {
+      closeBootOnboardingGate();
+      watcherLogger.info("boot:onboarding:required", {
+        version: onboardingState.version,
+        targetVersion: onboardingState.targetVersion,
+      });
+    } else {
+      openBootOnboardingGate({ reason: "already-completed" });
+    }
     await rebuildKnownAppIds();
     const folders = getWatchedFolders();
-    if (BOOT_WATCH_FOLDER_DELAY_MS > 0) {
-      await sleep(BOOT_WATCH_FOLDER_DELAY_MS);
+    if (!bootOnboardingRequired) {
+      if (BOOT_WATCH_FOLDER_DELAY_MS > 0) {
+        await sleep(BOOT_WATCH_FOLDER_DELAY_MS);
+      }
+      await startFolderWatchersBatched(folders, {
+        initialScan: false,
+        batchDelayMs: BOOT_ATTACH_DELAY_MS,
+      });
+    } else {
+      watcherLogger.info("boot:onboarding:watchers-deferred", {
+        folderCount: folders.length,
+      });
     }
-    await startFolderWatchersBatched(folders, {
-      initialScan: false,
-      batchDelayMs: BOOT_ATTACH_DELAY_MS,
-    });
     try {
       global.bootDone = true;
     } catch {}
@@ -5957,6 +6611,16 @@ module.exports = function makeWatchedFolders({
         try {
           broadcastAll("boot:ui-ready", { bootMode });
         } catch {}
+        if (bootOnboardingRequired && !bootOnboardingShowSent) {
+          bootOnboardingShowSent = true;
+          try {
+            broadcastAll("boot:onboarding:show", {
+              required: true,
+              version: onboardingState.version,
+              targetVersion: onboardingState.targetVersion,
+            });
+          } catch {}
+        }
         scheduleDeferredSeedPumpAfterOverlayGate();
         maybeEmitBootComplete();
       })
@@ -5968,7 +6632,25 @@ module.exports = function makeWatchedFolders({
         await waitForBootOverlayHiddenBeforeBackgroundScan();
       } catch {}
       try {
-        const scanJobs = folders.map((root, index) => ({ root, index }));
+        await waitForBootOnboardingGateOpen();
+      } catch {}
+      const rootsForBootScan = getWatchedFolders();
+      try {
+        await startFolderWatchersBatched(rootsForBootScan, {
+          initialScan: false,
+          batchDelayMs: BOOT_ATTACH_DELAY_MS,
+        });
+      } catch {}
+      try {
+        await flushBootOnboardingDirtyRoots({
+          reason: "boot-scan-gate-open",
+        });
+      } catch {}
+      try {
+        const scanJobs = rootsForBootScan.map((root, index) => ({
+          root,
+          index,
+        }));
         await runWithConcurrency(scanJobs, 1, async ({ root, index }) => {
           try {
             const normalizedRoot = normalizeRoot(root);
@@ -6105,6 +6787,7 @@ module.exports = function makeWatchedFolders({
   if (app && typeof app.on === "function") {
     app.on("before-quit", async () => {
       stopLumaPlayDiscoveryPolling();
+      stopBootOnboardingAttentionLoop();
       for (const entry of folderWatchers.values()) {
         try {
           await entry.watcher.close();
@@ -6135,5 +6818,10 @@ module.exports = function makeWatchedFolders({
     });
   }
 
-  return { rebuildKnownAppIds, refreshConfigState };
+  return {
+    rebuildKnownAppIds,
+    refreshConfigState,
+    isBootOnboardingPending,
+    forceBootOnboardingSkipAll,
+  };
 };

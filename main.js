@@ -77,6 +77,116 @@ const execLogger = createLogger("execution");
 const schemaLogger = createLogger("achschema");
 
 const PRESETS_MIGRATION_VERSION = "2026-01-12-duration";
+const PRESET_FOLDER_DEFAULT = "Default Presets";
+const PRESET_FOLDER_USERS = "Users Presets";
+const PRESET_FOLDER_DEFAULT_LEGACY = "Scalable";
+const PRESET_FOLDER_USERS_LEGACY = "Non-scalable";
+
+function getPresetCategoryRoots(baseFolder, category) {
+  const names =
+    category === "default"
+      ? [PRESET_FOLDER_DEFAULT, PRESET_FOLDER_DEFAULT_LEGACY]
+      : [PRESET_FOLDER_USERS, PRESET_FOLDER_USERS_LEGACY];
+  return names.map((name) => path.join(baseFolder, name));
+}
+
+function getUniqueSiblingPath(basePath) {
+  if (!fs.existsSync(basePath)) return basePath;
+  let suffix = 1;
+  let candidate = `${basePath}_${suffix}`;
+  while (fs.existsSync(candidate)) {
+    suffix += 1;
+    candidate = `${basePath}_${suffix}`;
+  }
+  return candidate;
+}
+
+function renameLegacyPresetFolder(legacyName, nextName) {
+  const legacyPath = path.join(userPresetsFolder, legacyName);
+  const nextPath = path.join(userPresetsFolder, nextName);
+
+  if (!fs.existsSync(legacyPath)) return;
+  let legacyStat = null;
+  try {
+    legacyStat = fs.statSync(legacyPath);
+  } catch (err) {
+    appLogger.warn("presets:legacy-stat-failed", {
+      legacyPath,
+      error: err?.message || String(err),
+    });
+    return;
+  }
+  if (!legacyStat.isDirectory()) return;
+
+  if (!fs.existsSync(nextPath)) {
+    try {
+      fs.renameSync(legacyPath, nextPath);
+      appLogger.info("presets:legacy-renamed", {
+        from: legacyPath,
+        to: nextPath,
+      });
+    } catch (err) {
+      appLogger.warn("presets:legacy-rename-failed", {
+        from: legacyPath,
+        to: nextPath,
+        error: err?.message || String(err),
+      });
+    }
+    return;
+  }
+
+  let nextStat = null;
+  try {
+    nextStat = fs.statSync(nextPath);
+  } catch (err) {
+    appLogger.warn("presets:new-stat-failed", {
+      nextPath,
+      error: err?.message || String(err),
+    });
+    return;
+  }
+  if (!nextStat.isDirectory()) {
+    appLogger.warn("presets:legacy-target-not-dir", {
+      nextPath,
+      legacyPath,
+    });
+    return;
+  }
+
+  const backupBase = path.join(
+    path.dirname(userPresetsFolder),
+    `presets_${legacyName.replace(/[\\/:*?"<>|]/g, "_")}_legacy_backup`,
+  );
+  const backupPath = getUniqueSiblingPath(backupBase);
+  try {
+    fs.renameSync(legacyPath, backupPath);
+    copyFolderOnce(backupPath, nextPath);
+    appLogger.warn("presets:legacy-merged-with-backup", {
+      legacyPath,
+      nextPath,
+      backupPath,
+    });
+  } catch (err) {
+    appLogger.warn("presets:legacy-merge-failed", {
+      legacyPath,
+      nextPath,
+      backupPath,
+      error: err?.message || String(err),
+    });
+  }
+}
+
+function renameLegacyPresetFoldersIfNeeded() {
+  try {
+    fs.mkdirSync(userPresetsFolder, { recursive: true });
+  } catch (err) {
+    appLogger.warn("presets:user-dir-create-failed", { error: err.message });
+    return;
+  }
+
+  renameLegacyPresetFolder(PRESET_FOLDER_DEFAULT_LEGACY, PRESET_FOLDER_DEFAULT);
+  renameLegacyPresetFolder(PRESET_FOLDER_USERS_LEGACY, PRESET_FOLDER_USERS);
+}
 
 function runWindowsConfirm({ title, message }) {
   const ps = process.env.SystemRoot
@@ -194,15 +304,13 @@ function copyProgressTemplateToUserPresetsOnce() {
   const targetPath = getUserProgressTemplatePath();
   const targetDir = path.dirname(targetPath);
   const bundledSourcePath = path.join(__dirname, "progress.html");
-  const legacyPresetPath = path.join(
+  const usersPresetProgressCandidates = getPresetCategoryRoots(
     userPresetsFolder,
-    "Non-scalable",
-    "Progress",
-    "progress.html",
-  );
-  const sourcePath = fs.existsSync(legacyPresetPath)
-    ? legacyPresetPath
-    : bundledSourcePath;
+    "users",
+  ).map((root) => path.join(root, "Progress", "progress.html"));
+  const sourcePath =
+    usersPresetProgressCandidates.find((candidate) => fs.existsSync(candidate)) ||
+    bundledSourcePath;
 
   try {
     if (!fs.existsSync(sourcePath)) {
@@ -238,15 +346,21 @@ function resolveProgressTemplatePath() {
 
 function resolveNotificationPresetFolder(presetName) {
   const requested = String(presetName || "default");
-  const scalableFolder = path.join(userPresetsFolder, "Scalable", requested);
-  const nonScalableFolder = path.join(
+  const defaultPresetFolders = getPresetCategoryRoots(
     userPresetsFolder,
-    "Non-scalable",
-    requested,
-  );
+    "default",
+  ).map((root) => path.join(root, requested));
+  const userPresetFolders = getPresetCategoryRoots(
+    userPresetsFolder,
+    "users",
+  ).map((root) => path.join(root, requested));
   const oldStyleFolder = path.join(userPresetsFolder, requested);
 
-  const candidates = [scalableFolder, nonScalableFolder, oldStyleFolder];
+  const candidates = [
+    ...defaultPresetFolders,
+    ...userPresetFolders,
+    oldStyleFolder,
+  ];
   const firstWithIndex = candidates.find((folder) =>
     fs.existsSync(path.join(folder, "index.html")),
   );
@@ -254,12 +368,17 @@ function resolveNotificationPresetFolder(presetName) {
     return { presetFolder: firstWithIndex, requestedPreset: requested };
   }
 
+  const defaultRootCandidates = getPresetCategoryRoots(
+    userPresetsFolder,
+    "default",
+  );
+  const userRootCandidates = getPresetCategoryRoots(userPresetsFolder, "users");
   const fallbackCandidates = [
-    path.join(userPresetsFolder, "Scalable", "Default"),
-    path.join(userPresetsFolder, "Non-scalable", "Default"),
+    ...defaultRootCandidates.map((root) => path.join(root, "Default")),
+    ...userRootCandidates.map((root) => path.join(root, "Default")),
     path.join(userPresetsFolder, "Default"),
-    path.join(userPresetsFolder, "Scalable", "default"),
-    path.join(userPresetsFolder, "Non-scalable", "default"),
+    ...defaultRootCandidates.map((root) => path.join(root, "default")),
+    ...userRootCandidates.map((root) => path.join(root, "default")),
     path.join(userPresetsFolder, "default"),
   ];
   const fallbackFolder = fallbackCandidates.find((folder) =>
@@ -445,9 +564,13 @@ let selectedPreset = "default";
 let selectedPosition = "center-bottom";
 let selectedNotificationScale = 1;
 let bootSeeding = true;
+let bootOnboardingRecoveryTimer = null;
+let bootOnboardingRecoveryLastAt = 0;
 global.bootDone = false;
 global.bootUiReady = false;
 global.bootOverlayHidden = false;
+global.bootOnboardingGateOpen = true;
+global.bootOnboardingRequired = false;
 let bootOverlayHiddenAt = 0;
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -1356,20 +1479,13 @@ function setOverlayPresented(next) {
     try {
       overlayWindow.setFocusable(false);
     } catch {}
-    try {
-      if (!overlayWindow.isVisible()) {
-        if (typeof overlayWindow.showInactive === "function") {
-          overlayWindow.showInactive();
-        } else {
-          // overlayWindow.show();
-        }
-      }
-    } catch {}
-    try {
-      overlayWindow.webContents.send("overlay:set-visible", { visible: true });
-    } catch {}
+    ensureOverlayVisibleInactive("set-overlay-presented");
+    sendOverlayVisibilitySignal(true);
     applyOverlayInteractShortcutRegistration();
     applyOverlayKeyboardScrollShortcutRegistration();
+    if (overlayUpdatePendingWhileHidden) {
+      pushOverlayDataUpdate({ force: true });
+    }
     return;
   }
 
@@ -1378,9 +1494,7 @@ function setOverlayPresented(next) {
   clearOverlayInteractShortcut();
   clearOverlayKeyboardScrollShortcuts();
   stopOverlayGlobalDrag();
-  try {
-    overlayWindow.webContents.send("overlay:set-visible", { visible: false });
-  } catch {}
+  sendOverlayVisibilitySignal(false);
   try {
     overlayWindow.setIgnoreMouseEvents(true, { forward: true });
   } catch {}
@@ -2416,6 +2530,8 @@ ipcMain.handle("boot:status", () => ({
   uiReady: global.bootUiReady === true,
   bootSeeding,
   bootManualSeedComplete: global.bootManualSeedComplete === true,
+  bootOnboardingGateOpen: global.bootOnboardingGateOpen !== false,
+  bootOnboardingRequired: global.bootOnboardingRequired === true,
 }));
 ipcMain.on("boot:overlay-hidden", () => {
   if (global.bootOverlayHidden === true) return;
@@ -3788,13 +3904,7 @@ ipcMain.handle("schema:regenerate", async (event, payload) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send("refresh-achievements-table", safeName);
       }
-      if (overlayWindow && !overlayWindow.isDestroyed()) {
-        overlayWindow.webContents.send("load-overlay-data", safeName);
-        overlayWindow.webContents.send("set-language", {
-          language: selectedLanguage,
-          uiLanguage: selectedUiLanguage,
-        });
-      }
+      pushOverlayDataUpdate({ configName: safeName });
       return {
         success: true,
         message: tUi("main.message.schemaRegenerateSuccess"),
@@ -3872,6 +3982,20 @@ const ICON_PNG_PATH = app.isPackaged
   : path.join(__dirname, "assets", "icon.png");
 const TRAY_MENU_WIDTH = 180;
 const TRAY_MENU_HEIGHT = 170;
+const TRAY_MENU_HEIGHT_WITH_RESUME = 220;
+
+function shouldShowTrayResumeStartup() {
+  return (
+    global.bootOnboardingGateOpen === false ||
+    global.bootOnboardingRequired === true
+  );
+}
+
+function getTrayMenuTargetHeight() {
+  return shouldShowTrayResumeStartup()
+    ? TRAY_MENU_HEIGHT_WITH_RESUME
+    : TRAY_MENU_HEIGHT;
+}
 
 function getTrayScaleFactor() {
   try {
@@ -3887,7 +4011,7 @@ function applyTrayMenuScale() {
   if (!trayMenuWindow || trayMenuWindow.isDestroyed()) return;
   const scale = getTrayScaleFactor();
   const width = Math.max(120, Math.round(TRAY_MENU_WIDTH));
-  const height = Math.max(120, Math.round(TRAY_MENU_HEIGHT));
+  const height = Math.max(120, Math.round(getTrayMenuTargetHeight()));
   trayMenuWindow.setBounds({ width, height }, false);
   if (!trayMenuWindow.webContents.isDestroyed()) {
     trayMenuWindow.webContents.setZoomFactor(1);
@@ -3990,7 +4114,7 @@ function createTrayMenuWindow() {
   }
   trayMenuWindow = new BrowserWindow({
     width: TRAY_MENU_WIDTH,
-    height: TRAY_MENU_HEIGHT,
+    height: getTrayMenuTargetHeight(),
     show: false,
     frame: false,
     resizable: false,
@@ -4087,6 +4211,78 @@ function openSettingsFromTray() {
   } else {
     mainWindow.webContents.send("tray:open-settings");
   }
+}
+
+function isBootOnboardingGatePending() {
+  return global.bootOnboardingGateOpen === false;
+}
+
+function emitBootOnboardingShowToMain(reason = "manual", extra = {}) {
+  if (!isBootOnboardingGatePending()) return;
+  const payload = {
+    required: true,
+    recovery: true,
+    reason: String(reason || "manual"),
+    ...extra,
+  };
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const sendShow = () => {
+    try {
+      mainWindow.webContents.send("boot:onboarding:show", payload);
+    } catch {}
+  };
+  if (mainWindow.webContents.isLoading()) {
+    mainWindow.webContents.once("did-finish-load", sendShow);
+  } else {
+    sendShow();
+  }
+}
+
+function scheduleBootOnboardingUiRecovery(reason = "unknown", extra = {}) {
+  if (!isBootOnboardingGatePending()) return;
+  if (isQuitting) return;
+  if (bootOnboardingRecoveryTimer) return;
+  const now = Date.now();
+  if (now - bootOnboardingRecoveryLastAt < 1200) return;
+  bootOnboardingRecoveryTimer = setTimeout(() => {
+    bootOnboardingRecoveryTimer = null;
+    bootOnboardingRecoveryLastAt = Date.now();
+    appLogger.warn("boot:onboarding:ui-recovery", {
+      reason: String(reason || "unknown"),
+      ...extra,
+    });
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      createMainWindow({ forceShow: true });
+    } else {
+      try {
+        if (mainWindow.webContents?.isCrashed?.()) {
+          mainWindow.webContents.reload();
+        }
+      } catch {}
+      showMainWindowRespectingPrefs();
+    }
+    emitBootOnboardingShowToMain(reason, extra);
+  }, 350);
+}
+
+async function resumeStartupFromTray() {
+  if (!isBootOnboardingGatePending()) {
+    return {
+      ok: true,
+      alreadyOpen: true,
+      reason: "already-open",
+    };
+  }
+  if (!watchedFoldersApi?.forceBootOnboardingSkipAll) {
+    return {
+      ok: false,
+      reason: "tray-resume-startup",
+      error: "Boot onboarding API unavailable.",
+    };
+  }
+  return await watchedFoldersApi.forceBootOnboardingSkipAll(
+    "tray-resume-startup",
+  );
 }
 
 function createTray() {
@@ -4225,6 +4421,12 @@ function createMainWindow(options = {}) {
   mainWindow.on("restore", refreshOverlayKeyboardScrollShortcuts);
   mainWindow.on("show", refreshOverlayKeyboardScrollShortcuts);
   mainWindow.on("hide", refreshOverlayKeyboardScrollShortcuts);
+  mainWindow.on("unresponsive", () => {
+    windowLogger.warn("create-main-window:unresponsive");
+    scheduleBootOnboardingUiRecovery("main-window-unresponsive", {
+      source: "mainWindow",
+    });
+  });
 
   mainWindow.on("move", () => scheduleMainWindowZoomUpdate());
   mainWindow.on("resize", () => scheduleMainWindowZoomUpdate());
@@ -4491,13 +4693,7 @@ ipcMain.on("show-notification", async (_event, achievement) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("refresh-achievements-table", selectedConfig);
     }
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-      overlayWindow.webContents.send("set-language", {
-        language: selectedLanguage,
-        uiLanguage: selectedUiLanguage,
-      });
-    }
+    pushOverlayDataUpdate();
   } else {
     notifyError(tUi("main.notify.achievement.syntaxInvalid"));
   }
@@ -4667,31 +4863,44 @@ ipcMain.handle("load-presets", async () => {
   if (!fs.existsSync(userPresetsFolder)) return [];
 
   try {
-    const scalableFolder = path.join(userPresetsFolder, "Scalable");
-    const nonScalableFolder = path.join(userPresetsFolder, "Non-scalable");
+    const defaultPresetRoots = getPresetCategoryRoots(userPresetsFolder, "default");
+    const userPresetRoots = getPresetCategoryRoots(userPresetsFolder, "users");
 
-    const hasScalable = fs.existsSync(scalableFolder);
-    const hasNonScalable = fs.existsSync(nonScalableFolder);
+    const listPresetDirs = (roots, options = {}) => {
+      const out = [];
+      const seen = new Set();
+      for (const root of roots) {
+        if (!fs.existsSync(root)) continue;
+        const dirs = fs
+          .readdirSync(root, { withFileTypes: true })
+          .filter((dirent) => dirent.isDirectory())
+          .map((dirent) => dirent.name)
+          .filter((name) => {
+            const value = String(name || "").toLowerCase();
+            if (options.excludeProgress && value === "progress") return false;
+            return true;
+          });
+        for (const name of dirs) {
+          const key = String(name || "").toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          out.push(name);
+        }
+      }
+      return out;
+    };
 
-    if (hasScalable || hasNonScalable) {
-      const scalableDirs = hasScalable
-        ? fs
-            .readdirSync(scalableFolder, { withFileTypes: true })
-            .filter((dirent) => dirent.isDirectory())
-            .map((dirent) => dirent.name)
-        : [];
+    const defaultPresets = listPresetDirs(defaultPresetRoots);
+    const userPresets = listPresetDirs(userPresetRoots, {
+      excludeProgress: true,
+    });
 
-      const nonScalableDirs = hasNonScalable
-        ? fs
-            .readdirSync(nonScalableFolder, { withFileTypes: true })
-            .filter((dirent) => dirent.isDirectory())
-            .map((dirent) => dirent.name)
-            .filter((name) => String(name || "").toLowerCase() !== "progress")
-        : [];
-
+    if (defaultPresets.length || userPresets.length) {
       return {
-        scalable: scalableDirs,
-        nonScalable: nonScalableDirs,
+        defaultPresets,
+        userPresets,
+        scalable: defaultPresets,
+        nonScalable: userPresets,
         isStructured: true,
       };
     }
@@ -4702,7 +4911,11 @@ ipcMain.handle("load-presets", async () => {
       .map((dirent) => dirent.name);
 
     const flatDirs = dirs.filter(
-      (dir) => dir !== "Scalable" && dir !== "Non-scalable",
+      (dir) =>
+        dir !== PRESET_FOLDER_DEFAULT &&
+        dir !== PRESET_FOLDER_USERS &&
+        dir !== PRESET_FOLDER_DEFAULT_LEGACY &&
+        dir !== PRESET_FOLDER_USERS_LEGACY,
     );
 
     return flatDirs;
@@ -5988,13 +6201,7 @@ async function monitorAchievementsFile(filePath) {
           queueAchievementNotification(notificationData);
 
           mainWindow.webContents.send("refresh-achievements-table");
-          if (overlayWindow && !overlayWindow.isDestroyed()) {
-            overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-            overlayWindow.webContents.send("set-language", {
-              language: selectedLanguage,
-              uiLanguage: selectedUiLanguage,
-            });
-          }
+          pushOverlayDataUpdate();
         }
       }
       const stillLocked = !(current?.earned === true || current?.earned === 1);
@@ -6035,13 +6242,7 @@ async function monitorAchievementsFile(filePath) {
           }
 
           mainWindow.webContents.send("refresh-achievements-table");
-          if (overlayWindow && !overlayWindow.isDestroyed()) {
-            overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-            overlayWindow.webContents.send("set-language", {
-              language: selectedLanguage,
-              uiLanguage: selectedUiLanguage,
-            });
-          }
+          pushOverlayDataUpdate();
         }
       }
     });
@@ -6067,13 +6268,7 @@ async function monitorAchievementsFile(filePath) {
   achievementsWatcher = () => processSnapshot(false);
   const refreshAchievementsUi = () => {
     mainWindow.webContents.send("refresh-achievements-table");
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-      overlayWindow.webContents.send("set-language", {
-        language: selectedLanguage,
-        uiLanguage: selectedUiLanguage,
-      });
-    }
+    pushOverlayDataUpdate();
   };
 
   if (isLumaPlay) {
@@ -6218,13 +6413,7 @@ ipcMain.on(
       selectedConfig = null;
       selectedPlatform = null;
 
-      if (overlayWindow && !overlayWindow.isDestroyed()) {
-        overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-        overlayWindow.webContents.send("set-language", {
-          language: selectedLanguage,
-          uiLanguage: selectedUiLanguage,
-        });
-      }
+      pushOverlayDataUpdate();
       return;
     }
 
@@ -6272,13 +6461,7 @@ ipcMain.on(
         stopActiveLumaPlayRegistryWatcher();
         achievementsFilePath = null;
         monitorAchievementsFile(null);
-        if (overlayWindow && !overlayWindow.isDestroyed()) {
-          overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-          overlayWindow.webContents.send("set-language", {
-            language: selectedLanguage,
-            uiLanguage: selectedUiLanguage,
-          });
-        }
+        pushOverlayDataUpdate();
         return;
       }
       achievementsFilePath = `lumaplay:${appid || "unknown"}`;
@@ -6286,13 +6469,7 @@ ipcMain.on(
         pendingMissingAchievementFiles.delete(configName);
       }
       monitorAchievementsFile(achievementsFilePath);
-      if (overlayWindow && !overlayWindow.isDestroyed()) {
-        overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-        overlayWindow.webContents.send("set-language", {
-          language: selectedLanguage,
-          uiLanguage: selectedUiLanguage,
-        });
-      }
+      pushOverlayDataUpdate();
       return;
     }
     if (normalizedPlatform === "xenia") {
@@ -6307,26 +6484,14 @@ ipcMain.on(
           configName,
           reason: "no-gpd",
         });
-        if (overlayWindow && !overlayWindow.isDestroyed()) {
-          overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-          overlayWindow.webContents.send("set-language", {
-            language: selectedLanguage,
-            uiLanguage: selectedUiLanguage,
-          });
-        }
+        pushOverlayDataUpdate();
         return;
       }
       if (isNonEmptyString(configName)) {
         pendingMissingAchievementFiles.delete(configName);
       }
       monitorAchievementsFile(achievementsFilePath);
-      if (overlayWindow && !overlayWindow.isDestroyed()) {
-        overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-        overlayWindow.webContents.send("set-language", {
-          language: selectedLanguage,
-          uiLanguage: selectedUiLanguage,
-        });
-      }
+      pushOverlayDataUpdate();
       return;
     }
     if (normalizedPlatform === "rpcs3") {
@@ -6342,26 +6507,14 @@ ipcMain.on(
           configName,
           reason: "no-tropusr",
         });
-        if (overlayWindow && !overlayWindow.isDestroyed()) {
-          overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-          overlayWindow.webContents.send("set-language", {
-            language: selectedLanguage,
-            uiLanguage: selectedUiLanguage,
-          });
-        }
+        pushOverlayDataUpdate();
         return;
       }
       if (isNonEmptyString(configName)) {
         pendingMissingAchievementFiles.delete(configName);
       }
       monitorAchievementsFile(achievementsFilePath);
-      if (overlayWindow && !overlayWindow.isDestroyed()) {
-        overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-        overlayWindow.webContents.send("set-language", {
-          language: selectedLanguage,
-          uiLanguage: selectedUiLanguage,
-        });
-      }
+      pushOverlayDataUpdate();
       return;
     }
     if (normalizedPlatform === "shadps4") {
@@ -6378,26 +6531,14 @@ ipcMain.on(
           configName,
           reason: "no-tropxml",
         });
-        if (overlayWindow && !overlayWindow.isDestroyed()) {
-          overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-          overlayWindow.webContents.send("set-language", {
-            language: selectedLanguage,
-            uiLanguage: selectedUiLanguage,
-          });
-        }
+        pushOverlayDataUpdate();
         return;
       }
       if (isNonEmptyString(configName)) {
         pendingMissingAchievementFiles.delete(configName);
       }
       monitorAchievementsFile(achievementsFilePath);
-      if (overlayWindow && !overlayWindow.isDestroyed()) {
-        overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-        overlayWindow.webContents.send("set-language", {
-          language: selectedLanguage,
-          uiLanguage: selectedUiLanguage,
-        });
-      }
+      pushOverlayDataUpdate();
       return;
     }
 
@@ -6415,26 +6556,14 @@ ipcMain.on(
           configName,
           reason: "no-usergamestats",
         });
-        if (overlayWindow && !overlayWindow.isDestroyed()) {
-          overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-          overlayWindow.webContents.send("set-language", {
-            language: selectedLanguage,
-            uiLanguage: selectedUiLanguage,
-          });
-        }
+        pushOverlayDataUpdate();
         return;
       }
       if (isNonEmptyString(configName)) {
         pendingMissingAchievementFiles.delete(configName);
       }
       monitorAchievementsFile(achievementsFilePath);
-      if (overlayWindow && !overlayWindow.isDestroyed()) {
-        overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-        overlayWindow.webContents.send("set-language", {
-          language: selectedLanguage,
-          uiLanguage: selectedUiLanguage,
-        });
-      }
+      pushOverlayDataUpdate();
       return;
     }
 
@@ -6443,13 +6572,7 @@ ipcMain.on(
       currentAppId = appid || null;
       achievementsFilePath = null; // we watch via renderer requests; overlay uses config path data
       monitorAchievementsFile(null);
-      if (overlayWindow && !overlayWindow.isDestroyed()) {
-        overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-        overlayWindow.webContents.send("set-language", {
-          language: selectedLanguage,
-          uiLanguage: selectedUiLanguage,
-        });
-      }
+      pushOverlayDataUpdate();
       return;
     }
 
@@ -6460,13 +6583,7 @@ ipcMain.on(
         configName,
         reason: "no-save-path",
       });
-      if (overlayWindow && !overlayWindow.isDestroyed()) {
-        overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-        overlayWindow.webContents.send("set-language", {
-          language: selectedLanguage,
-          uiLanguage: selectedUiLanguage,
-        });
-      }
+      pushOverlayDataUpdate();
       return;
     }
     if (selectedConfigPath) {
@@ -6542,13 +6659,7 @@ ipcMain.on(
 
     monitorAchievementsFile(achievementsFilePath);
 
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-      overlayWindow.webContents.send("set-language", {
-        language: selectedLanguage,
-        uiLanguage: selectedUiLanguage,
-      });
-    }
+    pushOverlayDataUpdate();
   },
 );
 
@@ -6922,10 +7033,171 @@ let overlayDragHook = null;
 let overlayDragHookStarted = false;
 let overlayDragHookInitAttempted = false;
 let overlayDragHookBootWaitTimer = null;
+let overlayUpdatePendingWhileHidden = false;
+let overlayPendingConfigName = undefined;
+let overlayShowInactiveRetryTimer = null;
+let overlayShowInactiveAttempts = 0;
+let overlayVisibilityAckTimer = null;
+let overlayVisibilityAckSeq = 0;
+let overlayVisibilityAckedSeq = 0;
+let overlaySuppressClosedReset = false;
+const OVERLAY_SHOW_INACTIVE_MAX_ATTEMPTS = 5;
+const OVERLAY_SHOW_INACTIVE_RETRY_MS = 120;
+const OVERLAY_VISIBILITY_ACK_TIMEOUT_MS = 700;
 const POST_BOOT_UI_INITIAL_DELAY_MS = 350;
 const POST_BOOT_UI_STEP_DELAY_MS = 300;
 const POST_BOOT_ZOOM_DELAY_MS = 200;
 let postBootUiInitScheduled = false;
+
+function clearOverlayShowInactiveRetryTimer() {
+  if (overlayShowInactiveRetryTimer) {
+    clearTimeout(overlayShowInactiveRetryTimer);
+    overlayShowInactiveRetryTimer = null;
+  }
+}
+
+function clearOverlayVisibilityAckTimer() {
+  if (overlayVisibilityAckTimer) {
+    clearTimeout(overlayVisibilityAckTimer);
+    overlayVisibilityAckTimer = null;
+  }
+}
+
+function sendOverlayVisibilitySignal(visible, options = {}) {
+  const opts = options || {};
+  if (!overlayWindow || overlayWindow.isDestroyed()) return false;
+  const wc = overlayWindow.webContents;
+  if (!wc || wc.isDestroyed?.() || wc.isCrashed?.()) return false;
+
+  const seq = Number.isInteger(opts.seq) ? opts.seq : ++overlayVisibilityAckSeq;
+  try {
+    wc.send("overlay:set-visible", { visible: !!visible, seq });
+  } catch {
+    return false;
+  }
+
+  clearOverlayVisibilityAckTimer();
+  const retries = Number.isInteger(opts.retries) ? opts.retries : 0;
+  if (retries >= 3) return true;
+  overlayVisibilityAckTimer = setTimeout(() => {
+    if (overlayVisibilityAckedSeq >= seq) return;
+    if (!overlayWindow || overlayWindow.isDestroyed()) return;
+    sendOverlayVisibilitySignal(visible, { seq, retries: retries + 1 });
+  }, OVERLAY_VISIBILITY_ACK_TIMEOUT_MS);
+  return true;
+}
+
+function ensureOverlayVisibleInactive(reason = "unknown") {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return false;
+  try {
+    if (overlayWindow.isVisible()) {
+      clearOverlayShowInactiveRetryTimer();
+      overlayShowInactiveAttempts = 0;
+      return true;
+    }
+  } catch {}
+
+  clearOverlayShowInactiveRetryTimer();
+  overlayShowInactiveAttempts = 0;
+
+  const tryShow = () => {
+    if (!overlayWindow || overlayWindow.isDestroyed()) {
+      clearOverlayShowInactiveRetryTimer();
+      return;
+    }
+    overlayShowInactiveAttempts += 1;
+    try {
+      overlayWindow.setFocusable(false);
+      overlayWindow.setSkipTaskbar(true);
+    } catch {}
+    try {
+      if (typeof overlayWindow.showInactive === "function") {
+        overlayWindow.showInactive();
+      } else {
+        windowLogger.warn("overlay:showinactive-missing", { reason });
+      }
+    } catch (err) {
+      windowLogger.warn("overlay:showinactive-error", {
+        reason,
+        attempt: overlayShowInactiveAttempts,
+        error: err?.message || String(err),
+      });
+    }
+    try {
+      overlayWindow.blur();
+    } catch {}
+    try {
+      if (overlayWindow.isVisible()) {
+        clearOverlayShowInactiveRetryTimer();
+        overlayShowInactiveAttempts = 0;
+        return;
+      }
+    } catch {}
+
+    if (overlayShowInactiveAttempts >= OVERLAY_SHOW_INACTIVE_MAX_ATTEMPTS) {
+      clearOverlayShowInactiveRetryTimer();
+      windowLogger.warn("overlay:showinactive-not-visible", {
+        reason,
+        attempts: overlayShowInactiveAttempts,
+      });
+      const restoreConfig = selectedConfig || null;
+      const restorePresented = overlayPresented;
+      overlaySuppressClosedReset = true;
+      try {
+        overlayWindow.destroy();
+      } catch {}
+      setTimeout(() => {
+        if (overlayWindow && !overlayWindow.isDestroyed()) return;
+        createOverlayWindow(restoreConfig, restorePresented);
+      }, 120);
+      return;
+    }
+    overlayShowInactiveRetryTimer = setTimeout(
+      tryShow,
+      OVERLAY_SHOW_INACTIVE_RETRY_MS,
+    );
+  };
+
+  tryShow();
+  return false;
+}
+
+function pushOverlayDataUpdate(options = {}) {
+  const opts = options || {};
+  const hasConfigOverride = Object.prototype.hasOwnProperty.call(
+    opts,
+    "configName",
+  );
+  const configName = hasConfigOverride
+    ? opts.configName
+    : isNonEmptyString(selectedConfig)
+      ? selectedConfig
+      : overlayPendingConfigName !== undefined
+        ? overlayPendingConfigName
+        : selectedConfig;
+  const targetWindow = opts.targetWindow || overlayWindow;
+  const force = opts.force === true;
+  if (!targetWindow || targetWindow.isDestroyed()) return false;
+  const wc = targetWindow.webContents;
+  if (!wc || wc.isDestroyed?.() || wc.isCrashed?.()) return false;
+  if (!force && !overlayPresented) {
+    overlayUpdatePendingWhileHidden = true;
+    overlayPendingConfigName = configName;
+    return false;
+  }
+  try {
+    wc.send("load-overlay-data", configName);
+    wc.send("set-language", {
+      language: selectedLanguage,
+      uiLanguage: selectedUiLanguage,
+    });
+    overlayUpdatePendingWhileHidden = false;
+    overlayPendingConfigName = undefined;
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function stopOverlayGlobalDrag() {
   overlayDragActive = false;
@@ -7101,9 +7373,9 @@ function schedulePostBootUiInitialization() {
   runSteps();
 }
 
-function createOverlayWindow(selectedConfig, initialPresented = true) {
+function createOverlayWindow(initialConfigName, initialPresented = true) {
   windowLogger.info("create-overlay:start", {
-    selectedConfig: selectedConfig || null,
+    selectedConfig: initialConfigName || selectedConfig || null,
     initialPresented: !!initialPresented,
   });
   const { width, height } =
@@ -7156,16 +7428,7 @@ function createOverlayWindow(selectedConfig, initialPresented = true) {
     try {
       setOverlayInteractive(false);
     } catch {}
-    try {
-      if (typeof overlayWindow.showInactive === "function") {
-        overlayWindow.showInactive();
-      } else {
-        // overlayWindow.show();
-      }
-    } catch {}
-    try {
-      overlayWindow.blur();
-    } catch {}
+    ensureOverlayVisibleInactive("overlay-ready-to-show");
     // Keep the window shown (inactive) and rely on CSS visibility to avoid OS-level hidden state.
     setTimeout(() => {
       if (!overlayWindow || overlayWindow.isDestroyed()) return;
@@ -7182,27 +7445,33 @@ function createOverlayWindow(selectedConfig, initialPresented = true) {
   });
 
   overlayWindow.webContents.on("did-finish-load", () => {
+    const resolvedConfigName = isNonEmptyString(selectedConfig)
+      ? selectedConfig
+      : overlayPendingConfigName !== undefined
+        ? overlayPendingConfigName
+        : initialConfigName;
     windowLogger.info("create-overlay:did-finish-load", {
-      selectedConfig: selectedConfig || null,
+      selectedConfig: resolvedConfigName || null,
     });
-    overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-    overlayWindow.webContents.send("set-language", {
-      language: selectedLanguage,
-      uiLanguage: selectedUiLanguage,
-    });
-    try {
-      overlayWindow.webContents.send("overlay:set-visible", {
-        visible: overlayPresented,
-      });
-    } catch {}
+    pushOverlayDataUpdate({ configName: resolvedConfigName });
+    sendOverlayVisibilitySignal(overlayPresented);
   });
 
   overlayWindow.on("closed", () => {
     windowLogger.info("create-overlay:closed");
+    const suppressReset = overlaySuppressClosedReset === true;
+    overlaySuppressClosedReset = false;
     stopOverlayGlobalDrag();
     overlayWindow = null;
     overlayInteractive = false;
-    overlayPresented = false;
+    if (!suppressReset) {
+      overlayPresented = false;
+      overlayUpdatePendingWhileHidden = false;
+      overlayPendingConfigName = undefined;
+    }
+    clearOverlayShowInactiveRetryTimer();
+    overlayShowInactiveAttempts = 0;
+    clearOverlayVisibilityAckTimer();
     clearOverlayInteractShortcut();
     clearOverlayKeyboardScrollShortcuts();
   });
@@ -7309,16 +7578,17 @@ ipcMain.handle("launchExecutable", async (_event, exePath, argsString) => {
 
 let currentAppId = null;
 
-ipcMain.on("toggle-overlay", (_event, selectedConfig) => {
-  if (!selectedConfig) return;
+ipcMain.on("toggle-overlay", (_event, requestedConfigName) => {
+  const nextConfigName = isNonEmptyString(requestedConfigName)
+    ? requestedConfigName
+    : isNonEmptyString(selectedConfig)
+      ? selectedConfig
+      : null;
+  if (!nextConfigName) return;
   if (!overlayWindow || overlayWindow.isDestroyed()) {
-    createOverlayWindow(selectedConfig);
+    createOverlayWindow(nextConfigName);
   } else {
-    overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-    overlayWindow.webContents.send("set-language", {
-      language: selectedLanguage,
-      uiLanguage: selectedUiLanguage,
-    });
+    pushOverlayDataUpdate({ configName: nextConfigName });
     if (!overlayPresented) {
       setOverlayPresented(true);
     }
@@ -7327,12 +7597,32 @@ ipcMain.on("toggle-overlay", (_event, selectedConfig) => {
 
 // Handle request for current config from overlay
 ipcMain.on("request-current-config", (event) => {
-  if (selectedConfig) {
-    event.sender.send("load-overlay-data", selectedConfig);
-    event.sender.send("set-language", {
-      language: selectedLanguage,
-      uiLanguage: selectedUiLanguage,
+  const activeConfigName = isNonEmptyString(selectedConfig)
+    ? selectedConfig
+    : null;
+  if (activeConfigName) {
+    pushOverlayDataUpdate({
+      configName: activeConfigName,
+      targetWindow:
+        overlayWindow && !overlayWindow.isDestroyed()
+          ? overlayWindow
+          : BrowserWindow.fromWebContents(event.sender),
     });
+  }
+});
+
+ipcMain.on("overlay:visible-ack", (event, payload) => {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  const senderWin = BrowserWindow.fromWebContents(event.sender);
+  if (!senderWin || senderWin.isDestroyed()) return;
+  if (senderWin.id !== overlayWindow.id) return;
+  const seq = Number(payload?.seq);
+  if (!Number.isInteger(seq) || seq <= 0) return;
+  if (seq > overlayVisibilityAckedSeq) {
+    overlayVisibilityAckedSeq = seq;
+  }
+  if (overlayVisibilityAckedSeq >= overlayVisibilityAckSeq) {
+    clearOverlayVisibilityAckTimer();
   }
 });
 
@@ -7361,13 +7651,7 @@ ipcMain.on(
       mainWindow.webContents.send("refresh-achievements-table", configName);
     }
 
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.webContents.send("load-overlay-data", selectedConfig);
-      overlayWindow.webContents.send("set-language", {
-        language: selectedLanguage,
-        uiLanguage: selectedUiLanguage,
-      });
-    }
+    pushOverlayDataUpdate();
     broadcastToAll("tray:language-changed", { language: selectedUiLanguage });
   },
 );
@@ -7449,6 +7733,46 @@ ipcMain.on("tray:action", (_event, action) => {
     hideTrayMenu();
     return;
   }
+  if (cmd === "resume-startup") {
+    hideTrayMenu();
+    (async () => {
+      const result = await resumeStartupFromTray();
+      const ok = result?.ok === true;
+      appLogger.info("boot:onboarding:tray-resume", {
+        ok,
+        alreadyOpen: result?.alreadyOpen === true,
+        mutedCount: Number(result?.mutedCount || 0) || 0,
+        error: result?.error || null,
+      });
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        createMainWindow({ forceShow: true });
+      } else {
+        showMainWindowRespectingPrefs();
+      }
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        const message = ok
+          ? "Startup resumed. Auto-config was skipped and discovered folders were muted."
+          : `Failed to resume startup: ${result?.error || "unknown error"}`;
+        try {
+          mainWindow.webContents.send("notify", {
+            message,
+            color: ok ? "#4CAF50" : "#f44336",
+          });
+        } catch {}
+        if (!ok) {
+          emitBootOnboardingShowToMain("tray-resume-failed", {
+            error: result?.error || null,
+          });
+        }
+      }
+    })().catch((err) => {
+      appLogger.error("boot:onboarding:tray-resume-failed", {
+        error: err?.message || String(err),
+      });
+      scheduleBootOnboardingUiRecovery("tray-resume-error");
+    });
+    return;
+  }
   if (cmd === "quit") {
     isQuitting = true;
     app.quit();
@@ -7500,6 +7824,7 @@ app.whenReady().then(async () => {
   }
 
   copyFolderOnce(defaultSoundsFolder, userSoundsFolder);
+  renameLegacyPresetFoldersIfNeeded();
   migrateDefaultPresetsIfNeeded();
   copyFolderOnce(defaultPresetsFolder, userPresetsFolder);
   copyProgressTemplateToUserPresetsOnce();
@@ -7521,6 +7846,8 @@ app.on("will-quit", () => {
       overlayDragHook.stop();
     } catch {}
   }
+  clearOverlayShowInactiveRetryTimer();
+  clearOverlayVisibilityAckTimer();
 });
 
 function showProgressNotification(data) {
@@ -8294,6 +8621,10 @@ function scheduleManualCacheSeedAfterBoot() {
   const tick = async () => {
     if (global.bootDone === true) {
       if (global.bootUiReady !== true) {
+        setTimeout(tick, 500);
+        return;
+      }
+      if (global.bootOnboardingGateOpen === false) {
         setTimeout(tick, 500);
         return;
       }
@@ -9136,19 +9467,74 @@ app.on("window-all-closed", () => {
 });
 
 app.on("render-process-gone", (_event, webContents, details) => {
+  const crashedUrl = webContents?.getURL?.() || null;
   appLogger.error("process:render-gone", {
     reason: details?.reason,
     exitCode: details?.exitCode,
     type: details?.type,
     id: webContents?.id,
-    url: webContents?.getURL?.() || null,
+    url: crashedUrl,
   });
   ipcLogger.error("process:render-gone", {
     reason: details?.reason,
     exitCode: details?.exitCode,
     type: details?.type,
     id: webContents?.id,
-    url: webContents?.getURL?.() || null,
+    url: crashedUrl,
+  });
+  const isOverlayRenderer = (() => {
+    try {
+      if (
+        overlayWindow &&
+        !overlayWindow.isDestroyed() &&
+        overlayWindow.webContents &&
+        !overlayWindow.webContents.isDestroyed()
+      ) {
+        return overlayWindow.webContents.id === webContents?.id;
+      }
+    } catch {}
+    return false;
+  })();
+  if (isOverlayRenderer) {
+    const restorePresented = overlayPresented === true;
+    const restoreConfig = selectedConfig || null;
+    windowLogger.warn("overlay:renderer-gone", {
+      reason: details?.reason || null,
+      processType: details?.type || null,
+      restorePresented,
+      restoreConfig,
+    });
+    overlaySuppressClosedReset = true;
+    try {
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.destroy();
+      }
+    } catch {}
+    setTimeout(() => {
+      if (overlayWindow && !overlayWindow.isDestroyed()) return;
+      createOverlayWindow(restoreConfig, restorePresented);
+    }, 180);
+    return;
+  }
+  if (!isBootOnboardingGatePending()) return;
+  const isMainRenderer = (() => {
+    try {
+      if (
+        mainWindow &&
+        !mainWindow.isDestroyed() &&
+        mainWindow.webContents &&
+        !mainWindow.webContents.isDestroyed()
+      ) {
+        return mainWindow.webContents.id === webContents?.id;
+      }
+    } catch {}
+    const u = String(crashedUrl || "").toLowerCase();
+    return u.includes("index.html");
+  })();
+  if (!isMainRenderer) return;
+  scheduleBootOnboardingUiRecovery("render-process-gone", {
+    processType: details?.type || null,
+    reason: details?.reason || null,
   });
 });
 

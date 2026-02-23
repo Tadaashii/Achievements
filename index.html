@@ -231,6 +231,14 @@
           >
             Shortcuts
           </button>
+          <button
+            id="tab-platformGuide"
+            class="settings-tab"
+            data-tab="platformGuide"
+            title="Platform & Emulator Guide"
+          >
+            Platform Guide
+          </button>
         </div>
 
         <div class="settings-tabs-content" tabindex="0">
@@ -1340,6 +1348,370 @@
               </div>
             </template>
           </div>
+          <div
+            id="platformGuideTab"
+            class="tab-content"
+            role="tabpanel"
+            aria-labelledby="tab-platformGuide"
+            hidden
+            tabindex="0"
+          >
+            <div style="padding: 0 10px">
+              <div class="settings-section">
+                <h4 id="platformGuideTitle">Platform & Emulator Guide</h4>
+                <p id="platformGuideIntro" class="platform-guide-note">
+                  This guide explains what to watch, how auto-config starts, and
+                  when notifications are generated for each platform.
+                </p>
+                <ul class="platform-guide-list">
+                  <li id="platformGuideQuickTip1">
+                    Add root folders in <strong>Settings → Folders</strong>.
+                  </li>
+                  <li id="platformGuideQuickTip2">
+                    Auto-config runs only for watched folders that are not
+                    muted/ignored.
+                  </li>
+                  <li id="platformGuideQuickTip3">
+                    Notifications are sent only on new unlock/progress changes,
+                    not for already imported old unlocks.
+                  </li>
+                </ul>
+              </div>
+
+              <div class="settings-section">
+                <details class="platform-guide-item" open>
+                  <summary id="platformGuideSteamSummary">
+                    Steam / Epic / GOG / Uplay
+                  </summary>
+                  <ul class="platform-guide-list">
+                    <li id="platformGuideSteamItem1">
+                      Core flow: watch save/achievement files (for example
+                      <code>achievements.json</code>,
+                      <code>achievements.ini</code>, <code>stats.bin</code>,
+                      <code>user_stats.ini</code>) inside configured roots.
+                    </li>
+                    <li id="platformGuideSteamItem2">
+                      Manual config: set a valid <code>AppID</code> and correct
+                      <code>Save path</code>.
+                    </li>
+                    <li id="platformGuideSteamItem3">
+                      Uplay note: if Steam mapping is needed, use the mapped
+                      Steam AppID field when available.
+                    </li>
+                    <li id="platformGuideSteamItem4">
+                      Epic emu method (Nemirtingas): if
+                      <code>NemirtingasEpicEmu</code> is used, the scanner
+                      discovers numeric AppIDs from user subfolders and treats
+                      them as Epic candidates.
+                    </li>
+                    <li id="platformGuideSteamItem5">
+                      GOG method 1 (preferred): detect
+                      <code>goggame-*.info</code> files and read game IDs from
+                      those files.
+                    </li>
+                    <li id="platformGuideSteamItem6">
+                      GOG method 2 (fallback): detect
+                      <code>UniverseLAN.ini</code> and read
+                      <code>GameSettings.AppID</code>; runtime progress is
+                      monitored from
+                      <code>UniverseLANData\\Achievements.ini</code>.
+                    </li>
+                    <li id="platformGuideSteamItem7">
+                      TENOKE method: detect <code>tenoke.ini</code> and read
+                      <code>id=APPID</code>.
+                    </li>
+                    <li id="platformGuideSteamItem8">
+                      TENOKE runtime: after config creation, watcher searches
+                      deeper for <code>user_stats.ini</code> (including
+                      <code>SteamData\\user_stats.ini</code>), updates
+                      <code>save_path</code>, and relinks automatically.
+                    </li>
+                    <li id="platformGuideSteamItem9">
+                      GOG can also run with manual config using a valid
+                      <code>AppID</code> and <code>Platform = GOG</code>, even
+                      without <code>.info</code> or
+                      <code>UniverseLAN.ini</code>.
+                    </li>
+                    <li id="platformGuideSteamItem10">
+                      If only numeric folders are present, auto mode may classify
+                      by heuristics; for strict GOG behavior, keep
+                      <code>goggame-*.info</code>/<code>UniverseLAN.ini</code>
+                      or set platform manually.
+                    </li>
+                  </ul>
+                </details>
+              </div>
+
+              <div class="settings-section">
+                <details class="platform-guide-item">
+                  <summary id="platformGuideSteamOfficialSummary">
+                    Steam (Official)
+                  </summary>
+                  <ul class="platform-guide-list">
+                    <li id="platformGuideSteamOfficialItem1">
+                      Watch folder:
+                      <code>Steam\appcache\stats</code>.
+                    </li>
+                    <li id="platformGuideSteamOfficialItem2">
+                      Detection is based on
+                      <code>UserGameStatsSchema_*.bin</code> files.
+                    </li>
+                    <li id="platformGuideSteamOfficialItem3">
+                      If schema/progress seems outdated, use folder rescan
+                      instead of manual schema regeneration.
+                    </li>
+                  </ul>
+                </details>
+              </div>
+
+              <div class="settings-section">
+                <details class="platform-guide-item">
+                  <summary id="platformGuideXeniaSummary">Xenia</summary>
+                  <ul class="platform-guide-list">
+                    <li id="platformGuideXeniaItem1">
+                      Watch the Xenia content/profile path where
+                      <code>.gpd</code> files are updated.
+                    </li>
+                    <li id="platformGuideXeniaItem2">
+                      Auto-config reads title data, generates schema/images, and
+                      starts notification flow from those files.
+                    </li>
+                  </ul>
+                </details>
+              </div>
+
+              <div class="settings-section">
+                <details class="platform-guide-item">
+                  <summary id="platformGuideRpcs3Summary">RPCS3</summary>
+                  <ul class="platform-guide-list">
+                    <li id="platformGuideRpcs3Item1">
+                      Watch trophy root:
+                      <code>dev_hdd0\home\&lt;user&gt;\trophy</code>.
+                    </li>
+                    <li id="platformGuideRpcs3Item2">
+                      Runtime updates are detected from
+                      <code>TROPUSR.DAT</code> and
+                      <code>TROPCONF.SFM</code>.
+                    </li>
+                  </ul>
+                </details>
+              </div>
+
+              <div class="settings-section">
+                <details class="platform-guide-item">
+                  <summary id="platformGuideShadps4Summary">
+                    PS4 (shadPS4)
+                  </summary>
+                  <ul class="platform-guide-list">
+                    <li id="platformGuideShadps4Item1">
+                      Watch folder:
+                      <code>%APPDATA%\shadPS4\game_data</code>.
+                    </li>
+                    <li id="platformGuideShadps4Item2">
+                      Trophy discovery and schema generation are based on PS4
+                      trophy files (for example <code>TROP.XML</code>).
+                    </li>
+                  </ul>
+                </details>
+              </div>
+
+              <div class="settings-section">
+                <details class="platform-guide-item">
+                  <summary id="platformGuideLumaSummary">LumaPlay</summary>
+                  <ul class="platform-guide-list">
+                    <li id="platformGuideLumaItem1">
+                      Enable
+                      <strong>Settings → Folders → Enable LumaPlay Watcher</strong>.
+                    </li>
+                    <li id="platformGuideLumaItem2">
+                      Windows only: the app listens for realtime registry events
+                      under <code>HKCU\SOFTWARE\LumaPlay</code>.
+                    </li>
+                    <li id="platformGuideLumaItem3">
+                      The watcher starts only when enabled; if disabled, no
+                      LumaPlay registry watcher process is started.
+                    </li>
+                    <li id="platformGuideLumaItem4">
+                      LumaPlay configs are expected as
+                      <code>platform=uplay</code> and
+                      <code>emu=lumaplay</code>.
+                    </li>
+                  </ul>
+                </details>
+              </div>
+
+              <div class="settings-section">
+                <details class="platform-guide-item">
+                  <summary id="platformGuideConfigRulesSummary">
+                    AppID and config rules
+                  </summary>
+                  <ul class="platform-guide-list">
+                    <li id="platformGuideConfigRulesItem1">
+                      Steam/Uplay/GOG/Steam Official use regular app IDs;
+                      Epic may use numeric or hex-like IDs.
+                    </li>
+                    <li id="platformGuideConfigRulesItem2">
+                      Xenia title IDs are hex and can be provided with or
+                      without the 0x prefix.
+                    </li>
+                    <li id="platformGuideConfigRulesItem3">
+                      RPCS3 expects trophy-set IDs in NP* format (example:
+                      NPWR12345_00).
+                    </li>
+                    <li id="platformGuideConfigRulesItem4">
+                      shadPS4 expects CUSA IDs (example: CUSA12345).
+                    </li>
+                    <li id="platformGuideConfigRulesItem5">
+                      LumaPlay config detection requires platform=uplay and
+                      emu=lumaplay.
+                    </li>
+                  </ul>
+                </details>
+              </div>
+
+              <div class="settings-section">
+                <details class="platform-guide-item">
+                  <summary id="platformGuideRescanSummary">
+                    Rescan vs Regenerate Schema
+                  </summary>
+                  <ul class="platform-guide-list">
+                    <li id="platformGuideRescanItem1">
+                      Regenerate Schema is used for Steam/Uplay/Epic/GOG
+                      schema refresh.
+                    </li>
+                    <li id="platformGuideRescanItem2">
+                      For Xenia, RPCS3, shadPS4 and Steam Official, schema
+                      regenerate is blocked by design.
+                    </li>
+                    <li id="platformGuideRescanItem3">
+                      For those platforms/emulators, use Folders → Rescan to
+                      rebuild from source files.
+                    </li>
+                  </ul>
+                </details>
+              </div>
+
+              <div class="settings-section">
+                <details class="platform-guide-item">
+                  <summary id="platformGuideOnboardingSummary">
+                    Boot onboarding and startup gate
+                  </summary>
+                  <ul class="platform-guide-list">
+                    <li id="platformGuideOnboardingItem1">
+                      On first run (or onboarding version change), startup
+                      waits for folder selection before full scanning.
+                    </li>
+                    <li id="platformGuideOnboardingItem2">
+                      While onboarding is pending, folder watchers are deferred
+                      to avoid unwanted auto-config activity.
+                    </li>
+                    <li id="platformGuideOnboardingItem3">
+                      Reminder messages are emitted periodically (about every
+                      20s by default) until a decision is made.
+                    </li>
+                    <li id="platformGuideOnboardingItem4">
+                      Tray action Resume Startup applies skip-all and mutes all
+                      discovered folders for auto-config.
+                    </li>
+                  </ul>
+                </details>
+              </div>
+
+              <div class="settings-section">
+                <details class="platform-guide-item">
+                  <summary id="platformGuideStateFiltersSummary">
+                    Filters and notification toggles
+                  </summary>
+                  <ul class="platform-guide-list">
+                    <li id="platformGuideStateFiltersItem1">
+                      Ignored folders are stored as blocked watched folders and
+                      are not scanned.
+                    </li>
+                    <li id="platformGuideStateFiltersItem2">
+                      Blacklisted AppIDs are skipped by auto-config and blocked
+                      for schema operations.
+                    </li>
+                    <li id="platformGuideStateFiltersItem3">
+                      Disable Global Progress and per-game progress mute affect
+                      progress notifications only.
+                    </li>
+                    <li id="platformGuideStateFiltersItem4">
+                      Disable Playtime and Disable Platinum control only their
+                      dedicated notification types.
+                    </li>
+                  </ul>
+                </details>
+              </div>
+
+              <div class="settings-section">
+                <details class="platform-guide-item">
+                  <summary id="platformGuideRecoverySummary">
+                    Recovery and temp data
+                  </summary>
+                  <ul class="platform-guide-list">
+                    <li id="platformGuideRecoveryItem1">
+                      Missing watched folders are rechecked periodically
+                      (around 4 seconds).
+                    </li>
+                    <li id="platformGuideRecoveryItem2">
+                      When a missing folder reappears, watcher attach and
+                      follow-up scan are retried automatically.
+                    </li>
+                    <li id="platformGuideRecoveryItem3">
+                      Temporary single-root auto-config folders in OS Temp are
+                      cleaned automatically after generation.
+                    </li>
+                  </ul>
+                </details>
+              </div>
+
+              <div class="settings-section">
+                <details class="platform-guide-item">
+                  <summary id="platformGuideLogsSummary">Useful log tags</summary>
+                  <ul class="platform-guide-list">
+                    <li id="platformGuideLogsItem1">
+                      Watchers: watch-save, watch-save-strict-root,
+                      watch-lumaplay.
+                    </li>
+                    <li id="platformGuideLogsItem2">
+                      Startup flow: boot:onboarding:*.
+                    </li>
+                    <li id="platformGuideLogsItem3">
+                      Initial snapshot evaluation: initial-notify:*.
+                    </li>
+                    <li id="platformGuideLogsItem4">
+                      Auto selection flow: auto-select:*.
+                    </li>
+                    <li id="platformGuideLogsItem5">
+                      Steam Official handling: steam-official:*.
+                    </li>
+                  </ul>
+                </details>
+              </div>
+
+              <div class="settings-section">
+                <details class="platform-guide-item">
+                  <summary id="platformGuideTroubleshootingSummary">
+                    Quick troubleshooting
+                  </summary>
+                  <ul class="platform-guide-list">
+                    <li id="platformGuideTroubleshootingItem1">
+                      Check that the game is not blacklisted and progress
+                      notifications are not muted globally/per-config.
+                    </li>
+                    <li id="platformGuideTroubleshootingItem2">
+                      Verify watched folder paths and confirm the save/trophy
+                      files actually change while playing.
+                    </li>
+                    <li id="platformGuideTroubleshootingItem3">
+                      After moving saves or emulator directories, run
+                      <strong>Rescan</strong> in Folders.
+                    </li>
+                  </ul>
+                </details>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2016,6 +2388,43 @@
         <div class="confirm-actions">
           <button id="appConfirmCancelBtn" type="button">Cancel</button>
           <button id="appConfirmOkBtn" type="button">OK</button>
+        </div>
+      </div>
+    </div>
+    <div
+      id="bootOnboardingModal"
+      class="modal hidden"
+      aria-hidden="true"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="modal-content boot-onboarding-modal">
+        <h3 id="bootOnboardingTitle">Choose folders for Auto-Config</h3>
+        <p id="bootOnboardingMessage">
+          We found folders with achievement data. Select which folders should
+          be scanned automatically.
+        </p>
+        <div
+          id="bootOnboardingList"
+          class="boot-onboarding-list"
+          role="list"
+          tabindex="0"
+          aria-label="Auto-config folder selection"
+        ></div>
+        <p id="bootOnboardingHint" class="boot-onboarding-hint"></p>
+        <div id="bootOnboardingActions" class="confirm-actions">
+          <button id="bootOnboardingSkipBtn" type="button">
+            Skip and mute all
+          </button>
+          <button id="bootOnboardingStartBtn" type="button">
+            Start Auto-Config
+          </button>
+        </div>
+        <div id="bootOnboardingDone" class="hidden">
+          <p id="bootOnboardingDoneMessage"></p>
+          <div class="confirm-actions">
+            <button id="bootOnboardingDoneOkBtn" type="button">OK</button>
+          </div>
         </div>
       </div>
     </div>
@@ -5008,32 +5417,43 @@
           const presetDropdown = document.getElementById("presetDropdown");
           presetDropdown.innerHTML = "";
 
-          // Create category for presets that support scaling above 100%
-          const highScalingGroup = document.createElement("optgroup");
-          highScalingGroup.label = "⭐ Supports 200% Scaling";
+          const defaultPresetsGroup = document.createElement("optgroup");
+          defaultPresetsGroup.label = "Default Presets";
 
-          // Create category for regular presets
-          const regularGroup = document.createElement("optgroup");
-          regularGroup.label = "Standard Presets (100% Max)";
+          const userPresetsGroup = document.createElement("optgroup");
+          userPresetsGroup.label = "Users Presets";
 
           // Check if we have the new structured format or old format
           if (presetsData.isStructured) {
             // Handle new structured format with separate folders
 
-            // Add scalable presets
-            presetsData.scalable.forEach((preset) => {
+            const defaultPresetsList = Array.isArray(
+              presetsData.defaultPresets,
+            )
+              ? presetsData.defaultPresets
+              : Array.isArray(presetsData.scalable)
+                ? presetsData.scalable
+                : [];
+            const userPresetsList = Array.isArray(presetsData.userPresets)
+              ? presetsData.userPresets
+              : Array.isArray(presetsData.nonScalable)
+                ? presetsData.nonScalable
+                : [];
+
+            // Add bundled/default presets
+            defaultPresetsList.forEach((preset) => {
               const option = document.createElement("option");
               option.value = preset;
               option.textContent = preset;
-              highScalingGroup.appendChild(option);
+              defaultPresetsGroup.appendChild(option);
             });
 
-            // Add non-scalable presets
-            presetsData.nonScalable.forEach((preset) => {
+            // Add user presets
+            userPresetsList.forEach((preset) => {
               const option = document.createElement("option");
               option.value = preset;
               option.textContent = preset;
-              regularGroup.appendChild(option);
+              userPresetsGroup.appendChild(option);
             });
           } else {
             // Handle old format for backwards compatibility
@@ -5042,22 +5462,21 @@
               option.value = preset;
               option.textContent = preset;
 
-              // Add presets to their appropriate groups using the old logic
+              // Fallback grouping for flat structures
               if (
                 preset === "Modern" ||
                 preset === "xqjan" ||
                 preset === "Neon Future"
               ) {
-                highScalingGroup.appendChild(option);
+                defaultPresetsGroup.appendChild(option);
               } else {
-                regularGroup.appendChild(option);
+                userPresetsGroup.appendChild(option);
               }
             });
           }
 
-          // Add groups to dropdown with enhanced scaling options first
-          presetDropdown.appendChild(highScalingGroup);
-          presetDropdown.appendChild(regularGroup);
+          presetDropdown.appendChild(defaultPresetsGroup);
+          presetDropdown.appendChild(userPresetsGroup);
         } catch (error) {
           console.error(
             tUi("log.presetsLoadError", "Error loading presets:"),
@@ -6672,14 +7091,31 @@
 
         const dashOverlay = document.getElementById("dashboardOverlay");
         const dashPanel = document.getElementById("dashboardPanel");
+        const onboardingModal = document.getElementById("bootOnboardingModal");
+        const onboardingContent = onboardingModal?.querySelector(".modal-content");
+        const confirmModal = document.getElementById("appConfirmModal");
+        const confirmContent = confirmModal?.querySelector(".modal-content");
+
+        const isOnboardingOpen = () =>
+          !!onboardingModal && !onboardingModal.classList.contains("hidden");
+        const isConfirmOpen = () =>
+          !!confirmModal && !confirmModal.classList.contains("hidden");
 
         const isAnyOpen = () =>
           (!!settingsMenu && !settingsMenu.classList.contains("hidden")) ||
-          (!!dashOverlay && dashOverlay.classList.contains("open"));
+          (!!dashOverlay && dashOverlay.classList.contains("open")) ||
+          isOnboardingOpen() ||
+          isConfirmOpen();
 
         const isInsideOverlay = (t) =>
           (!!settingsContent && t && settingsContent.contains(t)) ||
-          (!!dashPanel && t && dashPanel.contains(t));
+          (!!dashPanel && t && dashPanel.contains(t)) ||
+          (isOnboardingOpen() &&
+            ((!!onboardingContent && t && onboardingContent.contains(t)) ||
+              (!!onboardingModal && t && onboardingModal.contains(t)))) ||
+          (isConfirmOpen() &&
+            ((!!confirmContent && t && confirmContent.contains(t)) ||
+              (!!confirmModal && t && confirmModal.contains(t))));
 
         // — mouse/trackpad/touch
         const wheelBlock = (e) => {
@@ -6738,7 +7174,13 @@
         const dashOpen = document
           .getElementById("dashboardOverlay")
           ?.classList?.contains("open");
-        if (settingsOpen || dashOpen) return;
+        const onboardingOpen = !document
+          .getElementById("bootOnboardingModal")
+          ?.classList.contains("hidden");
+        const confirmOpen = !document
+          .getElementById("appConfirmModal")
+          ?.classList.contains("hidden");
+        if (settingsOpen || dashOpen || onboardingOpen || confirmOpen) return;
 
         if (!__scrollBlockersOn || !window.___bgScrollGuards) return;
         __scrollBlockersOn = false;
@@ -7936,6 +8378,7 @@
           "appSettingsDontHide",
           "titlebar",
           "appConfirmModal",
+          "bootOnboardingModal",
         ]);
 
         Array.from(document.body.children).forEach((el) => {
@@ -10057,6 +10500,10 @@
             .getElementById("settingsMenu")
             ?.classList.contains("hidden");
           if (settingsOpen) return;
+          const onboardingOpen = !document
+            .getElementById("bootOnboardingModal")
+            ?.classList.contains("hidden");
+          if (onboardingOpen) return;
           closeDashboard();
         });
 
@@ -10127,6 +10574,376 @@
         if (window.__dashboardShowOnStart === undefined) {
           window.__dashboardShowOnStart = null;
         }
+        const bootOnboardingModal = document.getElementById(
+          "bootOnboardingModal",
+        );
+        const bootOnboardingTitle = document.getElementById(
+          "bootOnboardingTitle",
+        );
+        const bootOnboardingMessage = document.getElementById(
+          "bootOnboardingMessage",
+        );
+        const bootOnboardingList = document.getElementById(
+          "bootOnboardingList",
+        );
+        const bootOnboardingHint = document.getElementById("bootOnboardingHint");
+        const bootOnboardingActions = document.getElementById(
+          "bootOnboardingActions",
+        );
+        const bootOnboardingStartBtn = document.getElementById(
+          "bootOnboardingStartBtn",
+        );
+        const bootOnboardingSkipBtn = document.getElementById(
+          "bootOnboardingSkipBtn",
+        );
+        const bootOnboardingDone = document.getElementById(
+          "bootOnboardingDone",
+        );
+        const bootOnboardingDoneMessage = document.getElementById(
+          "bootOnboardingDoneMessage",
+        );
+        const bootOnboardingDoneOkBtn = document.getElementById(
+          "bootOnboardingDoneOkBtn",
+        );
+        let bootOnboardingPromptActive = false;
+        let bootOnboardingPromptDone = false;
+        let bootOnboardingBusy = false;
+        let bootOnboardingCandidates = [];
+        let bootOnboardingLastFocus = null;
+        const BOOT_ONBOARDING_SEARCH_STAGE_MIN_MS = 900;
+        const BOOT_ONBOARDING_POST_RESULT_DELAY_MS = 280;
+        const BOOT_ONBOARDING_EMPTY_STAGE_DELAY_MS = 750;
+        const waitOnboardingDelay = (ms) =>
+          ms > 0
+            ? new Promise((resolve) => setTimeout(resolve, ms))
+            : Promise.resolve();
+
+        const setBootOnboardingModalVisible = (visible) => {
+          if (!bootOnboardingModal) return;
+          if (visible) {
+            bootOnboardingLastFocus = document.activeElement;
+            bootOnboardingModal.classList.remove("hidden");
+            bootOnboardingModal.setAttribute("aria-hidden", "false");
+            document.body.classList.add("modal-open");
+            return;
+          }
+          bootOnboardingModal.classList.add("hidden");
+          bootOnboardingModal.setAttribute("aria-hidden", "true");
+          document.body.classList.remove("modal-open");
+          if (
+            bootOnboardingLastFocus &&
+            typeof bootOnboardingLastFocus.focus === "function"
+          ) {
+            try {
+              bootOnboardingLastFocus.focus({ preventScroll: true });
+            } catch {}
+          }
+          bootOnboardingLastFocus = null;
+        };
+
+        const setBootOnboardingBusy = (busy) => {
+          bootOnboardingBusy = busy === true;
+          if (bootOnboardingStartBtn) bootOnboardingStartBtn.disabled = busy;
+          if (bootOnboardingSkipBtn) bootOnboardingSkipBtn.disabled = busy;
+        };
+
+        const renderBootOnboardingSearchingState = () => {
+          if (!bootOnboardingList) return;
+          bootOnboardingList.innerHTML = "";
+          const searching = document.createElement("div");
+          searching.className = "boot-onboarding-hint";
+          searching.textContent = tUi(
+            "boot.onboarding.searching",
+            "Searching folders…",
+          );
+          bootOnboardingList.appendChild(searching);
+        };
+
+        const onboardingSignalLabel = (id) => {
+          const key = String(id || "").trim();
+          if (!key) return "";
+          const map = {
+            "achievements-json": "achievements.json",
+            "achievements-ini": "achievements.ini",
+            "stats-bin": "stats.bin",
+            "user-stats-ini": "user_stats.ini",
+            "xenia-gpd": ".gpd",
+            "rpcs3-trophy": "tropusr.dat/tropconf.sfm",
+            "ps4-trophy": "trop.xml",
+            "steam-official-bin": "UserGameStatsSchema_*.bin",
+            "tenoke-ini": "tenoke.ini",
+            "gog-info": "*.info",
+          };
+          return map[key] || key;
+        };
+
+        const renderBootOnboardingCandidates = (candidates) => {
+          if (!bootOnboardingList) return;
+          bootOnboardingList.innerHTML = "";
+          const list = Array.isArray(candidates) ? candidates : [];
+          if (!list.length) {
+            const empty = document.createElement("div");
+            empty.className = "boot-onboarding-hint";
+            empty.textContent = tUi(
+              "boot.onboarding.empty",
+              "No folders with known achievement files were discovered.",
+            );
+            bootOnboardingList.appendChild(empty);
+            return;
+          }
+          for (const candidate of list) {
+            const pathValue = String(candidate?.path || "").trim();
+            if (!pathValue) continue;
+            const row = document.createElement("label");
+            row.className = "boot-onboarding-row";
+            row.setAttribute("role", "listitem");
+
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.value = pathValue;
+            checkbox.checked = candidate?.blocked !== true;
+
+            const main = document.createElement("span");
+            main.className = "boot-onboarding-row-main";
+
+            const pathEl = document.createElement("span");
+            pathEl.className = "boot-onboarding-path";
+            pathEl.textContent = pathValue;
+
+            const meta = document.createElement("span");
+            meta.className = "boot-onboarding-meta";
+            const signals = Array.isArray(candidate?.signals)
+              ? candidate.signals.map(onboardingSignalLabel).filter(Boolean)
+              : [];
+            const tags = [];
+            if (candidate?.recommended) {
+              tags.push(
+                `<span class="recommended">${tUi(
+                  "boot.onboarding.recommended",
+                  "Recommended",
+                )}</span>`,
+              );
+            }
+            if (candidate?.blocked) {
+              tags.push(
+                `<span class="muted">${tUi(
+                  "boot.onboarding.muted",
+                  "Muted currently",
+                )}</span>`,
+              );
+            }
+            if (signals.length) tags.push(signals.join(", "));
+            meta.innerHTML = tags.join(" • ");
+
+            main.append(pathEl, meta);
+            row.append(checkbox, main);
+            bootOnboardingList.appendChild(row);
+          }
+        };
+
+        const getBootOnboardingSelectedPaths = () => {
+          if (!bootOnboardingList) return [];
+          const checked = Array.from(
+            bootOnboardingList.querySelectorAll('input[type="checkbox"]:checked'),
+          );
+          return checked
+            .map((input) => String(input?.value || "").trim())
+            .filter(Boolean);
+        };
+
+        const showBootOnboardingCompletion = (messageText) => {
+          if (bootOnboardingActions) bootOnboardingActions.classList.add("hidden");
+          if (bootOnboardingDone) bootOnboardingDone.classList.remove("hidden");
+          if (bootOnboardingDoneMessage) {
+            bootOnboardingDoneMessage.textContent = messageText || "";
+          }
+          if (bootOnboardingHint) bootOnboardingHint.textContent = "";
+          if (bootOnboardingDoneOkBtn) {
+            setTimeout(() => bootOnboardingDoneOkBtn.focus(), 0);
+          }
+        };
+
+        const finalizeBootOnboardingSkipAll = async (options = {}) => {
+          const { showCompletion = true, closeModalOnSuccess = false } =
+            options || {};
+          setBootOnboardingBusy(true);
+          let result = null;
+          try {
+            result = await window.api.skipBootOnboarding();
+          } catch (err) {
+            result = { ok: false, error: err?.message || String(err) };
+          }
+          if (!result?.ok) {
+            if (bootOnboardingHint) {
+              bootOnboardingHint.textContent =
+                result?.error ||
+                tUi(
+                  "boot.onboarding.skipFailed",
+                  "Failed to skip onboarding.",
+                );
+            }
+            setBootOnboardingBusy(false);
+            return result;
+          }
+          bootOnboardingPromptDone = true;
+          if (showCompletion) {
+            showBootOnboardingCompletion(
+              tUi(
+                "boot.onboarding.skippedDone",
+                "Auto-config was skipped. Discovered folders were muted.",
+              ),
+            );
+          } else if (closeModalOnSuccess) {
+            setBootOnboardingModalVisible(false);
+          }
+          try {
+            window.refreshFoldersList?.();
+          } catch {}
+          setBootOnboardingBusy(false);
+          return result;
+        };
+
+        const runBootOnboardingFlow = async () => {
+          if (bootOnboardingPromptActive || bootOnboardingPromptDone) return;
+          if (!window.api?.getBootOnboardingState) {
+            bootOnboardingPromptDone = true;
+            return;
+          }
+          bootOnboardingPromptActive = true;
+          let state = null;
+          try {
+            state = await window.api.getBootOnboardingState();
+          } catch {}
+          if (!state?.required) {
+            bootOnboardingPromptDone = true;
+            bootOnboardingPromptActive = false;
+            return;
+          }
+          if (
+            !bootOnboardingModal ||
+            !bootOnboardingList ||
+            !bootOnboardingStartBtn ||
+            !bootOnboardingSkipBtn
+          ) {
+            try {
+              await window.api.skipBootOnboarding?.();
+            } catch {}
+            bootOnboardingPromptDone = true;
+            bootOnboardingPromptActive = false;
+            return;
+          }
+          if (bootOnboardingTitle) {
+            bootOnboardingTitle.textContent = tUi(
+              "boot.onboarding.title",
+              "Choose folders for Auto-Config",
+            );
+          }
+          if (bootOnboardingMessage) {
+            bootOnboardingMessage.textContent = tUi(
+              "boot.onboarding.message",
+              "We found folders with achievement data. Select which folders should be scanned automatically.",
+            );
+          }
+          if (bootOnboardingActions) {
+            bootOnboardingActions.classList.remove("hidden");
+          }
+          if (bootOnboardingDone) bootOnboardingDone.classList.add("hidden");
+          if (bootOnboardingStartBtn) {
+            bootOnboardingStartBtn.textContent = tUi(
+              "boot.onboarding.start",
+              "Start Auto-Config",
+            );
+          }
+          if (bootOnboardingSkipBtn) {
+            bootOnboardingSkipBtn.textContent = tUi(
+              "boot.onboarding.skip",
+              "Skip and mute all",
+            );
+          }
+          if (bootOnboardingDoneOkBtn) {
+            bootOnboardingDoneOkBtn.textContent = tUi(
+              "boot.onboarding.ok",
+              "OK",
+            );
+          }
+          if (bootOnboardingHint) {
+            bootOnboardingHint.textContent = "";
+          }
+          setBootOnboardingModalVisible(true);
+          setBootOnboardingBusy(true);
+          renderBootOnboardingSearchingState();
+          const discoveryStartedAt = Date.now();
+          let discovery = null;
+          try {
+            discovery = await window.api.discoverBootOnboardingFolders?.();
+          } catch (err) {
+            discovery = { ok: false, candidates: [], error: err?.message };
+          }
+          const discoveryElapsedMs = Date.now() - discoveryStartedAt;
+          if (discoveryElapsedMs < BOOT_ONBOARDING_SEARCH_STAGE_MIN_MS) {
+            await waitOnboardingDelay(
+              BOOT_ONBOARDING_SEARCH_STAGE_MIN_MS - discoveryElapsedMs,
+            );
+          }
+          if (bootOnboardingPromptDone) {
+            bootOnboardingPromptActive = false;
+            return;
+          }
+          bootOnboardingCandidates = Array.isArray(discovery?.candidates)
+            ? discovery.candidates
+            : [];
+          renderBootOnboardingCandidates(bootOnboardingCandidates);
+          if (bootOnboardingHint) {
+            if (!discovery?.ok) {
+              bootOnboardingHint.textContent = tUi(
+                "boot.onboarding.searchFailed",
+                "Folder search failed. You can skip and continue.",
+              );
+            } else if (!bootOnboardingCandidates.length) {
+              bootOnboardingHint.textContent = tUi(
+                "boot.onboarding.noCandidates",
+                "No candidate folders found. Continue to app.",
+              );
+              await waitOnboardingDelay(BOOT_ONBOARDING_EMPTY_STAGE_DELAY_MS);
+              const autoSkipResult = await finalizeBootOnboardingSkipAll({
+                showCompletion: false,
+                closeModalOnSuccess: true,
+              });
+              if (autoSkipResult?.ok) {
+                showNotification(
+                  tUi(
+                    "boot.onboarding.autoSkippedNoCandidates",
+                    "No candidate folders were found. Auto-config was skipped.",
+                  ),
+                  "#4CAF50",
+                );
+                bootOnboardingPromptActive = false;
+                return;
+              }
+            } else {
+              const count = bootOnboardingCandidates.length;
+              bootOnboardingHint.textContent = tUiFmt(
+                "boot.onboarding.foundCount",
+                { count: String(count) },
+                `Found ${count} folder(s).`,
+              );
+              await waitOnboardingDelay(BOOT_ONBOARDING_POST_RESULT_DELAY_MS);
+            }
+          }
+          setBootOnboardingBusy(false);
+          if (bootOnboardingStartBtn) {
+            setTimeout(() => bootOnboardingStartBtn.focus(), 0);
+          }
+        };
+
+        const maybeStartBootOnboarding = () => {
+          if (bootOnboardingPromptDone || bootOnboardingPromptActive) return;
+          if (document.body.classList.contains("booting")) return;
+          runBootOnboardingFlow().catch(() => {
+            bootOnboardingPromptActive = false;
+          });
+        };
+
         const maybeHideBootLoading = () => {
           if (bootNoticeShown) return;
           if (!window.__uiDataReady) return;
@@ -10135,6 +10952,7 @@
           try {
             window.api?.bootOverlayHidden?.();
           } catch {}
+          maybeStartBootOnboarding();
           window.__maybeOpenStartupDashboard?.();
         };
         window.__maybeHideBootLoading = maybeHideBootLoading;
@@ -10164,10 +10982,12 @@
             window.__prepareDashboardForStartup?.();
             window.__markUiDataReady?.();
             maybeHideBootLoading();
+            maybeStartBootOnboarding();
           })
           .catch(() => {});
         window.api?.on?.("boot:ui-ready", () => {
           window.__bootUiReady = true;
+          maybeStartBootOnboarding();
         });
         window.api?.on?.("boot:complete", () => {
           window.__bootDone = true;
@@ -10177,6 +10997,166 @@
           );
           window.__prepareDashboardForStartup?.();
           window.__markUiDataReady?.();
+          maybeStartBootOnboarding();
+        });
+        window.api?.on?.("boot:onboarding:show", () => {
+          maybeStartBootOnboarding();
+        });
+        window.api?.on?.("boot:onboarding:done", () => {
+          bootOnboardingPromptDone = true;
+          bootOnboardingPromptActive = false;
+        });
+        window.api?.on?.("boot:onboarding:attention", (payload = {}) => {
+          if (bootOnboardingPromptDone) return;
+          maybeStartBootOnboarding();
+          const waitedMs = Math.max(0, Number(payload?.waitedMs || 0) || 0);
+          const waitedSec = Math.max(1, Math.round(waitedMs / 1000));
+          const hintText = tUiFmt(
+            "boot.onboarding.attention",
+            { seconds: String(waitedSec) },
+            `Startup is waiting for your folder selection (${waitedSec}s).`,
+          );
+          if (
+            bootOnboardingModal &&
+            !bootOnboardingModal.classList.contains("hidden") &&
+            bootOnboardingHint &&
+            !bootOnboardingBusy
+          ) {
+            bootOnboardingHint.textContent = hintText;
+            return;
+          }
+          if (
+            bootOnboardingModal &&
+            bootOnboardingPromptActive &&
+            bootOnboardingModal.classList.contains("hidden")
+          ) {
+            setBootOnboardingModalVisible(true);
+            if (bootOnboardingHint && !bootOnboardingBusy) {
+              bootOnboardingHint.textContent = hintText;
+            }
+          }
+        });
+        window.api?.on?.("boot:onboarding:error", (payload = {}) => {
+          const message =
+            payload?.message ||
+            tUi("boot.onboarding.error", "Boot onboarding error.");
+          if (
+            bootOnboardingModal &&
+            !bootOnboardingModal.classList.contains("hidden") &&
+            bootOnboardingHint
+          ) {
+            bootOnboardingHint.textContent = message;
+          }
+          showNotification(message, "#ff9800");
+        });
+        if (bootOnboardingStartBtn) {
+          bootOnboardingStartBtn.addEventListener("click", async () => {
+            if (bootOnboardingBusy) return;
+            setBootOnboardingBusy(true);
+            const selectedPaths = getBootOnboardingSelectedPaths();
+            let result = null;
+            try {
+              result = await window.api.applyBootOnboardingSelection(
+                selectedPaths,
+              );
+            } catch (err) {
+              result = { ok: false, error: err?.message || String(err) };
+            }
+            if (!result?.ok) {
+              if (bootOnboardingHint) {
+                bootOnboardingHint.textContent =
+                  result?.error ||
+                  tUi(
+                    "boot.onboarding.applyFailed",
+                    "Failed to apply folder selection.",
+                  );
+              }
+              setBootOnboardingBusy(false);
+              return;
+            }
+            const message =
+              selectedPaths.length > 0
+                ? tUiFmt(
+                    "boot.onboarding.startedWithCount",
+                    { count: String(selectedPaths.length) },
+                    `Auto-Config started in background for ${selectedPaths.length} folder(s). Games will appear after config creation.`,
+                  )
+                : tUi(
+                    "boot.onboarding.startedMuted",
+                    "No folders selected. All discovered folders were muted for auto-config.",
+                  );
+            bootOnboardingPromptDone = true;
+            showBootOnboardingCompletion(message);
+            try {
+              window.refreshFoldersList?.();
+            } catch {}
+            setBootOnboardingBusy(false);
+          });
+        }
+        if (bootOnboardingSkipBtn) {
+          bootOnboardingSkipBtn.addEventListener("click", async () => {
+            if (bootOnboardingBusy) return;
+            await finalizeBootOnboardingSkipAll({
+              showCompletion: true,
+              closeModalOnSuccess: false,
+            });
+          });
+        }
+        if (bootOnboardingDoneOkBtn) {
+          bootOnboardingDoneOkBtn.addEventListener("click", () => {
+            setBootOnboardingModalVisible(false);
+          });
+        }
+        if (bootOnboardingList) {
+          bootOnboardingList.addEventListener("keydown", (event) => {
+            if (
+              !bootOnboardingModal ||
+              bootOnboardingModal.classList.contains("hidden")
+            ) {
+              return;
+            }
+            const scrollable =
+              bootOnboardingList.scrollHeight >
+              bootOnboardingList.clientHeight + 2;
+            if (!scrollable) return;
+            if (event.key === "PageDown") {
+              event.preventDefault();
+              event.stopPropagation();
+              bootOnboardingList.scrollTop +=
+                Math.max(120, Math.round(bootOnboardingList.clientHeight * 0.9));
+              return;
+            }
+            if (event.key === "PageUp") {
+              event.preventDefault();
+              event.stopPropagation();
+              bootOnboardingList.scrollTop -=
+                Math.max(120, Math.round(bootOnboardingList.clientHeight * 0.9));
+              return;
+            }
+            if (event.key === "Home") {
+              event.preventDefault();
+              event.stopPropagation();
+              bootOnboardingList.scrollTop = 0;
+              return;
+            }
+            if (event.key === "End") {
+              event.preventDefault();
+              event.stopPropagation();
+              bootOnboardingList.scrollTop = bootOnboardingList.scrollHeight;
+            }
+          });
+        }
+        document.addEventListener("keydown", (event) => {
+          if (
+            !bootOnboardingModal ||
+            bootOnboardingModal.classList.contains("hidden")
+          ) {
+            return;
+          }
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+          }
         });
         window.api?.on?.("boot:manual-seed-complete", () => {
           window.__bootManualSeedComplete = true;
@@ -10983,6 +11963,11 @@
             );
           } else if (overlay === "dashboard") {
             candidates.push(document.getElementById("dashboardBody"));
+          } else if (overlay === "onboarding") {
+            const modal = document
+              .getElementById("bootOnboardingModal")
+              ?.querySelector(".modal-content");
+            if (modal) candidates.push(modal);
           } else if (overlay === "config") {
             const modal = document
               .getElementById("configModal")
@@ -11308,7 +12293,10 @@
           const settings = byId("settingsMenu");
           const dashboard = byId("dashboardOverlay");
           const config = byId("configModal");
+          const onboarding = byId("bootOnboardingModal");
           const confirm = byId("appConfirmModal");
+          if (onboarding && !onboarding.classList.contains("hidden"))
+            return "onboarding";
           if (confirm && !confirm.classList.contains("hidden"))
             return "confirm";
           if (settings && !settings.classList.contains("hidden"))
@@ -11536,6 +12524,9 @@
         }
         function backOrClose() {
           const overlay = getActiveOverlaySafe();
+          if (overlay === "onboarding") {
+            return;
+          }
           if (overlay === "settings") {
             const mode = (window.__settingsMode ?? __settingsMode) || "tabs";
             if (mode === "section") {
@@ -11680,6 +12671,35 @@
               window.moveDashboardContextMenuFocus?.(1);
               return;
             }
+          }
+          if (overlay === "onboarding") {
+            const onboardingModal = document.getElementById("bootOnboardingModal");
+            if (action === A.BACK) {
+              return;
+            }
+            if (action === A.CONFIRM) {
+              const active = document.activeElement;
+              if (active && typeof active.click === "function") {
+                active.click();
+                return;
+              }
+              const startBtn = document.getElementById("bootOnboardingStartBtn");
+              startBtn?.click();
+              return;
+            }
+            if (
+              action === A.LEFT ||
+              action === A.RIGHT ||
+              action === A.UP ||
+              action === A.DOWN
+            ) {
+              moveFocus(
+                onboardingModal,
+                action === A.LEFT || action === A.UP ? -1 : 1,
+              );
+              return;
+            }
+            return;
           }
           if (overlay === "confirm") {
             if (action === A.BACK) {
