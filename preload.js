@@ -75,7 +75,7 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("new-achievement", (event, data) => callback(data)),
   onRefreshAchievementsTable: (callback) =>
     ipcRenderer.on("refresh-achievements-table", (event, data) =>
-      callback(data)
+      callback(data),
     ),
 
   // Update the configuration (now uses the 'update-config' event)
@@ -126,7 +126,7 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("platinum:manual", payload),
   onAchievementsMissing: (callback) =>
     ipcRenderer.on("achievements-missing", (e, configName) =>
-      callback(configName)
+      callback(configName),
     ),
   logCoverEvent: (level, message, meta) =>
     ipcRenderer.invoke("covers:ui-log", { level, message, meta }),
@@ -149,8 +149,6 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.send("window:set-position", { x, y }),
   setOverlayDragRegionHeight: (height) =>
     ipcRenderer.send("overlay:drag-region", { height }),
-  overlayVisibleAck: (payload) =>
-    ipcRenderer.send("overlay:visible-ack", payload),
   requestOverlayFocus: () => ipcRenderer.send("overlay:request-focus"),
   // language
   refreshUILanguage: (language) =>

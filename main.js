@@ -309,8 +309,9 @@ function copyProgressTemplateToUserPresetsOnce() {
     "users",
   ).map((root) => path.join(root, "Progress", "progress.html"));
   const sourcePath =
-    usersPresetProgressCandidates.find((candidate) => fs.existsSync(candidate)) ||
-    bundledSourcePath;
+    usersPresetProgressCandidates.find((candidate) =>
+      fs.existsSync(candidate),
+    ) || bundledSourcePath;
 
   try {
     if (!fs.existsSync(sourcePath)) {
@@ -395,7 +396,8 @@ function resolveNotificationPresetFolder(presetName) {
   }
 
   return {
-    presetFolder: candidates.find((folder) => fs.existsSync(folder)) || oldStyleFolder,
+    presetFolder:
+      candidates.find((folder) => fs.existsSync(folder)) || oldStyleFolder,
     requestedPreset: requested,
   };
 }
@@ -1479,13 +1481,20 @@ function setOverlayPresented(next) {
     try {
       overlayWindow.setFocusable(false);
     } catch {}
-    ensureOverlayVisibleInactive("set-overlay-presented");
-    sendOverlayVisibilitySignal(true);
+    try {
+      if (!overlayWindow.isVisible()) {
+        if (typeof overlayWindow.showInactive === "function") {
+          overlayWindow.showInactive();
+        } else {
+          // overlayWindow.show();
+        }
+      }
+    } catch {}
+    try {
+      overlayWindow.webContents.send("overlay:set-visible", { visible: true });
+    } catch {}
     applyOverlayInteractShortcutRegistration();
     applyOverlayKeyboardScrollShortcutRegistration();
-    if (overlayUpdatePendingWhileHidden) {
-      pushOverlayDataUpdate({ force: true });
-    }
     return;
   }
 
@@ -1494,7 +1503,9 @@ function setOverlayPresented(next) {
   clearOverlayInteractShortcut();
   clearOverlayKeyboardScrollShortcuts();
   stopOverlayGlobalDrag();
-  sendOverlayVisibilitySignal(false);
+  try {
+    overlayWindow.webContents.send("overlay:set-visible", { visible: false });
+  } catch {}
   try {
     overlayWindow.setIgnoreMouseEvents(true, { forward: true });
   } catch {}
@@ -1949,7 +1960,9 @@ function applyPreferenceSideEffects(
     let selectedIsLumaPlay = false;
     try {
       const safeConfig = sanitizeConfigName(selectedConfig || "");
-      const cfgPath = safeConfig ? path.join(configsDir, `${safeConfig}.json`) : "";
+      const cfgPath = safeConfig
+        ? path.join(configsDir, `${safeConfig}.json`)
+        : "";
       if (cfgPath && fs.existsSync(cfgPath)) {
         const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
         selectedIsLumaPlay = isLumaPlayConfig(cfg);
@@ -3253,8 +3266,7 @@ ipcMain.handle("load-saved-achievements", async (_event, configName) => {
         const parsed = readLumaPlayAchievementsSnapshot({
           appid: String(config?.appid || ""),
           configPath: config?.config_path || "",
-          preferredUser:
-            config?.lumaplay_user || config?.lumaplayUser || "",
+          preferredUser: config?.lumaplay_user || config?.lumaplayUser || "",
           previousSnapshot: cached,
         });
         if (parsed?.user && parsed.user !== config?.lumaplay_user) {
@@ -3904,7 +3916,13 @@ ipcMain.handle("schema:regenerate", async (event, payload) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send("refresh-achievements-table", safeName);
       }
-      pushOverlayDataUpdate({ configName: safeName });
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.webContents.send("load-overlay-data", safeName);
+        overlayWindow.webContents.send("set-language", {
+          language: selectedLanguage,
+          uiLanguage: selectedUiLanguage,
+        });
+      }
       return {
         success: true,
         message: tUi("main.message.schemaRegenerateSuccess"),
@@ -4693,7 +4711,13 @@ ipcMain.on("show-notification", async (_event, achievement) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("refresh-achievements-table", selectedConfig);
     }
-    pushOverlayDataUpdate();
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+      overlayWindow.webContents.send("set-language", {
+        language: selectedLanguage,
+        uiLanguage: selectedUiLanguage,
+      });
+    }
   } else {
     notifyError(tUi("main.notify.achievement.syntaxInvalid"));
   }
@@ -4863,7 +4887,10 @@ ipcMain.handle("load-presets", async () => {
   if (!fs.existsSync(userPresetsFolder)) return [];
 
   try {
-    const defaultPresetRoots = getPresetCategoryRoots(userPresetsFolder, "default");
+    const defaultPresetRoots = getPresetCategoryRoots(
+      userPresetsFolder,
+      "default",
+    );
     const userPresetRoots = getPresetCategoryRoots(userPresetsFolder, "users");
 
     const listPresetDirs = (roots, options = {}) => {
@@ -5597,7 +5624,9 @@ async function loadPreviousAchievements(configName, platform = "steam") {
   try {
     const normalizedPlatform = normalizePlatform(platform) || "steam";
     const safeName = sanitizeConfigName(configName || "");
-    const configPath = safeName ? path.join(configsDir, `${safeName}.json`) : "";
+    const configPath = safeName
+      ? path.join(configsDir, `${safeName}.json`)
+      : "";
     if (configPath && fs.existsSync(configPath)) {
       const cfg = JSON.parse(fs.readFileSync(configPath, "utf8"));
       const candidates = [];
@@ -5899,8 +5928,7 @@ async function monitorAchievementsFile(filePath) {
     String(filePath || "")
       .toLowerCase()
       .startsWith("usergamestats_");
-  const isLumaPlay =
-    isLumaPlayConfig(configMeta) && isLumaPlayWatcherEnabled();
+  const isLumaPlay = isLumaPlayConfig(configMeta) && isLumaPlayWatcherEnabled();
   try {
     if (
       fullAchievementsConfigPath &&
@@ -6201,7 +6229,13 @@ async function monitorAchievementsFile(filePath) {
           queueAchievementNotification(notificationData);
 
           mainWindow.webContents.send("refresh-achievements-table");
-          pushOverlayDataUpdate();
+          if (overlayWindow && !overlayWindow.isDestroyed()) {
+            overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+            overlayWindow.webContents.send("set-language", {
+              language: selectedLanguage,
+              uiLanguage: selectedUiLanguage,
+            });
+          }
         }
       }
       const stillLocked = !(current?.earned === true || current?.earned === 1);
@@ -6242,7 +6276,13 @@ async function monitorAchievementsFile(filePath) {
           }
 
           mainWindow.webContents.send("refresh-achievements-table");
-          pushOverlayDataUpdate();
+          if (overlayWindow && !overlayWindow.isDestroyed()) {
+            overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+            overlayWindow.webContents.send("set-language", {
+              language: selectedLanguage,
+              uiLanguage: selectedUiLanguage,
+            });
+          }
         }
       }
     });
@@ -6268,7 +6308,13 @@ async function monitorAchievementsFile(filePath) {
   achievementsWatcher = () => processSnapshot(false);
   const refreshAchievementsUi = () => {
     mainWindow.webContents.send("refresh-achievements-table");
-    pushOverlayDataUpdate();
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+      overlayWindow.webContents.send("set-language", {
+        language: selectedLanguage,
+        uiLanguage: selectedUiLanguage,
+      });
+    }
   };
 
   if (isLumaPlay) {
@@ -6413,7 +6459,13 @@ ipcMain.on(
       selectedConfig = null;
       selectedPlatform = null;
 
-      pushOverlayDataUpdate();
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+        overlayWindow.webContents.send("set-language", {
+          language: selectedLanguage,
+          uiLanguage: selectedUiLanguage,
+        });
+      }
       return;
     }
 
@@ -6461,7 +6513,13 @@ ipcMain.on(
         stopActiveLumaPlayRegistryWatcher();
         achievementsFilePath = null;
         monitorAchievementsFile(null);
-        pushOverlayDataUpdate();
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+          overlayWindow.webContents.send("set-language", {
+            language: selectedLanguage,
+            uiLanguage: selectedUiLanguage,
+          });
+        }
         return;
       }
       achievementsFilePath = `lumaplay:${appid || "unknown"}`;
@@ -6469,7 +6527,13 @@ ipcMain.on(
         pendingMissingAchievementFiles.delete(configName);
       }
       monitorAchievementsFile(achievementsFilePath);
-      pushOverlayDataUpdate();
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+        overlayWindow.webContents.send("set-language", {
+          language: selectedLanguage,
+          uiLanguage: selectedUiLanguage,
+        });
+      }
       return;
     }
     if (normalizedPlatform === "xenia") {
@@ -6484,14 +6548,26 @@ ipcMain.on(
           configName,
           reason: "no-gpd",
         });
-        pushOverlayDataUpdate();
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+          overlayWindow.webContents.send("set-language", {
+            language: selectedLanguage,
+            uiLanguage: selectedUiLanguage,
+          });
+        }
         return;
       }
       if (isNonEmptyString(configName)) {
         pendingMissingAchievementFiles.delete(configName);
       }
       monitorAchievementsFile(achievementsFilePath);
-      pushOverlayDataUpdate();
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+        overlayWindow.webContents.send("set-language", {
+          language: selectedLanguage,
+          uiLanguage: selectedUiLanguage,
+        });
+      }
       return;
     }
     if (normalizedPlatform === "rpcs3") {
@@ -6507,14 +6583,26 @@ ipcMain.on(
           configName,
           reason: "no-tropusr",
         });
-        pushOverlayDataUpdate();
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+          overlayWindow.webContents.send("set-language", {
+            language: selectedLanguage,
+            uiLanguage: selectedUiLanguage,
+          });
+        }
         return;
       }
       if (isNonEmptyString(configName)) {
         pendingMissingAchievementFiles.delete(configName);
       }
       monitorAchievementsFile(achievementsFilePath);
-      pushOverlayDataUpdate();
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+        overlayWindow.webContents.send("set-language", {
+          language: selectedLanguage,
+          uiLanguage: selectedUiLanguage,
+        });
+      }
       return;
     }
     if (normalizedPlatform === "shadps4") {
@@ -6531,14 +6619,26 @@ ipcMain.on(
           configName,
           reason: "no-tropxml",
         });
-        pushOverlayDataUpdate();
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+          overlayWindow.webContents.send("set-language", {
+            language: selectedLanguage,
+            uiLanguage: selectedUiLanguage,
+          });
+        }
         return;
       }
       if (isNonEmptyString(configName)) {
         pendingMissingAchievementFiles.delete(configName);
       }
       monitorAchievementsFile(achievementsFilePath);
-      pushOverlayDataUpdate();
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+        overlayWindow.webContents.send("set-language", {
+          language: selectedLanguage,
+          uiLanguage: selectedUiLanguage,
+        });
+      }
       return;
     }
 
@@ -6556,14 +6656,26 @@ ipcMain.on(
           configName,
           reason: "no-usergamestats",
         });
-        pushOverlayDataUpdate();
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+          overlayWindow.webContents.send("set-language", {
+            language: selectedLanguage,
+            uiLanguage: selectedUiLanguage,
+          });
+        }
         return;
       }
       if (isNonEmptyString(configName)) {
         pendingMissingAchievementFiles.delete(configName);
       }
       monitorAchievementsFile(achievementsFilePath);
-      pushOverlayDataUpdate();
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+        overlayWindow.webContents.send("set-language", {
+          language: selectedLanguage,
+          uiLanguage: selectedUiLanguage,
+        });
+      }
       return;
     }
 
@@ -6572,7 +6684,13 @@ ipcMain.on(
       currentAppId = appid || null;
       achievementsFilePath = null; // we watch via renderer requests; overlay uses config path data
       monitorAchievementsFile(null);
-      pushOverlayDataUpdate();
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+        overlayWindow.webContents.send("set-language", {
+          language: selectedLanguage,
+          uiLanguage: selectedUiLanguage,
+        });
+      }
       return;
     }
 
@@ -6583,7 +6701,13 @@ ipcMain.on(
         configName,
         reason: "no-save-path",
       });
-      pushOverlayDataUpdate();
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+        overlayWindow.webContents.send("set-language", {
+          language: selectedLanguage,
+          uiLanguage: selectedUiLanguage,
+        });
+      }
       return;
     }
     if (selectedConfigPath) {
@@ -6659,7 +6783,13 @@ ipcMain.on(
 
     monitorAchievementsFile(achievementsFilePath);
 
-    pushOverlayDataUpdate();
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+      overlayWindow.webContents.send("set-language", {
+        language: selectedLanguage,
+        uiLanguage: selectedUiLanguage,
+      });
+    }
   },
 );
 
@@ -7033,171 +7163,10 @@ let overlayDragHook = null;
 let overlayDragHookStarted = false;
 let overlayDragHookInitAttempted = false;
 let overlayDragHookBootWaitTimer = null;
-let overlayUpdatePendingWhileHidden = false;
-let overlayPendingConfigName = undefined;
-let overlayShowInactiveRetryTimer = null;
-let overlayShowInactiveAttempts = 0;
-let overlayVisibilityAckTimer = null;
-let overlayVisibilityAckSeq = 0;
-let overlayVisibilityAckedSeq = 0;
-let overlaySuppressClosedReset = false;
-const OVERLAY_SHOW_INACTIVE_MAX_ATTEMPTS = 5;
-const OVERLAY_SHOW_INACTIVE_RETRY_MS = 120;
-const OVERLAY_VISIBILITY_ACK_TIMEOUT_MS = 700;
 const POST_BOOT_UI_INITIAL_DELAY_MS = 350;
 const POST_BOOT_UI_STEP_DELAY_MS = 300;
 const POST_BOOT_ZOOM_DELAY_MS = 200;
 let postBootUiInitScheduled = false;
-
-function clearOverlayShowInactiveRetryTimer() {
-  if (overlayShowInactiveRetryTimer) {
-    clearTimeout(overlayShowInactiveRetryTimer);
-    overlayShowInactiveRetryTimer = null;
-  }
-}
-
-function clearOverlayVisibilityAckTimer() {
-  if (overlayVisibilityAckTimer) {
-    clearTimeout(overlayVisibilityAckTimer);
-    overlayVisibilityAckTimer = null;
-  }
-}
-
-function sendOverlayVisibilitySignal(visible, options = {}) {
-  const opts = options || {};
-  if (!overlayWindow || overlayWindow.isDestroyed()) return false;
-  const wc = overlayWindow.webContents;
-  if (!wc || wc.isDestroyed?.() || wc.isCrashed?.()) return false;
-
-  const seq = Number.isInteger(opts.seq) ? opts.seq : ++overlayVisibilityAckSeq;
-  try {
-    wc.send("overlay:set-visible", { visible: !!visible, seq });
-  } catch {
-    return false;
-  }
-
-  clearOverlayVisibilityAckTimer();
-  const retries = Number.isInteger(opts.retries) ? opts.retries : 0;
-  if (retries >= 3) return true;
-  overlayVisibilityAckTimer = setTimeout(() => {
-    if (overlayVisibilityAckedSeq >= seq) return;
-    if (!overlayWindow || overlayWindow.isDestroyed()) return;
-    sendOverlayVisibilitySignal(visible, { seq, retries: retries + 1 });
-  }, OVERLAY_VISIBILITY_ACK_TIMEOUT_MS);
-  return true;
-}
-
-function ensureOverlayVisibleInactive(reason = "unknown") {
-  if (!overlayWindow || overlayWindow.isDestroyed()) return false;
-  try {
-    if (overlayWindow.isVisible()) {
-      clearOverlayShowInactiveRetryTimer();
-      overlayShowInactiveAttempts = 0;
-      return true;
-    }
-  } catch {}
-
-  clearOverlayShowInactiveRetryTimer();
-  overlayShowInactiveAttempts = 0;
-
-  const tryShow = () => {
-    if (!overlayWindow || overlayWindow.isDestroyed()) {
-      clearOverlayShowInactiveRetryTimer();
-      return;
-    }
-    overlayShowInactiveAttempts += 1;
-    try {
-      overlayWindow.setFocusable(false);
-      overlayWindow.setSkipTaskbar(true);
-    } catch {}
-    try {
-      if (typeof overlayWindow.showInactive === "function") {
-        overlayWindow.showInactive();
-      } else {
-        windowLogger.warn("overlay:showinactive-missing", { reason });
-      }
-    } catch (err) {
-      windowLogger.warn("overlay:showinactive-error", {
-        reason,
-        attempt: overlayShowInactiveAttempts,
-        error: err?.message || String(err),
-      });
-    }
-    try {
-      overlayWindow.blur();
-    } catch {}
-    try {
-      if (overlayWindow.isVisible()) {
-        clearOverlayShowInactiveRetryTimer();
-        overlayShowInactiveAttempts = 0;
-        return;
-      }
-    } catch {}
-
-    if (overlayShowInactiveAttempts >= OVERLAY_SHOW_INACTIVE_MAX_ATTEMPTS) {
-      clearOverlayShowInactiveRetryTimer();
-      windowLogger.warn("overlay:showinactive-not-visible", {
-        reason,
-        attempts: overlayShowInactiveAttempts,
-      });
-      const restoreConfig = selectedConfig || null;
-      const restorePresented = overlayPresented;
-      overlaySuppressClosedReset = true;
-      try {
-        overlayWindow.destroy();
-      } catch {}
-      setTimeout(() => {
-        if (overlayWindow && !overlayWindow.isDestroyed()) return;
-        createOverlayWindow(restoreConfig, restorePresented);
-      }, 120);
-      return;
-    }
-    overlayShowInactiveRetryTimer = setTimeout(
-      tryShow,
-      OVERLAY_SHOW_INACTIVE_RETRY_MS,
-    );
-  };
-
-  tryShow();
-  return false;
-}
-
-function pushOverlayDataUpdate(options = {}) {
-  const opts = options || {};
-  const hasConfigOverride = Object.prototype.hasOwnProperty.call(
-    opts,
-    "configName",
-  );
-  const configName = hasConfigOverride
-    ? opts.configName
-    : isNonEmptyString(selectedConfig)
-      ? selectedConfig
-      : overlayPendingConfigName !== undefined
-        ? overlayPendingConfigName
-        : selectedConfig;
-  const targetWindow = opts.targetWindow || overlayWindow;
-  const force = opts.force === true;
-  if (!targetWindow || targetWindow.isDestroyed()) return false;
-  const wc = targetWindow.webContents;
-  if (!wc || wc.isDestroyed?.() || wc.isCrashed?.()) return false;
-  if (!force && !overlayPresented) {
-    overlayUpdatePendingWhileHidden = true;
-    overlayPendingConfigName = configName;
-    return false;
-  }
-  try {
-    wc.send("load-overlay-data", configName);
-    wc.send("set-language", {
-      language: selectedLanguage,
-      uiLanguage: selectedUiLanguage,
-    });
-    overlayUpdatePendingWhileHidden = false;
-    overlayPendingConfigName = undefined;
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 function stopOverlayGlobalDrag() {
   overlayDragActive = false;
@@ -7373,9 +7342,9 @@ function schedulePostBootUiInitialization() {
   runSteps();
 }
 
-function createOverlayWindow(initialConfigName, initialPresented = true) {
+function createOverlayWindow(selectedConfig, initialPresented = true) {
   windowLogger.info("create-overlay:start", {
-    selectedConfig: initialConfigName || selectedConfig || null,
+    selectedConfig: selectedConfig || null,
     initialPresented: !!initialPresented,
   });
   const { width, height } =
@@ -7428,7 +7397,16 @@ function createOverlayWindow(initialConfigName, initialPresented = true) {
     try {
       setOverlayInteractive(false);
     } catch {}
-    ensureOverlayVisibleInactive("overlay-ready-to-show");
+    try {
+      if (typeof overlayWindow.showInactive === "function") {
+        overlayWindow.showInactive();
+      } else {
+        // overlayWindow.show();
+      }
+    } catch {}
+    try {
+      overlayWindow.blur();
+    } catch {}
     // Keep the window shown (inactive) and rely on CSS visibility to avoid OS-level hidden state.
     setTimeout(() => {
       if (!overlayWindow || overlayWindow.isDestroyed()) return;
@@ -7445,33 +7423,27 @@ function createOverlayWindow(initialConfigName, initialPresented = true) {
   });
 
   overlayWindow.webContents.on("did-finish-load", () => {
-    const resolvedConfigName = isNonEmptyString(selectedConfig)
-      ? selectedConfig
-      : overlayPendingConfigName !== undefined
-        ? overlayPendingConfigName
-        : initialConfigName;
     windowLogger.info("create-overlay:did-finish-load", {
-      selectedConfig: resolvedConfigName || null,
+      selectedConfig: selectedConfig || null,
     });
-    pushOverlayDataUpdate({ configName: resolvedConfigName });
-    sendOverlayVisibilitySignal(overlayPresented);
+    overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+    overlayWindow.webContents.send("set-language", {
+      language: selectedLanguage,
+      uiLanguage: selectedUiLanguage,
+    });
+    try {
+      overlayWindow.webContents.send("overlay:set-visible", {
+        visible: overlayPresented,
+      });
+    } catch {}
   });
 
   overlayWindow.on("closed", () => {
     windowLogger.info("create-overlay:closed");
-    const suppressReset = overlaySuppressClosedReset === true;
-    overlaySuppressClosedReset = false;
     stopOverlayGlobalDrag();
     overlayWindow = null;
     overlayInteractive = false;
-    if (!suppressReset) {
-      overlayPresented = false;
-      overlayUpdatePendingWhileHidden = false;
-      overlayPendingConfigName = undefined;
-    }
-    clearOverlayShowInactiveRetryTimer();
-    overlayShowInactiveAttempts = 0;
-    clearOverlayVisibilityAckTimer();
+    overlayPresented = false;
     clearOverlayInteractShortcut();
     clearOverlayKeyboardScrollShortcuts();
   });
@@ -7578,17 +7550,16 @@ ipcMain.handle("launchExecutable", async (_event, exePath, argsString) => {
 
 let currentAppId = null;
 
-ipcMain.on("toggle-overlay", (_event, requestedConfigName) => {
-  const nextConfigName = isNonEmptyString(requestedConfigName)
-    ? requestedConfigName
-    : isNonEmptyString(selectedConfig)
-      ? selectedConfig
-      : null;
-  if (!nextConfigName) return;
+ipcMain.on("toggle-overlay", (_event, selectedConfig) => {
+  if (!selectedConfig) return;
   if (!overlayWindow || overlayWindow.isDestroyed()) {
-    createOverlayWindow(nextConfigName);
+    createOverlayWindow(selectedConfig);
   } else {
-    pushOverlayDataUpdate({ configName: nextConfigName });
+    overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+    overlayWindow.webContents.send("set-language", {
+      language: selectedLanguage,
+      uiLanguage: selectedUiLanguage,
+    });
     if (!overlayPresented) {
       setOverlayPresented(true);
     }
@@ -7597,32 +7568,12 @@ ipcMain.on("toggle-overlay", (_event, requestedConfigName) => {
 
 // Handle request for current config from overlay
 ipcMain.on("request-current-config", (event) => {
-  const activeConfigName = isNonEmptyString(selectedConfig)
-    ? selectedConfig
-    : null;
-  if (activeConfigName) {
-    pushOverlayDataUpdate({
-      configName: activeConfigName,
-      targetWindow:
-        overlayWindow && !overlayWindow.isDestroyed()
-          ? overlayWindow
-          : BrowserWindow.fromWebContents(event.sender),
+  if (selectedConfig) {
+    event.sender.send("load-overlay-data", selectedConfig);
+    event.sender.send("set-language", {
+      language: selectedLanguage,
+      uiLanguage: selectedUiLanguage,
     });
-  }
-});
-
-ipcMain.on("overlay:visible-ack", (event, payload) => {
-  if (!overlayWindow || overlayWindow.isDestroyed()) return;
-  const senderWin = BrowserWindow.fromWebContents(event.sender);
-  if (!senderWin || senderWin.isDestroyed()) return;
-  if (senderWin.id !== overlayWindow.id) return;
-  const seq = Number(payload?.seq);
-  if (!Number.isInteger(seq) || seq <= 0) return;
-  if (seq > overlayVisibilityAckedSeq) {
-    overlayVisibilityAckedSeq = seq;
-  }
-  if (overlayVisibilityAckedSeq >= overlayVisibilityAckSeq) {
-    clearOverlayVisibilityAckTimer();
   }
 });
 
@@ -7651,7 +7602,13 @@ ipcMain.on(
       mainWindow.webContents.send("refresh-achievements-table", configName);
     }
 
-    pushOverlayDataUpdate();
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.webContents.send("load-overlay-data", selectedConfig);
+      overlayWindow.webContents.send("set-language", {
+        language: selectedLanguage,
+        uiLanguage: selectedUiLanguage,
+      });
+    }
     broadcastToAll("tray:language-changed", { language: selectedUiLanguage });
   },
 );
@@ -7846,8 +7803,6 @@ app.on("will-quit", () => {
       overlayDragHook.stop();
     } catch {}
   }
-  clearOverlayShowInactiveRetryTimer();
-  clearOverlayVisibilityAckTimer();
 });
 
 function showProgressNotification(data) {
@@ -8529,10 +8484,7 @@ async function seedManualConfigsAtBoot() {
 
     const platform = normalizePlatform(config?.platform) || "steam";
 
-    const cachePath = getCachePath(
-      configFileName,
-      platform,
-    );
+    const cachePath = getCachePath(configFileName, platform);
     if (fs.existsSync(cachePath)) {
       if (seedKey) bootSeededCacheKeys.add(seedKey);
       return;
@@ -8544,7 +8496,10 @@ async function seedManualConfigsAtBoot() {
       if (typeof config?.name === "string" && config.name.trim()) {
         aliases.push(config.name.trim());
       }
-      if (typeof config?.displayName === "string" && config.displayName.trim()) {
+      if (
+        typeof config?.displayName === "string" &&
+        config.displayName.trim()
+      ) {
         aliases.push(config.displayName.trim());
       }
       for (const altName of aliases) {
@@ -8598,11 +8553,7 @@ async function seedManualConfigsAtBoot() {
       },
     );
     if (snapshot && Object.keys(snapshot).length) {
-      seedCacheFromSnapshot(
-        configFileName,
-        snapshot,
-        platform,
-      );
+      seedCacheFromSnapshot(configFileName, snapshot, platform);
       if (seedKey) bootSeededCacheKeys.add(seedKey);
       bumpCacheBatchStat("seeded");
     }
@@ -9482,40 +9433,6 @@ app.on("render-process-gone", (_event, webContents, details) => {
     id: webContents?.id,
     url: crashedUrl,
   });
-  const isOverlayRenderer = (() => {
-    try {
-      if (
-        overlayWindow &&
-        !overlayWindow.isDestroyed() &&
-        overlayWindow.webContents &&
-        !overlayWindow.webContents.isDestroyed()
-      ) {
-        return overlayWindow.webContents.id === webContents?.id;
-      }
-    } catch {}
-    return false;
-  })();
-  if (isOverlayRenderer) {
-    const restorePresented = overlayPresented === true;
-    const restoreConfig = selectedConfig || null;
-    windowLogger.warn("overlay:renderer-gone", {
-      reason: details?.reason || null,
-      processType: details?.type || null,
-      restorePresented,
-      restoreConfig,
-    });
-    overlaySuppressClosedReset = true;
-    try {
-      if (overlayWindow && !overlayWindow.isDestroyed()) {
-        overlayWindow.destroy();
-      }
-    } catch {}
-    setTimeout(() => {
-      if (overlayWindow && !overlayWindow.isDestroyed()) return;
-      createOverlayWindow(restoreConfig, restorePresented);
-    }, 180);
-    return;
-  }
   if (!isBootOnboardingGatePending()) return;
   const isMainRenderer = (() => {
     try {

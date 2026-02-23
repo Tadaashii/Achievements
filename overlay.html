@@ -718,16 +718,7 @@
       window.api.on("overlay:set-visible", (payload) => {
         const visible =
           payload && typeof payload === "object" ? payload.visible : payload;
-        const seq =
-          payload && typeof payload === "object"
-            ? Number(payload.seq)
-            : Number.NaN;
         setOverlayVisible(!!visible);
-        if (Number.isInteger(seq) && seq > 0) {
-          try {
-            window.api.overlayVisibleAck?.({ visible: !!visible, seq });
-          } catch {}
-        }
       });
 
       function setupOverlayDrag() {
