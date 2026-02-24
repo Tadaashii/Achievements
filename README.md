@@ -343,6 +343,18 @@ Sources used when available: Steam Web API, SteamDB, SteamHunters, Exophase, GOG
 - Automatically detects and imports existing achievements
 - Supports multiple achievement languages if available in Config
 
+## ⚠️ Known Limitations & Workarounds
+
+- Match privilege level between app and game (`non-admin/non-admin` or `admin/admin`) for more reliable overlay and shortcut behavior.
+- If overlay shortcut does not trigger in a specific game, switch to a 3-key combo and test `Ctrl+PageUp` / `Ctrl+PageDown` fallback.
+- Overlay drag may fail in elevated/protected game contexts; use snap positions (`Ctrl+Alt+Shift+1..5`) or nudge (`Ctrl+Alt+Shift+Arrow Keys`) instead.
+- In some engine/driver combinations, overlay z-order can vary (may appear behind windows); retoggle overlay and prefer Borderless Windowed mode.
+- Flip/compositor behavior is controlled by Windows + GPU driver; app cannot force a single flip mode across all systems.
+- Toggle **Disable Hardware Acceleration** (restart required) and keep the mode that is most stable for your setup.
+- Notifications are queue-based; long preset durations can cause perceived delay. Reduce **Notification Duration** if needed.
+- Presets with expensive effects (blur/backdrop + layered animation) can micro-stutter on some GPUs; use lighter presets if needed.
+- Avoid running multiple overlay/injector tools at the same time when troubleshooting display/focus issues.
+
 ### Videos
 
 https://youtu.be/fsqoKiMGLkw | https://youtu.be/nOoiU5lPopM | https://youtu.be/KwRUo53VTho
