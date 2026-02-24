@@ -300,6 +300,14 @@ Sources used when available: Steam Web API, SteamDB, SteamHunters, Exophase, GOG
   - Confirm/Activate: `Enter` / `Space`; Controller: Xbox A, PlayStation ✕.
   - Page scroll: `PageUp` / `PageDown`; Controller: Right Stick (RS).
   - Move focus: Arrow keys; Controller: D-pad or Left Stick (LS).
+- **Overlay (while visible)**
+  - Toggle visibility: configurable **Overlay Shortcut** from Settings (disabled by default until assigned).
+  - Toggle interaction mode (click-through ↔ interactive): configurable **Interact Key** from Settings (default: `\`).
+  - Page scroll: `PageUp` / `PageDown` with fallback `Ctrl+PageUp` / `Ctrl+PageDown`.
+  - Snap 5 positions: `Ctrl+Alt+Shift+1..5` (Top-Left, Top-Right, Center, Bottom-Left, Bottom-Right).
+  - Cycle snap presets: `Ctrl+Alt+Shift+M`.
+  - Fine nudge (20px): `Ctrl+Alt+Shift+Arrow Keys`.
+  - Overlay-specific shortcuts above are active only while the overlay is shown.
 - **Dashboard**
   - Grid navigation: Arrow keys, `Home`, `End`, `PageUp`, `PageDown`; Controller: D-pad or LS.
   - Search: `Ctrl+F`; Controller: Xbox X, PlayStation ☐.

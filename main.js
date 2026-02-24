@@ -1466,6 +1466,11 @@ function applyOverlayFocusMode() {
   } catch {}
 }
 
+// Overlay focus safety contract (keep this for drag/snap/reposition fallback logic):
+// 1) Do not call `overlayWindow.show()` or `overlayWindow.focus()` from move/snap paths.
+// 2) Reposition only an already-created overlay via `setPosition`/`setBounds`.
+// 3) Keep the overlay non-focusable and rely on existing click-through toggles.
+// 4) Avoid aggressive `setAlwaysOnTop` retoggles during movement (z-order churn/focus side effects).
 function setOverlayPresented(next) {
   overlayPresented = !!next;
   if (!overlayWindow || overlayWindow.isDestroyed()) return;
@@ -1486,7 +1491,7 @@ function setOverlayPresented(next) {
         if (typeof overlayWindow.showInactive === "function") {
           overlayWindow.showInactive();
         } else {
-          // overlayWindow.show();
+          // Keep fallback intentionally non-activating; do not use overlayWindow.show() here.
         }
       }
     } catch {}
@@ -1495,6 +1500,7 @@ function setOverlayPresented(next) {
     } catch {}
     applyOverlayInteractShortcutRegistration();
     applyOverlayKeyboardScrollShortcutRegistration();
+    applyOverlayPositionShortcutRegistration();
     return;
   }
 
@@ -1502,6 +1508,8 @@ function setOverlayPresented(next) {
   setOverlayInteractive(false);
   clearOverlayInteractShortcut();
   clearOverlayKeyboardScrollShortcuts();
+  clearOverlayPositionShortcuts();
+  overlaySnapCycleIndex = -1;
   stopOverlayGlobalDrag();
   try {
     overlayWindow.webContents.send("overlay:set-visible", { visible: false });
@@ -1512,14 +1520,206 @@ function setOverlayPresented(next) {
 }
 
 function clearOverlayKeyboardScrollShortcuts() {
-  if (registeredOverlayScrollPageUpShortcut) {
-    globalShortcut.unregister(registeredOverlayScrollPageUpShortcut);
-    registeredOverlayScrollPageUpShortcut = null;
+  if (
+    Array.isArray(registeredOverlayScrollPageUpShortcuts) &&
+    registeredOverlayScrollPageUpShortcuts.length
+  ) {
+    for (const accelerator of registeredOverlayScrollPageUpShortcuts) {
+      try {
+        globalShortcut.unregister(accelerator);
+      } catch {}
+    }
   }
-  if (registeredOverlayScrollPageDownShortcut) {
-    globalShortcut.unregister(registeredOverlayScrollPageDownShortcut);
-    registeredOverlayScrollPageDownShortcut = null;
+  if (
+    Array.isArray(registeredOverlayScrollPageDownShortcuts) &&
+    registeredOverlayScrollPageDownShortcuts.length
+  ) {
+    for (const accelerator of registeredOverlayScrollPageDownShortcuts) {
+      try {
+        globalShortcut.unregister(accelerator);
+      } catch {}
+    }
   }
+  registeredOverlayScrollPageUpShortcuts = [];
+  registeredOverlayScrollPageDownShortcuts = [];
+}
+
+function clearOverlayPositionShortcuts() {
+  if (
+    Array.isArray(registeredOverlayPositionShortcuts) &&
+    registeredOverlayPositionShortcuts.length
+  ) {
+    for (const accelerator of registeredOverlayPositionShortcuts) {
+      try {
+        globalShortcut.unregister(accelerator);
+      } catch {}
+    }
+  }
+  registeredOverlayPositionShortcuts = [];
+}
+
+function getOverlayPositionContext() {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return null;
+  let bounds;
+  try {
+    bounds = overlayWindow.getBounds();
+  } catch {
+    return null;
+  }
+  if (!bounds) return null;
+  let workArea = null;
+  try {
+    workArea = screen.getDisplayMatching(bounds)?.workArea || null;
+  } catch {}
+  if (!workArea) {
+    try {
+      workArea = screen.getPrimaryDisplay()?.workArea || null;
+    } catch {}
+  }
+  if (!workArea) return null;
+  return { bounds, workArea };
+}
+
+function clampOverlayPositionToWorkArea(nextX, nextY, bounds, workArea) {
+  const width = Math.max(0, Number(bounds?.width) || 0);
+  const height = Math.max(0, Number(bounds?.height) || 0);
+  const minX = Math.round(workArea.x);
+  const minY = Math.round(workArea.y);
+  const maxX = Math.round(workArea.x + Math.max(0, workArea.width - width));
+  const maxY = Math.round(workArea.y + Math.max(0, workArea.height - height));
+  return {
+    x: Math.min(Math.max(Math.round(nextX), minX), maxX),
+    y: Math.min(Math.max(Math.round(nextY), minY), maxY),
+  };
+}
+
+function setOverlayPositionClamped(nextX, nextY) {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return false;
+  const ctx = getOverlayPositionContext();
+  if (!ctx) return false;
+  const { bounds, workArea } = ctx;
+  const { x, y } = clampOverlayPositionToWorkArea(
+    nextX,
+    nextY,
+    bounds,
+    workArea,
+  );
+  try {
+    stopOverlayGlobalDrag();
+    overlayWindow.setPosition(x, y, false);
+    applyOverlayFocusMode();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function snapOverlayByFactors(xFactor, yFactor) {
+  const ctx = getOverlayPositionContext();
+  if (!ctx) return false;
+  const { bounds, workArea } = ctx;
+  const minX = Math.round(workArea.x);
+  const minY = Math.round(workArea.y);
+  const maxX = Math.round(
+    workArea.x + Math.max(0, workArea.width - Math.max(0, bounds.width || 0)),
+  );
+  const maxY = Math.round(
+    workArea.y + Math.max(0, workArea.height - Math.max(0, bounds.height || 0)),
+  );
+  const safeX = Math.min(1, Math.max(0, Number(xFactor) || 0));
+  const safeY = Math.min(1, Math.max(0, Number(yFactor) || 0));
+  const nextX = minX + Math.round((maxX - minX) * safeX);
+  const nextY = minY + Math.round((maxY - minY) * safeY);
+  return setOverlayPositionClamped(nextX, nextY);
+}
+
+function cycleOverlaySnapPreset() {
+  if (!OVERLAY_SNAP5_PRESETS.length) return false;
+  overlaySnapCycleIndex =
+    (overlaySnapCycleIndex + 1) % OVERLAY_SNAP5_PRESETS.length;
+  const preset = OVERLAY_SNAP5_PRESETS[overlaySnapCycleIndex];
+  if (!preset) return false;
+  return snapOverlayByFactors(preset.x, preset.y);
+}
+
+function applyOverlayPositionShortcutRegistration() {
+  if (
+    !overlayWindow ||
+    overlayWindow.isDestroyed() ||
+    !overlayPresented ||
+    !overlayWindow.isVisible()
+  ) {
+    clearOverlayPositionShortcuts();
+    return;
+  }
+
+  const registerAll = (accelerators, onFire) => {
+    const seen = new Set();
+    for (const accelerator of accelerators) {
+      if (typeof accelerator !== "string" || !accelerator.trim()) continue;
+      if (seen.has(accelerator)) continue;
+      seen.add(accelerator);
+      try {
+        const ok = globalShortcut.register(accelerator, onFire);
+        if (ok) registeredOverlayPositionShortcuts.push(accelerator);
+      } catch {}
+    }
+  };
+
+  clearOverlayPositionShortcuts();
+
+  OVERLAY_SNAP5_PRESETS.forEach((preset, index) => {
+    registerAll([preset.accelerator], () => {
+      overlaySnapCycleIndex = index;
+      snapOverlayByFactors(preset.x, preset.y);
+    });
+  });
+
+  OVERLAY_SNAP9_NUMPAD_PRESETS.forEach((preset) => {
+    registerAll(preset.accelerators, () => {
+      snapOverlayByFactors(preset.x, preset.y);
+    });
+  });
+
+  registerAll(["Control+Alt+Shift+M"], () => {
+    cycleOverlaySnapPreset();
+  });
+
+  registerAll(["Control+Alt+Shift+Left"], () => {
+    const ctx = getOverlayPositionContext();
+    if (!ctx) return;
+    setOverlayPositionClamped(
+      ctx.bounds.x - OVERLAY_NUDGE_STEP_PX,
+      ctx.bounds.y,
+    );
+  });
+
+  registerAll(["Control+Alt+Shift+Right"], () => {
+    const ctx = getOverlayPositionContext();
+    if (!ctx) return;
+    setOverlayPositionClamped(
+      ctx.bounds.x + OVERLAY_NUDGE_STEP_PX,
+      ctx.bounds.y,
+    );
+  });
+
+  registerAll(["Control+Alt+Shift+Up"], () => {
+    const ctx = getOverlayPositionContext();
+    if (!ctx) return;
+    setOverlayPositionClamped(
+      ctx.bounds.x,
+      ctx.bounds.y - OVERLAY_NUDGE_STEP_PX,
+    );
+  });
+
+  registerAll(["Control+Alt+Shift+Down"], () => {
+    const ctx = getOverlayPositionContext();
+    if (!ctx) return;
+    setOverlayPositionClamped(
+      ctx.bounds.x,
+      ctx.bounds.y + OVERLAY_NUDGE_STEP_PX,
+    );
+  });
 }
 
 function applyOverlayKeyboardScrollShortcutRegistration() {
@@ -1539,16 +1739,25 @@ function applyOverlayKeyboardScrollShortcutRegistration() {
     }
   } catch {}
 
-  const registerIfNeeded = (accelerator, onFire, setter) => {
-    if (setter()) return;
-    try {
-      const ok = globalShortcut.register(accelerator, onFire);
-      if (ok) setter(accelerator);
-    } catch {}
+  const registerAll = (accelerators, onFire) => {
+    const seen = new Set();
+    const registered = [];
+    for (const accelerator of accelerators) {
+      if (typeof accelerator !== "string" || !accelerator.trim()) continue;
+      if (seen.has(accelerator)) continue;
+      seen.add(accelerator);
+      try {
+        const ok = globalShortcut.register(accelerator, onFire);
+        if (ok) registered.push(accelerator);
+      } catch {}
+    }
+    return registered;
   };
 
-  registerIfNeeded(
-    "PageUp",
+  clearOverlayKeyboardScrollShortcuts();
+
+  registeredOverlayScrollPageUpShortcuts = registerAll(
+    ["PageUp", "Control+PageUp"],
     () => {
       if (
         !overlayWindow ||
@@ -1561,14 +1770,10 @@ function applyOverlayKeyboardScrollShortcutRegistration() {
         direction: "up",
       });
     },
-    (acc) => {
-      if (typeof acc === "string") registeredOverlayScrollPageUpShortcut = acc;
-      return !!registeredOverlayScrollPageUpShortcut;
-    },
   );
 
-  registerIfNeeded(
-    "PageDown",
+  registeredOverlayScrollPageDownShortcuts = registerAll(
+    ["PageDown", "Control+PageDown"],
     () => {
       if (
         !overlayWindow ||
@@ -1580,11 +1785,6 @@ function applyOverlayKeyboardScrollShortcutRegistration() {
       overlayWindow.webContents.send("overlay:scroll-page", {
         direction: "down",
       });
-    },
-    (acc) => {
-      if (typeof acc === "string")
-        registeredOverlayScrollPageDownShortcut = acc;
-      return !!registeredOverlayScrollPageDownShortcut;
     },
   );
 }
@@ -7154,8 +7354,10 @@ let overlayInteractive = false;
 let overlayPresented = false;
 let registeredOverlayShortcut = null;
 let registeredOverlayInteractShortcut = null;
-let registeredOverlayScrollPageUpShortcut = null;
-let registeredOverlayScrollPageDownShortcut = null;
+let registeredOverlayScrollPageUpShortcuts = [];
+let registeredOverlayScrollPageDownShortcuts = [];
+let registeredOverlayPositionShortcuts = [];
+let overlaySnapCycleIndex = -1;
 let overlayDragRegionHeight = 90;
 let overlayDragActive = false;
 let overlayDragOffset = null;
@@ -7163,6 +7365,88 @@ let overlayDragHook = null;
 let overlayDragHookStarted = false;
 let overlayDragHookInitAttempted = false;
 let overlayDragHookBootWaitTimer = null;
+const OVERLAY_NUDGE_STEP_PX = 20;
+const OVERLAY_SNAP5_PRESETS = [
+  { accelerator: "Control+Alt+Shift+1", x: 0, y: 0 },
+  { accelerator: "Control+Alt+Shift+2", x: 1, y: 0 },
+  { accelerator: "Control+Alt+Shift+3", x: 0.5, y: 0.5 },
+  { accelerator: "Control+Alt+Shift+4", x: 0, y: 1 },
+  { accelerator: "Control+Alt+Shift+5", x: 1, y: 1 },
+];
+const OVERLAY_SNAP9_NUMPAD_PRESETS = [
+  {
+    accelerators: [
+      "Control+Alt+Shift+num1",
+      "Control+Alt+Shift+Num1",
+      "Control+Alt+Shift+Numpad1",
+    ],
+    x: 0,
+    y: 1,
+  },
+  {
+    accelerators: [
+      "Control+Alt+Shift+num2",
+      "Control+Alt+Shift+Num2",
+      "Control+Alt+Shift+Numpad2",
+    ],
+    x: 0.5,
+    y: 1,
+  },
+  {
+    accelerators: [
+      "Control+Alt+Shift+num3",
+      "Control+Alt+Shift+Num3",
+      "Control+Alt+Shift+Numpad3",
+    ],
+    x: 1,
+    y: 1,
+  },
+  {
+    accelerators: [
+      "Control+Alt+Shift+num4",
+      "Control+Alt+Shift+Num4",
+      "Control+Alt+Shift+Numpad4",
+    ],
+    x: 0,
+    y: 0.5,
+  },
+  {
+    accelerators: [
+      "Control+Alt+Shift+num5",
+      "Control+Alt+Shift+Num5",
+      "Control+Alt+Shift+Numpad5",
+    ],
+    x: 0.5,
+    y: 0.5,
+  },
+  {
+    accelerators: [
+      "Control+Alt+Shift+num6",
+      "Control+Alt+Shift+Num6",
+      "Control+Alt+Shift+Numpad6",
+    ],
+    x: 1,
+    y: 0.5,
+  },
+  {
+    accelerators: [
+      "Control+Alt+Shift+num7",
+      "Control+Alt+Shift+Num7",
+      "Control+Alt+Shift+Numpad7",
+    ],
+    x: 0,
+    y: 0,
+  },
+  {
+    accelerators: [
+      "Control+Alt+Shift+num8",
+      "Control+Alt+Shift+Num8",
+      "Control+Alt+Shift+Numpad8",
+    ],
+    x: 0.5,
+    y: 0,
+  },
+];
 const POST_BOOT_UI_INITIAL_DELAY_MS = 350;
 const POST_BOOT_UI_STEP_DELAY_MS = 300;
 const POST_BOOT_ZOOM_DELAY_MS = 200;
@@ -7252,6 +7536,7 @@ function initOverlayGlobalDragHook() {
     const nextX = Math.round(point.x - overlayDragOffset.x);
     const nextY = Math.round(point.y - overlayDragOffset.y);
     try {
+      // Reposition only; do not activate/focus the window while dragging.
       overlayWindow.setPosition(nextX, nextY, false);
     } catch {}
   });
@@ -7382,6 +7667,7 @@ function createOverlayWindow(selectedConfig, initialPresented = true) {
   });
 
   overlayWindow.setAlwaysOnTop(true, "floating");
+  // Keep this as one-time setup; avoid frequent retoggles during runtime moves/snaps.
   overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   overlayWindow.setFullScreenable(false);
   overlayWindow.setFocusable(false);
@@ -7401,7 +7687,7 @@ function createOverlayWindow(selectedConfig, initialPresented = true) {
       if (typeof overlayWindow.showInactive === "function") {
         overlayWindow.showInactive();
       } else {
-        // overlayWindow.show();
+        // Keep fallback intentionally non-activating; do not use overlayWindow.show() here.
       }
     } catch {}
     try {
@@ -7415,9 +7701,12 @@ function createOverlayWindow(selectedConfig, initialPresented = true) {
       if (overlayPresented) {
         applyOverlayInteractShortcutRegistration();
         applyOverlayKeyboardScrollShortcutRegistration();
+        applyOverlayPositionShortcutRegistration();
       } else {
         clearOverlayInteractShortcut();
         clearOverlayKeyboardScrollShortcuts();
+        clearOverlayPositionShortcuts();
+        overlaySnapCycleIndex = -1;
       }
     }, 50);
   });
@@ -7446,6 +7735,8 @@ function createOverlayWindow(selectedConfig, initialPresented = true) {
     overlayPresented = false;
     clearOverlayInteractShortcut();
     clearOverlayKeyboardScrollShortcuts();
+    clearOverlayPositionShortcuts();
+    overlaySnapCycleIndex = -1;
   });
 
   overlayWindow.on("show", () => {
@@ -7463,6 +7754,7 @@ function createOverlayWindow(selectedConfig, initialPresented = true) {
       if (!overlayInteractive) applyOverlayInputMode();
       applyOverlayFocusMode();
       applyOverlayKeyboardScrollShortcutRegistration();
+      applyOverlayPositionShortcutRegistration();
     }, 50);
   });
 
@@ -7470,6 +7762,8 @@ function createOverlayWindow(selectedConfig, initialPresented = true) {
     setOverlayInteractive(false);
     applyOverlayInteractShortcutRegistration();
     clearOverlayKeyboardScrollShortcuts();
+    clearOverlayPositionShortcuts();
+    overlaySnapCycleIndex = -1;
     stopOverlayGlobalDrag();
   });
 

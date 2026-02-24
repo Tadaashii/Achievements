@@ -1274,8 +1274,15 @@ module.exports = function makeWatchedFolders({
       discovered = [],
       selectedPaths = [],
       reason = "apply-selection",
+      muteAllDefaultRoots = false,
     } = options || {};
     const candidateRoots = normalizeOnboardingCandidateRoots(discovered);
+    if (muteAllDefaultRoots) {
+      for (const root of DEFAULT_WATCH_ROOTS) {
+        const normalized = normalizePrefPath(root);
+        if (normalized) candidateRoots.add(normalized);
+      }
+    }
     const selectedSet = normalizeOnboardingSelection(selectedPaths, candidateRoots);
     const blocked = getBlockedFoldersSet();
     for (const root of candidateRoots) {
@@ -1380,6 +1387,7 @@ module.exports = function makeWatchedFolders({
         discovered,
         selectedPaths: [],
         reason: String(reason || "manual-skip-all"),
+        muteAllDefaultRoots: true,
       });
     } catch (err) {
       emitBootOnboardingError("force-skip-all", err, {
@@ -1527,7 +1535,6 @@ module.exports = function makeWatchedFolders({
     const candidates = [];
     for (const entry of entries) {
       const signals = await scanFolderSignalsForOnboarding(entry.path);
-      if (signals.size === 0) continue;
       candidates.push(buildOnboardingCandidate(entry, signals));
     }
     candidates.sort((a, b) => {
@@ -6312,6 +6319,7 @@ module.exports = function makeWatchedFolders({
         discovered,
         selectedPaths: [],
         reason: "skip-all",
+        muteAllDefaultRoots: true,
       });
     } catch (err) {
       emitBootOnboardingError("skip-all", err, { recoverable: true });

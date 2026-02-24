@@ -888,6 +888,107 @@
                   </ul>
                 </div>
 
+                <!-- Overlay -->
+                <div class="settings-section">
+                  <h4 id="settings-overlayControlsTitle">Overlay</h4>
+                  <ul class="shortcut-list">
+                    <li class="shortcut-item" tabindex="0">
+                      <div class="ctl-label">Show / Hide Overlay</div>
+                      <div class="ctl-line">
+                        <span class="hint">Keyboard:</span>
+                        <div class="ctl-line sub">
+                          Configurable in Settings: Overlay Shortcut
+                        </div>
+                      </div>
+                    </li>
+
+                    <li class="shortcut-item" tabindex="0">
+                      <div class="ctl-label">Toggle Interaction Mode</div>
+                      <div class="ctl-line">
+                        <span class="hint">Keyboard:</span>
+                        <div class="ctl-line sub">
+                          Interact Key from Settings (default <kbd>\</kbd>)
+                        </div>
+                      </div>
+                      <div class="ctl-line sub">
+                        Switches click-through ↔ interactive (drag/scroll)
+                      </div>
+                    </li>
+
+                    <li class="shortcut-item" tabindex="0">
+                      <div class="ctl-label">Overlay Page Scroll</div>
+                      <div class="ctl-line">
+                        <span class="hint">Keyboard:</span>
+                        <div class="ctl-line sub"><kbd>PageUp</kbd></div>
+                        <div class="ctl-line sub"><kbd>PageDown</kbd></div>
+                        <div class="ctl-line sub">
+                          <kbd>Ctrl</kbd>+<kbd>PageUp</kbd>
+                        </div>
+                        <div class="ctl-line sub">
+                          <kbd>Ctrl</kbd>+<kbd>PageDown</kbd>
+                        </div>
+                      </div>
+                    </li>
+
+                    <li class="shortcut-item" tabindex="0">
+                      <div class="ctl-label">Snap 5 Positions</div>
+                      <div class="ctl-line">
+                        <span class="hint">Keyboard:</span>
+                        <div class="ctl-line sub">
+                          <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd
+                            >1</kbd
+                          >
+                          (Top-Left)
+                        </div>
+                        <div class="ctl-line sub">
+                          <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd
+                            >2</kbd
+                          >
+                          (Top-Right)
+                        </div>
+                        <div class="ctl-line sub">
+                          <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd
+                            >3</kbd
+                          >
+                          (Center)
+                        </div>
+                        <div class="ctl-line sub">
+                          <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd
+                            >4</kbd
+                          >
+                          (Bottom-Left)
+                        </div>
+                        <div class="ctl-line sub">
+                          <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd
+                            >5</kbd
+                          >
+                          (Bottom-Right)
+                        </div>
+                      </div>
+                    </li>
+
+                    <li class="shortcut-item" tabindex="0">
+                      <div class="ctl-label">Snap Grid / Cycle / Nudge</div>
+                      <div class="ctl-line">
+                        <span class="hint">Keyboard:</span>
+                        <div class="ctl-line sub">
+                          <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd
+                            >M</kbd
+                          >
+                          (cycle presets)
+                        </div>
+                        <div class="ctl-line sub">
+                          <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+Arrow
+                          (nudge 20px)
+                        </div>
+                      </div>
+                      <div class="ctl-line sub">
+                        Active only while the overlay is shown
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+
                 <!-- Dashboard -->
                 <div class="settings-section">
                   <h4 id="settings-dashboardTitle">Dashboard</h4>
@@ -1433,8 +1534,8 @@
                       <code>UniverseLAN.ini</code>.
                     </li>
                     <li id="platformGuideSteamItem10">
-                      If only numeric folders are present, auto mode may classify
-                      by heuristics; for strict GOG behavior, keep
+                      If only numeric folders are present, auto mode may
+                      classify by heuristics; for strict GOG behavior, keep
                       <code>goggame-*.info</code>/<code>UniverseLAN.ini</code>
                       or set platform manually.
                     </li>
@@ -1490,8 +1591,7 @@
                     </li>
                     <li id="platformGuideRpcs3Item2">
                       Runtime updates are detected from
-                      <code>TROPUSR.DAT</code> and
-                      <code>TROPCONF.SFM</code>.
+                      <code>TROPUSR.DAT</code> and <code>TROPCONF.SFM</code>.
                     </li>
                   </ul>
                 </details>
@@ -1521,7 +1621,9 @@
                   <ul class="platform-guide-list">
                     <li id="platformGuideLumaItem1">
                       Enable
-                      <strong>Settings → Folders → Enable LumaPlay Watcher</strong>.
+                      <strong
+                        >Settings → Folders → Enable LumaPlay Watcher</strong
+                      >.
                     </li>
                     <li id="platformGuideLumaItem2">
                       Windows only: the app listens for realtime registry events
@@ -1533,8 +1635,7 @@
                     </li>
                     <li id="platformGuideLumaItem4">
                       LumaPlay configs are expected as
-                      <code>platform=uplay</code> and
-                      <code>emu=lumaplay</code>.
+                      <code>platform=uplay</code> and <code>emu=lumaplay</code>.
                     </li>
                   </ul>
                 </details>
@@ -1547,8 +1648,8 @@
                   </summary>
                   <ul class="platform-guide-list">
                     <li id="platformGuideConfigRulesItem1">
-                      Steam/Uplay/GOG/Steam Official use regular app IDs;
-                      Epic may use numeric or hex-like IDs.
+                      Steam/Uplay/GOG/Steam Official use regular app IDs; Epic
+                      may use numeric or hex-like IDs.
                     </li>
                     <li id="platformGuideConfigRulesItem2">
                       Xenia title IDs are hex and can be provided with or
@@ -1576,8 +1677,8 @@
                   </summary>
                   <ul class="platform-guide-list">
                     <li id="platformGuideRescanItem1">
-                      Regenerate Schema is used for Steam/Uplay/Epic/GOG
-                      schema refresh.
+                      Regenerate Schema is used for Steam/Uplay/Epic/GOG schema
+                      refresh.
                     </li>
                     <li id="platformGuideRescanItem2">
                       For Xenia, RPCS3, shadPS4 and Steam Official, schema
@@ -1598,8 +1699,8 @@
                   </summary>
                   <ul class="platform-guide-list">
                     <li id="platformGuideOnboardingItem1">
-                      On first run (or onboarding version change), startup
-                      waits for folder selection before full scanning.
+                      On first run (or onboarding version change), startup waits
+                      for folder selection before full scanning.
                     </li>
                     <li id="platformGuideOnboardingItem2">
                       While onboarding is pending, folder watchers are deferred
@@ -1650,8 +1751,8 @@
                   </summary>
                   <ul class="platform-guide-list">
                     <li id="platformGuideRecoveryItem1">
-                      Missing watched folders are rechecked periodically
-                      (around 4 seconds).
+                      Missing watched folders are rechecked periodically (around
+                      4 seconds).
                     </li>
                     <li id="platformGuideRecoveryItem2">
                       When a missing folder reappears, watcher attach and
@@ -1667,7 +1768,9 @@
 
               <div class="settings-section">
                 <details class="platform-guide-item">
-                  <summary id="platformGuideLogsSummary">Useful log tags</summary>
+                  <summary id="platformGuideLogsSummary">
+                    Useful log tags
+                  </summary>
                   <ul class="platform-guide-list">
                     <li id="platformGuideLogsItem1">
                       Watchers: watch-save, watch-save-strict-root,
@@ -2401,8 +2504,8 @@
       <div class="modal-content boot-onboarding-modal">
         <h3 id="bootOnboardingTitle">Choose folders for Auto-Config</h3>
         <p id="bootOnboardingMessage">
-          We found folders with achievement data. Select which folders should
-          be scanned automatically.
+          We found folders with achievement data. Select which folders should be
+          scanned automatically.
         </p>
         <div
           id="bootOnboardingList"
@@ -5427,9 +5530,7 @@
           if (presetsData.isStructured) {
             // Handle new structured format with separate folders
 
-            const defaultPresetsList = Array.isArray(
-              presetsData.defaultPresets,
-            )
+            const defaultPresetsList = Array.isArray(presetsData.defaultPresets)
               ? presetsData.defaultPresets
               : Array.isArray(presetsData.scalable)
                 ? presetsData.scalable
@@ -7092,7 +7193,8 @@
         const dashOverlay = document.getElementById("dashboardOverlay");
         const dashPanel = document.getElementById("dashboardPanel");
         const onboardingModal = document.getElementById("bootOnboardingModal");
-        const onboardingContent = onboardingModal?.querySelector(".modal-content");
+        const onboardingContent =
+          onboardingModal?.querySelector(".modal-content");
         const confirmModal = document.getElementById("appConfirmModal");
         const confirmContent = confirmModal?.querySelector(".modal-content");
 
@@ -10583,10 +10685,10 @@
         const bootOnboardingMessage = document.getElementById(
           "bootOnboardingMessage",
         );
-        const bootOnboardingList = document.getElementById(
-          "bootOnboardingList",
-        );
-        const bootOnboardingHint = document.getElementById("bootOnboardingHint");
+        const bootOnboardingList =
+          document.getElementById("bootOnboardingList");
+        const bootOnboardingHint =
+          document.getElementById("bootOnboardingHint");
         const bootOnboardingActions = document.getElementById(
           "bootOnboardingActions",
         );
@@ -10596,9 +10698,8 @@
         const bootOnboardingSkipBtn = document.getElementById(
           "bootOnboardingSkipBtn",
         );
-        const bootOnboardingDone = document.getElementById(
-          "bootOnboardingDone",
-        );
+        const bootOnboardingDone =
+          document.getElementById("bootOnboardingDone");
         const bootOnboardingDoneMessage = document.getElementById(
           "bootOnboardingDoneMessage",
         );
@@ -10744,7 +10845,9 @@
         const getBootOnboardingSelectedPaths = () => {
           if (!bootOnboardingList) return [];
           const checked = Array.from(
-            bootOnboardingList.querySelectorAll('input[type="checkbox"]:checked'),
+            bootOnboardingList.querySelectorAll(
+              'input[type="checkbox"]:checked',
+            ),
           );
           return checked
             .map((input) => String(input?.value || "").trim())
@@ -10752,7 +10855,8 @@
         };
 
         const showBootOnboardingCompletion = (messageText) => {
-          if (bootOnboardingActions) bootOnboardingActions.classList.add("hidden");
+          if (bootOnboardingActions)
+            bootOnboardingActions.classList.add("hidden");
           if (bootOnboardingDone) bootOnboardingDone.classList.remove("hidden");
           if (bootOnboardingDoneMessage) {
             bootOnboardingDoneMessage.textContent = messageText || "";
@@ -10777,10 +10881,7 @@
             if (bootOnboardingHint) {
               bootOnboardingHint.textContent =
                 result?.error ||
-                tUi(
-                  "boot.onboarding.skipFailed",
-                  "Failed to skip onboarding.",
-                );
+                tUi("boot.onboarding.skipFailed", "Failed to skip onboarding.");
             }
             setBootOnboardingBusy(false);
             return result;
@@ -10902,24 +11003,9 @@
             } else if (!bootOnboardingCandidates.length) {
               bootOnboardingHint.textContent = tUi(
                 "boot.onboarding.noCandidates",
-                "No candidate folders found. Continue to app.",
+                "No candidate folders found. Use Skip and mute all to continue.",
               );
               await waitOnboardingDelay(BOOT_ONBOARDING_EMPTY_STAGE_DELAY_MS);
-              const autoSkipResult = await finalizeBootOnboardingSkipAll({
-                showCompletion: false,
-                closeModalOnSuccess: true,
-              });
-              if (autoSkipResult?.ok) {
-                showNotification(
-                  tUi(
-                    "boot.onboarding.autoSkippedNoCandidates",
-                    "No candidate folders were found. Auto-config was skipped.",
-                  ),
-                  "#4CAF50",
-                );
-                bootOnboardingPromptActive = false;
-                return;
-              }
             } else {
               const count = bootOnboardingCandidates.length;
               bootOnboardingHint.textContent = tUiFmt(
@@ -10932,8 +11018,19 @@
           }
           setBootOnboardingBusy(false);
           if (bootOnboardingStartBtn) {
-            setTimeout(() => bootOnboardingStartBtn.focus(), 0);
+            bootOnboardingStartBtn.disabled =
+              bootOnboardingBusy || bootOnboardingCandidates.length === 0;
           }
+          if (bootOnboardingSkipBtn) {
+            bootOnboardingSkipBtn.disabled = bootOnboardingBusy;
+          }
+          setTimeout(() => {
+            if (bootOnboardingCandidates.length === 0) {
+              bootOnboardingSkipBtn?.focus();
+            } else {
+              bootOnboardingStartBtn?.focus();
+            }
+          }, 0);
         };
 
         const maybeStartBootOnboarding = () => {
@@ -11056,9 +11153,8 @@
             const selectedPaths = getBootOnboardingSelectedPaths();
             let result = null;
             try {
-              result = await window.api.applyBootOnboardingSelection(
-                selectedPaths,
-              );
+              result =
+                await window.api.applyBootOnboardingSelection(selectedPaths);
             } catch (err) {
               result = { ok: false, error: err?.message || String(err) };
             }
@@ -11122,15 +11218,19 @@
             if (event.key === "PageDown") {
               event.preventDefault();
               event.stopPropagation();
-              bootOnboardingList.scrollTop +=
-                Math.max(120, Math.round(bootOnboardingList.clientHeight * 0.9));
+              bootOnboardingList.scrollTop += Math.max(
+                120,
+                Math.round(bootOnboardingList.clientHeight * 0.9),
+              );
               return;
             }
             if (event.key === "PageUp") {
               event.preventDefault();
               event.stopPropagation();
-              bootOnboardingList.scrollTop -=
-                Math.max(120, Math.round(bootOnboardingList.clientHeight * 0.9));
+              bootOnboardingList.scrollTop -= Math.max(
+                120,
+                Math.round(bootOnboardingList.clientHeight * 0.9),
+              );
               return;
             }
             if (event.key === "Home") {
@@ -12673,7 +12773,9 @@
             }
           }
           if (overlay === "onboarding") {
-            const onboardingModal = document.getElementById("bootOnboardingModal");
+            const onboardingModal = document.getElementById(
+              "bootOnboardingModal",
+            );
             if (action === A.BACK) {
               return;
             }
@@ -12683,7 +12785,9 @@
                 active.click();
                 return;
               }
-              const startBtn = document.getElementById("bootOnboardingStartBtn");
+              const startBtn = document.getElementById(
+                "bootOnboardingStartBtn",
+              );
               startBtn?.click();
               return;
             }

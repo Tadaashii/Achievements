@@ -1,4 +1,18 @@
-@import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap");
+@font-face {
+  font-family: "Raposo UI";
+  src: url("./fonts/NotoSans-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Raposo UI";
+  src: url("./fonts/NotoSans-SemiBold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
 html {
   overflow: hidden;
   scrollbar-width: none;
@@ -23,7 +37,7 @@ html {
 
 body {
   background-color: var(--background);
-  font-family: Montserrat;
+  font-family: "Raposo UI", sans-serif;
   animation-delay: 1s;
 }
 

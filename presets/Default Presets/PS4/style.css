@@ -16,6 +16,7 @@
   opacity: 0;
   z-index: 10000;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+  will-change: transform, opacity;
   animation: ps4AchievementIn var(--inDur, 500ms) forwards,
     ps4AchievementOut var(--outDur, 500ms) forwards var(--outDelay, 4500ms);
 }
@@ -59,6 +60,8 @@
   height: 100%;
   border-radius: 15%;
   transform: scale(0);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
   animation: ps4TrophyIn var(--inDur, 500ms) forwards,
     ps4TrophyOut var(--outDur, 500ms) forwards var(--outDelay, 4500ms);
 }
@@ -300,9 +303,15 @@
   height: 25px;
   width: 25px;
   position: absolute;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.ach.active .ringring {
   -webkit-animation: pulsate calc(1s * var(--timeline-scale, 1)) ease-out infinite;
   animation: pulsate calc(1s * var(--timeline-scale, 1)) ease-out infinite;
-  opacity: 0;
+  -webkit-animation-delay: var(--ringDelay, 0ms);
+  animation-delay: var(--ringDelay, 0ms);
 }
 
 @-webkit-keyframes pulsate {
