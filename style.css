@@ -81,6 +81,46 @@ html {
   margin-right: 4px;
 }
 
+.titlebar-controls i {
+  display: none;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.titlebar-fallback {
+  font-size: 16px;
+  line-height: 1;
+  font-family: "Segoe UI Symbol", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+html.fa-ready .titlebar-controls i {
+  display: inline-block;
+}
+
+html.fa-ready .titlebar-fallback {
+  display: none;
+}
+
+.fa-icon,
+.fa-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.fa-fallback {
+  font-family: "Segoe UI Symbol", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+html:not(.fa-ready) .fa-icon {
+  display: none !important;
+}
+
+html.fa-ready .fa-fallback {
+  display: none !important;
+}
+
 .titlebar-button {
   width: 46px;
   height: 38px;
@@ -1750,7 +1790,8 @@ body.window-maximized .dashboard-grid {
   transform: scale(0.96);
 }
 
-.icon-btn i {
+.icon-btn i,
+.icon-btn .fa-fallback {
   font-size: 14px;
 }
 

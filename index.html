@@ -6,10 +6,94 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="assets/vendor/fontawesome/css/all.min.css" />
     <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      rel="preload"
+      href="assets/vendor/fontawesome/webfonts/fa-solid-900.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
     />
+    <link
+      rel="preload"
+      href="assets/vendor/fontawesome/webfonts/fa-regular-400.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="assets/vendor/fontawesome/webfonts/fa-brands-400.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <script>
+      (() => {
+        let readyMarked = false;
+        const markReady = () => {
+          if (readyMarked) return;
+          readyMarked = true;
+          try {
+            document.documentElement.classList.add("fa-ready");
+          } catch {}
+        };
+        const isReady = () => {
+          try {
+            if (!document.fonts || typeof document.fonts.check !== "function") {
+              return true;
+            }
+            return (
+              document.fonts.check('16px "Font Awesome 6 Free"') ||
+              document.fonts.check('16px "Font Awesome 6 Brands"') ||
+              document.fonts.check("16px FontAwesome")
+            );
+          } catch {
+            return true;
+          }
+        };
+
+        const primeFonts = async () => {
+          try {
+            if (!document.fonts || typeof document.fonts.load !== "function") {
+              return;
+            }
+            await Promise.allSettled([
+              document.fonts.load('900 16px "Font Awesome 6 Free"'),
+              document.fonts.load('400 16px "Font Awesome 6 Free"'),
+              document.fonts.load('400 16px "Font Awesome 6 Brands"'),
+            ]);
+          } catch {}
+        };
+
+        const bootstrap = async () => {
+          if (isReady()) {
+            markReady();
+            return;
+          }
+
+          await primeFonts();
+          if (isReady()) {
+            markReady();
+            return;
+          }
+
+          try {
+            if (document.fonts && document.fonts.ready) {
+              await Promise.race([
+                document.fonts.ready,
+                new Promise((resolve) => setTimeout(resolve, 1200)),
+              ]);
+            }
+          } catch {}
+
+          // Prevent permanent fallback mode if font checks lag or fail to report.
+          markReady();
+        };
+
+        bootstrap();
+      })();
+    </script>
 
     <title>Achievements</title>
     <style>
@@ -157,16 +241,20 @@
       </div>
       <div class="titlebar-controls">
         <button id="settingsBtn" class="titlebar-button">
-          <i class="fas fa-cog"></i>
+          <i class="fas fa-cog" aria-hidden="true"></i>
+          <span class="titlebar-fallback" aria-hidden="true">⚙</span>
         </button>
         <button id="minimizeBtn" class="titlebar-button">
-          <i class="fas fa-minus"></i>
+          <i class="fas fa-minus" aria-hidden="true"></i>
+          <span class="titlebar-fallback" aria-hidden="true">−</span>
         </button>
         <button id="maximizeBtn" class="titlebar-button">
-          <i class="far fa-square"></i>
+          <i class="far fa-square" aria-hidden="true"></i>
+          <span class="titlebar-fallback" aria-hidden="true">□</span>
         </button>
         <button id="closeBtn" class="titlebar-button close">
-          <i class="fas fa-times"></i>
+          <i class="fas fa-times" aria-hidden="true"></i>
+          <span class="titlebar-fallback" aria-hidden="true">×</span>
         </button>
       </div>
     </div>
@@ -1943,7 +2031,9 @@
           </div>
 
           <button id="playBtn" style="display: none; margin-left: auto">
-            <i class="fas fa-play"></i> Play
+            <i class="fas fa-play fa-icon" aria-hidden="true"></i>
+            <span class="fa-fallback" aria-hidden="true">▶</span>
+            Play
           </button>
         </div>
 
@@ -2307,7 +2397,11 @@
             title="Search achievements (Ctrl+F)"
             aria-label="Search achievements"
           >
-            <i class="fa-solid fa-magnifying-glass"></i>
+            <i
+              class="fa-solid fa-magnifying-glass fa-icon"
+              aria-hidden="true"
+            ></i>
+            <span class="fa-fallback" aria-hidden="true">🔍</span>
           </button>
           <input
             id="achievementsSearchInput"
@@ -2410,7 +2504,8 @@
                 type="button"
                 title="Sort by name (A→Z / Z→A)"
               >
-                <i class="fa-solid fa-font"></i>
+                <i class="fa-solid fa-font fa-icon" aria-hidden="true"></i>
+                <span class="fa-fallback" aria-hidden="true">A</span>
                 <span class="dir">↑</span>
               </button>
 
@@ -2421,7 +2516,11 @@
                 type="button"
                 title="Sort by progress (low→high / high→low)"
               >
-                <i class="fa-solid fa-chart-simple"></i>
+                <i
+                  class="fa-solid fa-chart-simple fa-icon"
+                  aria-hidden="true"
+                ></i>
+                <span class="fa-fallback" aria-hidden="true">▤</span>
                 <span class="dir">↑</span>
               </button>
 
@@ -2432,7 +2531,8 @@
                 type="button"
                 title="Sort by last updated (newest / oldest)"
               >
-                <i class="fa-regular fa-clock"></i>
+                <i class="fa-regular fa-clock fa-icon" aria-hidden="true"></i>
+                <span class="fa-fallback" aria-hidden="true">🕒</span>
                 <span class="dir">↓</span>
               </button>
             </div>
@@ -2527,7 +2627,7 @@
       <div class="modal-content boot-onboarding-modal">
         <h3 id="bootOnboardingTitle">Choose folders for Auto-Config</h3>
         <p id="bootOnboardingMessage">
-          We found folders with achievement data. Select which folders should be
+          Was found folders with achievement data. Select which folders should be
           scanned automatically.
         </p>
         <div
@@ -4828,7 +4928,7 @@
             "tooltip.blacklistRemove",
             "Remove from blacklist",
           );
-          btnRemove.innerHTML = '<i class="fa-regular fa-trash-can"></i>';
+          btnRemove.innerHTML = faWithFallback("fa-regular fa-trash-can", "🗑");
           btnRemove.addEventListener("click", async () => {
             try {
               await window.api.blacklistConfig({
@@ -7083,6 +7183,10 @@
           }
         });
 
+      function faWithFallback(iconClasses, fallbackChar) {
+        return `<i class="${iconClasses} fa-icon" aria-hidden="true"></i><span class="fa-fallback" aria-hidden="true">${fallbackChar}</span>`;
+      }
+
       // Window control buttons
       document.getElementById("minimizeBtn").addEventListener("click", () => {
         window.customApi.minimizeWindow();
@@ -7097,14 +7201,16 @@
       });
 
       // Update maximize button icon when window state changes
+      const getMaximizeBtnInnerHtml = (isMaximized) =>
+        isMaximized
+          ? '<i class="far fa-clone" aria-hidden="true"></i><span class="titlebar-fallback" aria-hidden="true">▣</span>'
+          : '<i class="far fa-square" aria-hidden="true"></i><span class="titlebar-fallback" aria-hidden="true">□</span>';
       window.electron?.ipcRenderer?.on?.(
         "window-state-change",
         (isMaximized) => {
           const maximizeBtn = document.getElementById("maximizeBtn");
           if (!maximizeBtn) return;
-          maximizeBtn.innerHTML = isMaximized
-            ? '<i class="far fa-clone"></i>'
-            : '<i class="far fa-square"></i>';
+          maximizeBtn.innerHTML = getMaximizeBtnInnerHtml(!!isMaximized);
           document.body.classList.toggle("window-maximized", !!isMaximized);
         },
       );
@@ -8332,8 +8438,8 @@
               : tUi("tooltip.folderIgnore", "Ignore this folder");
             btnBlock.setAttribute("aria-label", btnBlock.title);
             btnBlock.innerHTML = blocked
-              ? '<i class="fa-solid fa-bell-slash"></i>' // ignore
-              : '<i class="fa-solid fa-bell"></i>'; // active
+              ? faWithFallback("fa-solid fa-bell-slash", "🔕") // ignore
+              : faWithFallback("fa-solid fa-bell", "🔔"); // active
             btnBlock.addEventListener("click", async () => {
               const channel = blocked ? "folders:unblock" : "folders:block";
               const res = await invoke(channel, folderPath);
@@ -8350,7 +8456,7 @@
             btnEdit.className = "icon-btn edit";
             btnEdit.title = tUi("tooltip.folderEdit", "Edit folder");
             btnEdit.setAttribute("aria-label", btnEdit.title);
-            btnEdit.innerHTML = '<i class="fa-regular fa-pen-to-square"></i>';
+            btnEdit.innerHTML = faWithFallback("fa-regular fa-pen-to-square", "✎");
             btnEdit.addEventListener("click", async () => {
               let next = null;
               if (typeof window.api?.selectFolder === "function") {
@@ -8389,7 +8495,7 @@
             btnRemove.className = "icon-btn remove";
             btnRemove.title = tUi("tooltip.folderRemove", "Remove folder");
             btnRemove.setAttribute("aria-label", btnRemove.title);
-            btnRemove.innerHTML = '<i class="fa-regular fa-trash-can"></i>';
+            btnRemove.innerHTML = faWithFallback("fa-regular fa-trash-can", "🗑");
             btnRemove.addEventListener("click", async () => {
               const res = await invoke("folders:remove", folderPath);
               if (res?.ok) renderFoldersList(res.folders);
@@ -9940,7 +10046,7 @@
                 btn.title = exe
                   ? tUi("dashboard.play", "Play")
                   : tUi("dashboard.noExecutable", "No executable set");
-                btn.innerHTML = '<i class="fas fa-play"></i>';
+                btn.innerHTML = faWithFallback("fas fa-play", "▶");
 
                 if (!exe) {
                   btn.classList.add("is-disabled");
@@ -10033,8 +10139,8 @@
                       "Stop tracking this game",
                     );
                 blockBtn.innerHTML = removing
-                  ? '<i class="fa-solid fa-check"></i>'
-                  : '<i class="fa-solid fa-ban"></i>';
+                  ? faWithFallback("fa-solid fa-check", "✓")
+                  : faWithFallback("fa-solid fa-ban", "⛔");
                 blockBtn.addEventListener("click", async (ev) => {
                   ev.preventDefault();
                   ev.stopPropagation();
@@ -10965,7 +11071,7 @@
           if (bootOnboardingMessage) {
             bootOnboardingMessage.textContent = tUi(
               "boot.onboarding.message",
-              "We found folders with achievement data. Select which folders should be scanned automatically.",
+              "Was found folders with achievement data. Select which folders should be scanned automatically.",
             );
           }
           if (bootOnboardingActions) {

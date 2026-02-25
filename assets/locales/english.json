@@ -517,7 +517,7 @@
   "placeholder.achievementsSearchInput": "Search achievements…",
   "title.achievementsSearchToggle": "Search achievements (Ctrl+F)",
   "boot.onboarding.title": "Choose folders for Auto-Config",
-  "boot.onboarding.message": "We found folders with achievement data. Select which folders should be scanned automatically.",
+  "boot.onboarding.message": "Was found folders with achievement data. Select which folders should be scanned automatically.",
   "boot.onboarding.start": "Start Auto-Config",
   "boot.onboarding.skip": "Skip and mute all",
   "boot.onboarding.ok": "OK",

@@ -3,10 +3,94 @@
   <head>
     <meta charset="UTF-8" />
     <title>Achievements Overlay</title>
+    <link rel="stylesheet" href="assets/vendor/fontawesome/css/all.min.css" />
     <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      rel="preload"
+      href="assets/vendor/fontawesome/webfonts/fa-solid-900.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
     />
+    <link
+      rel="preload"
+      href="assets/vendor/fontawesome/webfonts/fa-regular-400.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="assets/vendor/fontawesome/webfonts/fa-brands-400.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <script>
+      (() => {
+        let readyMarked = false;
+        const markReady = () => {
+          if (readyMarked) return;
+          readyMarked = true;
+          try {
+            document.documentElement.classList.add("fa-ready");
+          } catch {}
+        };
+        const isReady = () => {
+          try {
+            if (!document.fonts || typeof document.fonts.check !== "function") {
+              return true;
+            }
+            return (
+              document.fonts.check('16px "Font Awesome 6 Free"') ||
+              document.fonts.check('16px "Font Awesome 6 Brands"') ||
+              document.fonts.check("16px FontAwesome")
+            );
+          } catch {
+            return true;
+          }
+        };
+
+        const primeFonts = async () => {
+          try {
+            if (!document.fonts || typeof document.fonts.load !== "function") {
+              return;
+            }
+            await Promise.allSettled([
+              document.fonts.load('900 16px "Font Awesome 6 Free"'),
+              document.fonts.load('400 16px "Font Awesome 6 Free"'),
+              document.fonts.load('400 16px "Font Awesome 6 Brands"'),
+            ]);
+          } catch {}
+        };
+
+        const bootstrap = async () => {
+          if (isReady()) {
+            markReady();
+            return;
+          }
+
+          await primeFonts();
+          if (isReady()) {
+            markReady();
+            return;
+          }
+
+          try {
+            if (document.fonts && document.fonts.ready) {
+              await Promise.race([
+                document.fonts.ready,
+                new Promise((resolve) => setTimeout(resolve, 1200)),
+              ]);
+            }
+          } catch {}
+
+          // Prevent permanent fallback mode if font checks lag or fail to report.
+          markReady();
+        };
+
+        bootstrap();
+      })();
+    </script>
     <style>
       /* Dracula Theme Color Variables */
       :root {
@@ -157,6 +241,23 @@
         color: var(--dracula-cyan);
       }
 
+      .fa-fallback {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+        font-family: "Segoe UI Emoji", "Segoe UI Symbol", "Segoe UI", Tahoma,
+          Geneva, Verdana, sans-serif;
+      }
+
+      html:not(.fa-ready) .fa-icon {
+        display: none;
+      }
+
+      html.fa-ready .fa-fallback {
+        display: none;
+      }
+
       .stats-item .value {
         font-weight: bold;
         color: var(--dracula-green);
@@ -276,6 +377,12 @@
         color: var(--dracula-purple);
       }
 
+      .empty-state .fa-fallback {
+        font-size: 48px;
+        margin-bottom: 16px;
+        color: var(--dracula-purple);
+      }
+
       .empty-state-message {
         font-size: 16px;
       }
@@ -288,14 +395,16 @@
         <div class="overlay-header">
           <h2 id="overlayTitle">Achievements</h2>
           <div id="achievement-count" class="stats-item">
-            <i class="fas fa-trophy"></i>
+            <i class="fas fa-trophy fa-icon" aria-hidden="true"></i>
+            <span class="fa-fallback" aria-hidden="true">🏆</span>
             <span class="value">0/0</span>
           </div>
         </div>
 
         <div class="overlay-stats">
           <div class="stats-item">
-            <i class="fas fa-chart-simple"></i>
+            <i class="fas fa-chart-simple fa-icon" aria-hidden="true"></i>
+            <span class="fa-fallback" aria-hidden="true">📊</span>
             <span id="overlayCompletionLabel">Completion:</span>
             <span id="completion-percentage" class="value">0%</span>
           </div>
@@ -310,7 +419,8 @@
       </div>
       <div class="overlay-container">
         <div id="empty-state" class="empty-state">
-          <i class="fas fa-gamepad"></i>
+          <i class="fas fa-gamepad fa-icon" aria-hidden="true"></i>
+          <span class="fa-fallback" aria-hidden="true">🎮</span>
           <div id="overlayEmptyMessage" class="empty-state-message">
             Select a game configuration to view achievements
           </div>
@@ -330,6 +440,8 @@
         window.i18nUi && typeof window.i18nUi.getString === "function"
           ? window.i18nUi.getString(key, fallback)
           : fallback;
+      const faWithFallback = (iconClasses, fallbackChar) =>
+        `<i class="${iconClasses} fa-icon" aria-hidden="true"></i><span class="fa-fallback" aria-hidden="true">${fallbackChar}</span>`;
 
       async function loadOverlayPrefs() {
         if (overlayPrefsLoaded && overlayPrefs) return overlayPrefs;
@@ -557,7 +669,10 @@
             const icon = achievement.icon || iconGray;
             const isHidden = Number(achievement.hidden) === 1;
 
-            let statusHTML = `<div class="status-locked"><i class="fas fa-lock"></i> ${tUi(
+            let statusHTML = `<div class="status-locked">${faWithFallback(
+              "fas fa-lock",
+              "🔒",
+            )} ${tUi(
               "overlay.statusLocked",
               "Locked",
             )}</div>`;
@@ -574,7 +689,10 @@
                 : description;
 
             if (saved?.earned) {
-              statusHTML = `<div class="status-unlocked"><i class="fas fa-unlock"></i> ${tUi(
+              statusHTML = `<div class="status-unlocked">${faWithFallback(
+                "fas fa-unlock",
+                "🔓",
+              )} ${tUi(
                 "overlay.statusUnlocked",
                 "Unlocked",
               )}</div>`;
