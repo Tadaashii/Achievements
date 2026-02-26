@@ -357,7 +357,10 @@ Sources used when available: Steam Web API, SteamDB, SteamHunters, Exophase, GOG
 
 ### Videos
 
-https://youtu.be/fsqoKiMGLkw | https://youtu.be/nOoiU5lPopM | https://youtu.be/KwRUo53VTho
+    - First Run: https://youtu.be/c1jDfynHd-U + Controller Support: https://youtu.be/fsqoKiMGLkw
+    - Manual Config: https://youtu.be/abdVuDB80Ow
+    - Auto Config: https://youtu.be/nOoiU5lPopM
+    - Multi-Platform Support: https://youtu.be/KwRUo53VTho
 
 ## 👤 Author
 
