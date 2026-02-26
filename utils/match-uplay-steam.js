@@ -140,6 +140,82 @@ function persistSteamDb(apps) {
   }
 }
 
+function isWhitespaceByte(byte) {
+  return byte === 0x20 || byte === 0x09 || byte === 0x0a || byte === 0x0d;
+}
+
+function appendSteamDbEntries(entries) {
+  if (!Array.isArray(entries) || !entries.length) return true;
+  let fd = null;
+  try {
+    fs.mkdirSync(path.dirname(STEAM_DB_PATH), { recursive: true });
+    if (!fs.existsSync(STEAM_DB_PATH)) {
+      fs.writeFileSync(STEAM_DB_PATH, "[]", "utf8");
+    }
+
+    fd = fs.openSync(STEAM_DB_PATH, "r+");
+    const stats = fs.fstatSync(fd);
+    if (!stats || stats.size < 2) return false;
+
+    const one = Buffer.alloc(1);
+    let lastPos = stats.size - 1;
+    let lastByte = -1;
+    while (lastPos >= 0) {
+      fs.readSync(fd, one, 0, 1, lastPos);
+      const byte = one[0];
+      if (!isWhitespaceByte(byte)) {
+        lastByte = byte;
+        break;
+      }
+      lastPos -= 1;
+    }
+    if (lastPos < 0 || lastByte !== 0x5d) return false; // ']'
+
+    let prevPos = lastPos - 1;
+    let prevByte = -1;
+    while (prevPos >= 0) {
+      fs.readSync(fd, one, 0, 1, prevPos);
+      const byte = one[0];
+      if (!isWhitespaceByte(byte)) {
+        prevByte = byte;
+        break;
+      }
+      prevPos -= 1;
+    }
+
+    const isEmptyArray = prevByte === 0x5b; // '['
+    const payload = entries
+      .map((row) =>
+        JSON.stringify({
+          appid: Number(row.appid),
+          name: String(row.name || ""),
+        })
+      )
+      .join(",");
+    if (!payload) return true;
+
+    const insertion = isEmptyArray ? payload : `,${payload}`;
+    const suffix = "]";
+    const finalChunk = `${insertion}${suffix}`;
+    fs.writeSync(fd, finalChunk, lastPos, "utf8");
+    fs.ftruncateSync(fd, lastPos + Buffer.byteLength(finalChunk));
+
+    console.log(
+      `💾 appended Steam DB: +${entries.length} entries -> ${STEAM_DB_PATH}`
+    );
+    return true;
+  } catch (err) {
+    console.warn("⚠️ Failed to append steamdb.json:", err.message);
+    return false;
+  } finally {
+    if (fd !== null) {
+      try {
+        fs.closeSync(fd);
+      } catch {}
+    }
+  }
+}
+
 function httpGet(url) {
   return new Promise((resolve, reject) => {
     const req = https.get(url, (res) => {
@@ -522,21 +598,31 @@ async function fetchSteamList() {
 
   if (remote && remote.length) {
     const map = new Map(local.map((a) => [a.appid, a.name]));
-    let changed = false;
+    const additions = [];
+    let renamed = 0;
     for (const app of remote) {
       const existingName = map.get(app.appid);
       if (existingName === undefined) {
         map.set(app.appid, app.name);
-        changed = true;
+        additions.push({ appid: app.appid, name: app.name });
       } else if (existingName !== app.name) {
         map.set(app.appid, app.name);
-        changed = true;
+        renamed += 1;
       }
     }
     const merged = Array.from(map.entries())
       .map(([appid, name]) => ({ appid, name }))
       .sort((a, b) => a.appid - b.appid);
-    if (changed) persistSteamDb(merged);
+    if (additions.length || renamed > 0) {
+      if (renamed === 0 && additions.length > 0) {
+        const appended = appendSteamDbEntries(additions);
+        if (!appended) {
+          persistSteamDb(merged);
+        }
+      } else {
+        persistSteamDb(merged);
+      }
+    }
     return merged;
   }
 

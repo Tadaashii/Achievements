@@ -1416,6 +1416,9 @@ function registerOverlayShortcut(newShortcut) {
           `Overlay Shortcut Pressed : ${newShortcut}`,
         ),
       );
+      if (isBootOnboardingGatePending() || global.bootOnboardingRequired) {
+        return;
+      }
       if (overlayWindow && !overlayWindow.isDestroyed()) {
         setOverlayPresented(!overlayPresented);
       } else {
@@ -7451,6 +7454,7 @@ const POST_BOOT_UI_INITIAL_DELAY_MS = 350;
 const POST_BOOT_UI_STEP_DELAY_MS = 300;
 const POST_BOOT_ZOOM_DELAY_MS = 200;
 let postBootUiInitScheduled = false;
+let postBootOverlayCreateDeferredTimer = null;
 
 function stopOverlayGlobalDrag() {
   overlayDragActive = false;
@@ -7587,6 +7591,19 @@ function schedulePostBootUiInitialization() {
   postBootUiInitScheduled = true;
 
   const runSteps = () => {
+    const scheduleOverlayCreate = () => {
+      if (overlayWindow && !overlayWindow.isDestroyed()) return;
+      if (isBootOnboardingGatePending() || global.bootOnboardingRequired) {
+        if (postBootOverlayCreateDeferredTimer) return;
+        postBootOverlayCreateDeferredTimer = setTimeout(() => {
+          postBootOverlayCreateDeferredTimer = null;
+          scheduleOverlayCreate();
+        }, 500);
+        return;
+      }
+      createOverlayWindow(selectedConfig || null, false);
+    };
+
     const steps = [
       () => {
         if (!tray || tray.isDestroyed?.()) {
@@ -7594,9 +7611,7 @@ function schedulePostBootUiInitialization() {
         }
       },
       () => {
-        if (!overlayWindow || overlayWindow.isDestroyed()) {
-          createOverlayWindow(selectedConfig || null, false);
-        }
+        scheduleOverlayCreate();
       },
     ];
 
@@ -7846,6 +7861,7 @@ let currentAppId = null;
 
 ipcMain.on("toggle-overlay", (_event, selectedConfig) => {
   if (!selectedConfig) return;
+  if (isBootOnboardingGatePending() || global.bootOnboardingRequired) return;
   if (!overlayWindow || overlayWindow.isDestroyed()) {
     createOverlayWindow(selectedConfig);
   } else {
@@ -8941,10 +8957,36 @@ const defaultUplaySteamMapPath = path.join(
   "assets",
   "uplay-steam.json",
 );
+const defaultSteamDbPath = path.join(__dirname, "assets", "steamdb.json");
 const runtimeUplaySteamMapPath = path.join(
   app.getPath("userData"),
   "uplay-steam.json",
 );
+const runtimeSteamDbPath = path.join(app.getPath("userData"), "steamdb.json");
+
+function ensureRuntimeSteamDb() {
+  try {
+    if (fs.existsSync(runtimeSteamDbPath)) return;
+    fs.mkdirSync(path.dirname(runtimeSteamDbPath), { recursive: true });
+    if (fs.existsSync(defaultSteamDbPath)) {
+      fs.copyFileSync(defaultSteamDbPath, runtimeSteamDbPath);
+    } else {
+      fs.writeFileSync(runtimeSteamDbPath, "[]", "utf8");
+    }
+  } catch (err) {
+    ipcLogger.warn("steamdb:init-failed", {
+      error: err?.message || String(err),
+    });
+  }
+}
+
+function getRuntimeUplayMappingEnv() {
+  return {
+    ...process.env,
+    STEAM_DB_PATH: runtimeSteamDbPath,
+  };
+}
+
 function ensureRuntimeUplayMap() {
   try {
     if (fs.existsSync(runtimeUplaySteamMapPath)) return;
@@ -8981,6 +9023,7 @@ function refreshRuntimeUplayMapping() {
       {
         windowsHide: true,
         stdio: "ignore",
+        env: getRuntimeUplayMappingEnv(),
       },
     );
     ipcLogger.info("uplay-mapping:refresh-success");
@@ -9007,7 +9050,7 @@ function refreshRuntimeUplayMappingAsync() {
   execFile(
     process.execPath,
     ["--run-as-node", script, `--output=${runtimeUplaySteamMapPath}`],
-    { windowsHide: true },
+    { windowsHide: true, env: getRuntimeUplayMappingEnv() },
     (err) => {
       if (err) {
         ipcLogger.warn("uplay-mapping:refresh-failed", {
@@ -9032,6 +9075,8 @@ function refreshRuntimeUplayMappingAsync() {
 }
 refreshRuntimeUplayMappingAsync.inflight = false;
 
+ensureRuntimeSteamDb();
+process.env.STEAM_DB_PATH = runtimeSteamDbPath;
 ensureRuntimeUplayMap();
 let uplaySteamMap = loadRuntimeUplayMap();
 const uplayToSteam = new Map();
