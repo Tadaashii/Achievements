@@ -160,6 +160,16 @@ Creates a standalone `.exe` installer in the `dist/` folder.
 4. Let the game identify and auto-select the config, or Select the config manually, set your Language to view achievements, progress, and playtime.
 5. Optional: mute progress notifications for that config using the checkbox under the config dropdown.
 
+### First-Run Onboarding (Auto-Config Gate)
+
+- On first run (or after onboarding version changes), startup pauses and shows a folder selection modal before full auto-scan starts.
+- The app searches for known achievement/save signals (for example `achievements.json`, `achievements.ini`, `stats.bin`, emulator trophy/gpd files) and lists candidate folders.
+- **Start Auto-Config** keeps selected folders active and mutes unchecked discovered folders, then continues startup and background config generation.
+- **Skip and mute all** continues startup immediately and mutes discovered/default auto-config roots.
+- While onboarding is pending, folder watchers and boot auto-config scans are deferred by design to avoid unwanted automatic generation.
+- Onboarding completion state is saved in `%APPDATA%/Achievements/preferences.json` (`autoConfigOnboardingCompleted`, `autoConfigOnboardingVersion`, `autoConfigOnboardingCompletedAt`).
+- If the modal is not visible but startup is gated, use tray action **Resume Startup (Mute all)**.
+
 ### Basic Setup
 
 #### Manual Configuration
@@ -357,10 +367,10 @@ Sources used when available: Steam Web API, SteamDB, SteamHunters, Exophase, GOG
 
 ### Videos
 
-    - First Run: https://youtu.be/c1jDfynHd-U + Controller Support: https://youtu.be/fsqoKiMGLkw
-    - Manual Config: https://youtu.be/abdVuDB80Ow
-    - Auto Config: https://youtu.be/nOoiU5lPopM
-    - Multi-Platform Support: https://youtu.be/KwRUo53VTho
+- [First Run](https://youtu.be/c1jDfynHd-U) + [Controller Support](https://youtu.be/fsqoKiMGLkw)
+- [Manual Config](https://youtu.be/abdVuDB80Ow)
+- [Auto Config](https://youtu.be/nOoiU5lPopM)
+- [Multi-Platform Support](https://youtu.be/KwRUo53VTho)
 
 ## 👤 Author
 
