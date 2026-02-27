@@ -6,9 +6,11 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "start:linux": "electron . --ozone-platform=x11",
     "pack": "electron-builder --dir",
     "dl-browsers": "cross-env PLAYWRIGHT_BROWSERS_PATH=0 node ./node_modules/playwright-core/cli.js install chromium chromium-headless-shell",
-    "dist": "npm run dl-browsers && electron-builder --win --x64"
+    "dist": "npm run dl-browsers && electron-builder --win --x64",
+    "dist:linux": "npm run dl-browsers && electron-builder --linux AppImage"
   },
   "build": {
     "appId": "com.achievements.app",
@@ -27,6 +29,7 @@
     },
     "files": [
       "icon.ico",
+      "icon.png",
       "main.js",
       "preload.js",
       "index.html",
@@ -58,6 +61,10 @@
         "to": "icon.ico"
       },
       {
+        "from": "icon.png",
+        "to": "icon.png"
+      },
+      {
         "from": "node_modules/playwright-core/.local-browsers",
         "to": "playwright-browsers"
       }
@@ -82,6 +89,11 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Achievements"
+    },
+    "linux": {
+      "icon": "icon.png",
+      "target": "AppImage",
+      "category": "Development"
     },
     "afterPack": "build/afterPack.js"
   },
