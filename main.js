@@ -6,6 +6,7 @@ const {
   screen,
   globalShortcut,
   Tray,
+  Menu
 } = require("electron");
 // Polyfill File for environments where undici expects it (Electron main may lack global File)
 if (typeof globalThis.File === "undefined") {
@@ -4195,9 +4196,10 @@ function getUserPreferredSound() {
 let tray = null;
 let trayMenuWindow = null;
 let isQuitting = false;
+const ICON_NAME = process.platform === "win32" ? "icon.ico" : "icon.png"
 const ICON_PATH = app.isPackaged
-  ? path.join(process.resourcesPath, "icon.ico") // in installer: resources\icon.ico
-  : path.join(__dirname, "icon.ico");
+  ? path.join(process.resourcesPath, ICON_NAME) // in installer: resources\icon.ico
+  : path.join(__dirname, ICON_NAME);
 const ICON_PNG_PATH = app.isPackaged
   ? path.join(app.getAppPath(), "assets", "icon.png") // in installer: resources\app.asar\assets\icon.png
   : path.join(__dirname, "assets", "icon.png");
@@ -4509,18 +4511,31 @@ async function resumeStartupFromTray() {
 function createTray() {
   tray = new Tray(ICON_PATH);
   tray.setToolTip("Achievements App");
-  createTrayMenuWindow();
-
-  tray.on("click", () => {
-    toggleTrayMenu();
-  });
-  tray.on("right-click", () => {
-    toggleTrayMenu();
-  });
-  tray.on("double-click", () => {
-    hideTrayMenu();
-    showMainWindowRespectingPrefs();
-  });
+  if (process.platform === 'linux') {
+    const contextMenu = Menu.buildFromTemplate([{
+      label: 'Show',
+      click: () => showMainWindowRespectingPrefs()
+    },
+    {
+      label: 'Settings',
+      click: () => openSettingsFromTray()
+    },
+    { role: 'quit' }
+    ])
+    tray.setContextMenu(contextMenu)
+  }else {
+    createTrayMenuWindow();
+    tray.on("click", () => {
+      toggleTrayMenu();
+    });
+    tray.on("right-click", () => {
+      toggleTrayMenu();
+    });
+    tray.on("double-click", () => {
+      hideTrayMenu();
+      showMainWindowRespectingPrefs();
+    });
+  }
 }
 
 let achievementsFilePath; // achievements.json path
