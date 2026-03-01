@@ -283,6 +283,7 @@ contextBridge.exposeInMainWorld("electron", {
       return ipcRenderer.invoke(channel, ...args);
     },
   },
+  platform: () => process.platform
 });
 
 contextBridge.exposeInMainWorld("autoConfigApi", {

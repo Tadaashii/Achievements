@@ -2657,6 +2657,11 @@
 
     <script src="utils/i18n-ui.js"></script>
     <script>
+
+      if (window.electron.platform() === "linux") {
+        document.getElementsByClassName('input-with-button')[3].style = "pointer-events: none; opacity: 0.2;"
+      }
+
       window.__coverNameCache = window.__coverNameCache || {};
       function rememberCoverName(appid, displayName) {
         if (!appid || !displayName) return;
@@ -5574,7 +5579,8 @@
           }
           const playBtn = document.getElementById("playBtn");
           if (playBtn)
-            playBtn.style.display = currentConfig?.executable
+            playBtn.style.display = currentConfig?.executable && 
+                  window.electron.platform() !== "linux"
               ? "inline-block"
               : "none";
 
@@ -10038,7 +10044,8 @@
                 const data = meta?.data || {};
                 const exe = data.executable || null;
                 const args = data.arguments || "";
-                if (card.querySelector(".dash-play")) return;
+                if (card.querySelector(".dash-play") || 
+                        window.electron.platform() === "linux") return;
 
                 const btn = document.createElement("button");
                 btn.className = "dash-play";
